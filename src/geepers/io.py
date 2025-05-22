@@ -3,7 +3,6 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Optional,
@@ -17,7 +16,6 @@ import rasterio as rio
 import rasterio.windows
 from numpy.typing import ArrayLike
 from rasterio.vrt import WarpedVRT
-from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import thread_map
 
 from ._types import PathOrStr

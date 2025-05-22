@@ -9,7 +9,7 @@ authors = [
 ]
 description = "Download GPS data and compare to InSAR"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 
 classifiers = [
   "Intended Audience :: Developers",
@@ -70,7 +70,7 @@ src = ["src"]
 extend-select = ["I"]
 
 [tool.black]
-target-version = ["py39", "py310", "py311", "py312"]
+target-version = ["py311", "py312", "py313"]
 preview = true
 
 [tool.isort]
@@ -78,7 +78,7 @@ profile = "black"
 known_first_party = ["geepers"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

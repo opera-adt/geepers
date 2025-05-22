@@ -8,8 +8,8 @@ from .midas import MidasResult, midas
 
 try:
     from ._robust_fit import robust_linear_fit
-except ImportError as e:
-    print(f"Failed to import `robust_linear_fit`: e")
+except ImportError:
+    print("Failed to import `robust_linear_fit`: e")
     robust_linear_fit
 
 EMPTY_MIDAS = MidasResult(np.nan, np.nan, np.nan, np.nan, np.nan, np.array([]))
