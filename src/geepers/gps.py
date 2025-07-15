@@ -23,6 +23,7 @@ from shapely.geometry import box
 
 from geepers import utils
 from geepers.io import XarrayReader
+from geepers.schemas import RawObsSchema
 
 from ._types import PathOrStr
 
@@ -193,6 +194,7 @@ def load_station_enu(
     end_date: str | datetime.date | None = None,
     download_if_missing: bool = True,
     zero_by: str = "mean",  # TODO: remove, or change to Enum
+    validate_schema: bool = True,
 ) -> pd.DataFrame:
     """Load GPS station data in the east-north-up (ENU) coordinate system.
 
@@ -208,11 +210,14 @@ def load_station_enu(
         Whether to download the data if it's not found locally. Default is True.
     zero_by : str, optional
         How to zero the data. Either "mean" or "start". Default is "mean".
+    validate_schema : bool, optional
+        Whether to validate the output against RawObsSchema. Default is True.
 
     Returns
     -------
     pd.DataFrame
         A DataFrame containing the ENU data for the specified station and date range.
+        If validate_schema is True, the DataFrame is validated against RawObsSchema.
 
     Raises
     ------
@@ -243,6 +248,30 @@ def load_station_enu(
     else:
         msg = "zero_by must be either 'mean' or 'start'"
         raise ValueError(msg)
+
+    # Prepare data for schema validation
+    if validate_schema:
+        # Add station name and convert date to time for RawObsSchema
+        df_for_schema = df.copy()
+        df_for_schema["station"] = station_name
+        df_for_schema["time"] = pd.to_datetime(df_for_schema["date"])
+
+        # Map UNR column names to standard schema names
+        df_for_schema = df_for_schema.rename(
+            columns={
+                "sige": "sigma_east",
+                "sign": "sigma_north",
+                "sigu": "sigma_up",
+            }
+        )
+
+        # Add default correlation coefficients (UNR doesn't provide these)
+        df_for_schema["corr_en"] = 0.0
+        df_for_schema["corr_eu"] = 0.0
+        df_for_schema["corr_nu"] = 0.0
+
+        # Validate against RawObsSchema
+        RawObsSchema.validate(df_for_schema, lazy=True)
 
     return df.set_index("date")
 
