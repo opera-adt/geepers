@@ -52,7 +52,9 @@ class TestRawObsSchema:
             }
         )
 
-        with pytest.raises(Exception):  # Pandera will raise a validation error
+        with pytest.raises(
+            Exception, match="validation"
+        ):  # Pandera will raise a validation error
             RawObsSchema.validate(df)
 
     def test_zero_sigma_values(self):
@@ -73,7 +75,9 @@ class TestRawObsSchema:
             }
         )
 
-        with pytest.raises(Exception):  # Pandera will raise a validation error
+        with pytest.raises(
+            Exception, match="validation"
+        ):  # Pandera will raise a validation error
             RawObsSchema.validate(df)
 
 
@@ -149,7 +153,9 @@ class TestMetadataSchema:
             }
         )
 
-        with pytest.raises(Exception):  # Pandera will raise a validation error
+        with pytest.raises(
+            Exception, match="validation"
+        ):  # Pandera will raise a validation error
             MetadataSchema.validate(df)
 
 
@@ -195,5 +201,7 @@ class TestRatesSchema:
             }
         )
 
-        with pytest.raises(Exception):  # Pandera will raise a validation error
+        with pytest.raises(
+            Exception, match="validation"
+        ):  # Pandera will raise a validation error
             RatesSchema.validate(df)

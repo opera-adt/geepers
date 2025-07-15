@@ -120,7 +120,7 @@ def build_covariance_matrix(
          [σ_E*σ_N*ρ_EN, σ_N², σ_N*σ_U*ρ_NU],
          [σ_E*σ_U*ρ_EU, σ_N*σ_U*ρ_NU, σ_U²]]
 
-    """  # noqa: RUF002
+    """
     # Build covariance matrix
     cov_matrix = np.array(
         [
@@ -177,7 +177,7 @@ def sigma_los(
     -----
     The LOS uncertainty is computed as:
     σ_LOS² = u^T Σ u
-    where u is the unit LOS vector and Σ is the 3×3 ENU covariance matrix.
+    where u is the unit LOS vector and Σ is the 3x3 ENU covariance matrix.
 
     """
     # Validate LOS vector
@@ -204,7 +204,7 @@ def sigma_los(
         # Get covariance matrix from the model
         cov_matrix = uncertainty_data.to_covariance_matrix()
 
-        # Compute σ_LOS² = u^T Σ u
+        # Compute sigma_LOS^2 = u^T Sigma u
         los_var = (u.T @ cov_matrix @ u)[0, 0]
         los_uncertainties.append(np.sqrt(los_var))
 

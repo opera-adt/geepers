@@ -145,6 +145,7 @@ ignore = [
 "**/__init__.py" = ["F401", "F403"]
 "tests/**" = ["D", "N", "PTH", "ARG001", "PLR2004", "E501"]
 "scripts/*" = ["F401"]
+"src/geepers/uncertainty.py" = ["RUF002"]                   # let us use sigma here
 
 [tool.black]
 target-version = ["py311", "py312", "py313"]
