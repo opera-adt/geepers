@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from dask import compute
 from tqdm.auto import tqdm
 from tqdm.dask import TqdmCallback
 
@@ -52,8 +53,6 @@ def process_insar_data(
     lats = df_gps_stations.lat.to_numpy()
 
     # los_insar gets stacks as (n_stations, len(time) ), each row one station
-    from dask import compute
-
     with TqdmCallback(desc="Sampling InSAR data locations"):
         r = compute(reader.read_lon_lat(lons, lats))
     los_insar = np.stack(r).squeeze()

@@ -209,14 +209,11 @@ def load_station_enu(
         Whether to download the data if it's not found locally. Default is True.
     zero_by : str, optional
         How to zero the data. Either "mean" or "start". Default is "mean".
-    validate_schema : bool, optional
-        Whether to validate the output against RawObsModel. Default is True.
 
     Returns
     -------
     pd.DataFrame
         A DataFrame containing the ENU data for the specified station and date range.
-        If validate_schema is True, the DataFrame is validated against RawObsModel.
 
     Raises
     ------

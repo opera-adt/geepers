@@ -5,11 +5,9 @@ import numpy as np
 import pandas as pd
 
 from .gps import read_station_llas
-from .los import get_default_los_vector
 from .midas import MidasResult, midas
 from .quality import compute_station_quality
 from .schemas import DailyDispModel
-from .uncertainty import get_sigma_los
 
 EMPTY_MIDAS = MidasResult(np.nan, np.nan, np.nan, np.nan, np.nan, np.array([]))
 
@@ -18,9 +16,6 @@ def calculate_rates(
     df: pd.DataFrame,
     outlier_threshold: float = 50,
     to_mm: bool = True,
-    los_vector: np.ndarray | None = None,
-    satellite: str = "sentinel1_ascending",
-    validate_daily_schema: bool = False,
 ) -> gpd.GeoDataFrame:
     """Calculate rates for each station from GPS and InSAR time series.
 
@@ -33,15 +28,6 @@ def calculate_rates(
     to_mm : bool
         If True, output is in mm/year.
         Otherwise, units are no changed (meters/year)
-    los_vector : np.ndarray, optional
-        3-element LOS unit vector (u_east, u_north, u_up) for computing
-        LOS uncertainty. If None, uses default vector for satellite.
-    satellite : str, optional
-        Satellite configuration for default LOS vector. Default is
-        "sentinel1_ascending".
-    validate_daily_schema : bool, optional
-        Whether to validate daily displacement data against DailyDispModel.
-        Default is False.
 
     Returns
     -------
@@ -58,23 +44,8 @@ def calculate_rates(
     # Remove obvious outliers
     df = df[abs(df["value"]) < outlier_threshold]
 
-    # Set up LOS vector for uncertainty calculation
-    if los_vector is None:
-        los_vector = get_default_los_vector(satellite)
-
     # Optional validation for daily displacement data
-    if validate_daily_schema:
-        # Check if data looks like daily displacement data
-        expected_cols = {"station", "date", "east_mm", "north_mm", "up_mm"}
-        if expected_cols.issubset(set(df.columns)):
-            try:
-                DailyDispModel.validate(df, lazy=True)
-            except Exception:
-                # If validation fails, continue without error but log
-                import logging
-
-                logger = logging.getLogger("geepers")
-                logger.warning("Daily displacement data validation failed")
+    DailyDispModel.validate(df)
 
     # Pivot to get separate GPS and InSAR columns
     df_wide = df.pivot_table(
@@ -120,21 +91,13 @@ def calculate_rates(
         midas_outputs = _dump_midas(gps_midas, prefix="gps_")
 
         # Compute LOS uncertainty
-        # Use the first available row with uncertainty data
-        sigma_row = group.dropna(
-            subset=["sigma_east_mm", "sigma_north_mm", "sigma_up_mm"]
-        )
-        if not sigma_row.empty:
-            sigma_los_series = get_sigma_los(sigma_row.iloc[:1], los_vector)
-            sigma_los_mm = float(sigma_los_series.iloc[0])
-
+        # TODO: this is not implemented for the rate from the observations
         return pd.Series(
             {
                 "difference": float(insar_velocity - gps_midas.velocity),
                 "insar_velocity": float(insar_velocity),
                 "insar_velocity_l2": float(insar_velocity_l2),
                 "gps_velocity_l2": gps_velocity_l2,
-                "sigma_los_mm": sigma_los_mm,
                 **quality_dict,
                 **midas_outputs,
             }
