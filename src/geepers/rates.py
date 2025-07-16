@@ -8,7 +8,7 @@ from .gps import read_station_llas
 from .los import get_default_los_vector
 from .midas import MidasResult, midas
 from .quality import compute_station_quality
-from .schemas import DailyDispSchema
+from .schemas import DailyDispModel
 from .uncertainty import sigma_los
 
 EMPTY_MIDAS = MidasResult(np.nan, np.nan, np.nan, np.nan, np.nan, np.array([]))
@@ -40,7 +40,7 @@ def calculate_rates(
         Satellite configuration for default LOS vector. Default is
         "sentinel1_ascending".
     validate_daily_schema : bool, optional
-        Whether to validate daily displacement data against DailyDispSchema.
+        Whether to validate daily displacement data against DailyDispModel.
         Default is False.
 
     Returns
@@ -68,7 +68,7 @@ def calculate_rates(
         expected_cols = {"station", "date", "east_mm", "north_mm", "up_mm"}
         if expected_cols.issubset(set(df.columns)):
             try:
-                DailyDispSchema.validate(df, lazy=True)
+                DailyDispModel.validate(df, lazy=True)
             except Exception:
                 # If validation fails, continue without error but log
                 import logging
@@ -82,7 +82,7 @@ def calculate_rates(
     ).reset_index()
 
     # Function to calculate rate for a single station's time series
-    def calc_station_metrics(group):
+    def calc_station_metrics(group: pd.DataFrame) -> pd.Series:
         # Convert dates to years since first measurement
         years = (group["date"] - group["date"].min()).dt.total_seconds() / (
             365.25 * 24 * 3600
@@ -154,7 +154,7 @@ def calculate_rates(
         )
 
     # Calculate rates for each station
-    rates = df_wide.groupby("station").apply(calc_station_metrics, include_groups=False)
+    rates = df_wide.groupby("station").apply(calc_station_metrics)
 
     # Get the longitude and latitude of each station
     gdf_stations = read_station_llas(to_geodataframe=True)

@@ -5,11 +5,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from geepers.schemas import DailyDispSchema, MetadataSchema, RatesSchema, RawObsSchema
+from geepers.schemas import DailyDispModel, MetadataModel, RatesModel, RawObsModel
 
 
-class TestRawObsSchema:
-    """Tests for RawObsSchema validation."""
+class TestRawObsModel:
+    """Tests for RawObsModel validation."""
 
     def test_valid_raw_obs_data(self):
         """Test validation with valid raw observation data."""
@@ -30,7 +30,7 @@ class TestRawObsSchema:
         )
 
         # Should not raise
-        validated_df = RawObsSchema.validate(df)
+        validated_df = RawObsModel.validate(df)
         assert len(validated_df) == 2
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -53,9 +53,9 @@ class TestRawObsSchema:
         )
 
         with pytest.raises(
-            Exception, match="validation"
+            Exception, match="failed element-wise validator"
         ):  # Pandera will raise a validation error
-            RawObsSchema.validate(df)
+            RawObsModel.validate(df)
 
     def test_zero_sigma_values(self):
         """Test validation fails with zero sigma values."""
@@ -76,13 +76,13 @@ class TestRawObsSchema:
         )
 
         with pytest.raises(
-            Exception, match="validation"
+            Exception, match="failed element-wise validator"
         ):  # Pandera will raise a validation error
-            RawObsSchema.validate(df)
+            RawObsModel.validate(df)
 
 
-class TestDailyDispSchema:
-    """Tests for DailyDispSchema validation."""
+class TestDailyDispModel:
+    """Tests for DailyDispModel validation."""
 
     def test_valid_daily_data(self):
         """Test validation with valid daily displacement data."""
@@ -100,7 +100,7 @@ class TestDailyDispSchema:
         )
 
         # Should not raise
-        validated_df = DailyDispSchema.validate(df)
+        validated_df = DailyDispModel.validate(df)
         assert len(validated_df) == 2
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -118,12 +118,12 @@ class TestDailyDispSchema:
         )
 
         # Should not raise
-        validated_df = DailyDispSchema.validate(df)
+        validated_df = DailyDispModel.validate(df)
         assert len(validated_df) == 1
 
 
-class TestMetadataSchema:
-    """Tests for MetadataSchema validation."""
+class TestMetadataModel:
+    """Tests for MetadataModel validation."""
 
     def test_valid_metadata(self):
         """Test validation with valid metadata."""
@@ -138,7 +138,7 @@ class TestMetadataSchema:
         )
 
         # Should not raise
-        validated_df = MetadataSchema.validate(df)
+        validated_df = MetadataModel.validate(df)
         assert len(validated_df) == 1
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -154,13 +154,13 @@ class TestMetadataSchema:
         )
 
         with pytest.raises(
-            Exception, match="validation"
+            Exception, match="failed element-wise validator"
         ):  # Pandera will raise a validation error
-            MetadataSchema.validate(df)
+            MetadataModel.validate(df)
 
 
-class TestRatesSchema:
-    """Tests for RatesSchema validation."""
+class TestRatesModel:
+    """Tests for RatesModel validation."""
 
     def test_valid_rates_data(self):
         """Test validation with valid rates data."""
@@ -182,7 +182,7 @@ class TestRatesSchema:
         )
 
         # Should not raise
-        validated_df = RatesSchema.validate(df)
+        validated_df = RatesModel.validate(df)
         assert len(validated_df) == 1
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -202,6 +202,6 @@ class TestRatesSchema:
         )
 
         with pytest.raises(
-            Exception, match="validation"
+            Exception, match="failed element-wise validator"
         ):  # Pandera will raise a validation error
-            RatesSchema.validate(df)
+            RatesModel.validate(df)

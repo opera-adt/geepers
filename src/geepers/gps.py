@@ -23,7 +23,7 @@ from shapely.geometry import box
 
 from geepers import utils
 from geepers.io import XarrayReader
-from geepers.schemas import RawObsSchema
+from geepers.schemas import RawObsModel
 
 from ._types import PathOrStr
 
@@ -195,7 +195,7 @@ def load_station_enu(
     download_if_missing: bool = True,
     zero_by: str = "mean",  # TODO: remove, or change to Enum
     validate_schema: bool = True,
-) -> pd.DataFrame:
+) -> pd.DataFrame:  # type: ignore[return-value]
     """Load GPS station data in the east-north-up (ENU) coordinate system.
 
     Parameters
@@ -211,13 +211,13 @@ def load_station_enu(
     zero_by : str, optional
         How to zero the data. Either "mean" or "start". Default is "mean".
     validate_schema : bool, optional
-        Whether to validate the output against RawObsSchema. Default is True.
+        Whether to validate the output against RawObsModel. Default is True.
 
     Returns
     -------
     pd.DataFrame
         A DataFrame containing the ENU data for the specified station and date range.
-        If validate_schema is True, the DataFrame is validated against RawObsSchema.
+        If validate_schema is True, the DataFrame is validated against RawObsModel.
 
     Raises
     ------
@@ -251,7 +251,7 @@ def load_station_enu(
 
     # Prepare data for schema validation
     if validate_schema:
-        # Add station name and convert date to time for RawObsSchema
+        # Add station name and convert date to time for RawObsModel
         df_for_schema = df.copy()
         df_for_schema["station"] = station_name
         df_for_schema["time"] = pd.to_datetime(df_for_schema["date"])
@@ -270,8 +270,8 @@ def load_station_enu(
         df_for_schema["corr_eu"] = 0.0
         df_for_schema["corr_nu"] = 0.0
 
-        # Validate against RawObsSchema
-        RawObsSchema.validate(df_for_schema, lazy=True)
+        # Validate against RawObsModel
+        RawObsModel.validate(df_for_schema, lazy=True)
 
     return df.set_index("date")
 
@@ -368,7 +368,7 @@ def download_station_locations(filename: PathOrStr, url: str) -> None:
 
 def read_station_llas(
     filename: PathOrStr | None = None, to_geodataframe: bool = False
-) -> pd.DataFrame:
+) -> pd.DataFrame:  # type: ignore[return-value]
     """Read the station latitude, longitude, and altitude (LLA) data.
 
     Parameters

@@ -146,6 +146,7 @@ ignore = [
 "tests/**" = ["D", "N", "PTH", "ARG001", "PLR2004", "E501"]
 "scripts/*" = ["F401"]
 "src/geepers/uncertainty.py" = ["RUF002"]                   # let us use sigma here
+"src/geepers/schemas.py" = ["D106"]
 
 [tool.black]
 target-version = ["py311", "py312", "py313"]
@@ -154,6 +155,7 @@ preview = true
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
+plugins = ["pandera.mypy"]
 
 
 [tool.pytest.ini_options]

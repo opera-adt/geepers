@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from affine import cached_property
+from numpy.typing import ArrayLike
 from pyproj import Transformer
 from rasterio.crs import CRS
 
@@ -213,7 +214,7 @@ class XarrayReader:
           references the same dask array.
 
         """
-        times = pd.to_datetime(target_times)
+        times = pd.to_datetime(target_times)  # type: ignore[arg-type]
 
         # Create a mapping from each target time to its corresponding file
         time_to_file: dict[int, Path | str] = {}
@@ -282,15 +283,15 @@ class XarrayReader:
         return self.da.rio.crs
 
     def read_lon_lat(
-        self, lons: float | Sequence[float], lats: float | Sequence[float]
+        self, lons: float | ArrayLike, lats: float | ArrayLike
     ) -> list[xr.DataArray]:
         """Read values at given longitudes and latitudes.
 
         Parameters
         ----------
-        lons : float | Sequence[float]
+        lons : float | ArrayLike
             Longitudes to read.
-        lats : float | Sequence[float]
+        lats : float | ArrayLike
             Latitudes to read.
 
         Returns

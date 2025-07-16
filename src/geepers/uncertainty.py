@@ -154,7 +154,7 @@ def sigma_los(
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with standardized uncertainty columns (validated by DailyDispSchema).
+        DataFrame with standardized uncertainty columns (validated by DailyDispModel).
         Expected columns: sigma_east_mm, sigma_north_mm, sigma_up_mm, and
         optionally corr_en, corr_eu, corr_nu.
     los_vector : np.ndarray or pd.Series
