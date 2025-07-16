@@ -9,7 +9,7 @@ from .los import get_default_los_vector
 from .midas import MidasResult, midas
 from .quality import compute_station_quality
 from .schemas import DailyDispModel
-from .uncertainty import sigma_los
+from .uncertainty import get_sigma_los
 
 EMPTY_MIDAS = MidasResult(np.nan, np.nan, np.nan, np.nan, np.nan, np.array([]))
 
@@ -96,24 +96,21 @@ def calculate_rates(
         gps_midas = EMPTY_MIDAS
         if not group["los_gps"].isna().all():
             mask = ~group["los_gps"].isna()
-            if sum(mask) > 2:  # Need at least 3 points for meaningful rate
-                # Calculate rates using least squares fit
-                gps_velocity_l2 = (
-                    np.polyfit(years[mask], group["los_gps"][mask], 1)[0] * const
-                )
-
-                group_df = group[["date", "los_gps"]].dropna().set_index("date")
-                gps_midas = const * _get_midas_rate(group_df)
+            # Calculate rates using least squares fit
+            gps_velocity_l2 = (
+                np.polyfit(years[mask], group["los_gps"][mask], 1)[0] * const
+            )
+            group_df = group[["date", "los_gps"]].dropna().set_index("date")
+            gps_midas = const * _get_midas_rate(group_df)
 
         # InSAR rate
         if not group["los_insar"].isna().all():
             mask = ~group["los_insar"].isna()
-            if sum(mask) > 2:  # Need at least 3 points for meaningful rate
-                x, y = np.array(years[mask]), np.array(group["los_insar"][mask])
-                insar_velocity_l2 = np.polyfit(x, y, 1)[0] * const
-                group_df_insar = group[["date", "los_insar"]].dropna().set_index("date")
-                insar_midas = const * _get_midas_rate(group_df_insar)
-                insar_velocity = insar_midas.velocity
+            x, y = np.array(years[mask]), np.array(group["los_insar"][mask])
+            insar_velocity_l2 = np.polyfit(x, y, 1)[0] * const
+            group_df_insar = group[["date", "los_insar"]].dropna().set_index("date")
+            insar_midas = const * _get_midas_rate(group_df_insar)
+            insar_velocity = insar_midas.velocity
 
         # Compute station quality metrics
         station_df = group.set_index("date")
@@ -122,24 +119,14 @@ def calculate_rates(
 
         midas_outputs = _dump_midas(gps_midas, prefix="gps_")
 
-        # Compute LOS uncertainty if sigma columns are available
-        sigma_los_mm = np.nan
-        has_sigma_cols = all(
-            col in group.columns
-            for col in ["sigma_east_mm", "sigma_north_mm", "sigma_up_mm"]
+        # Compute LOS uncertainty
+        # Use the first available row with uncertainty data
+        sigma_row = group.dropna(
+            subset=["sigma_east_mm", "sigma_north_mm", "sigma_up_mm"]
         )
-        if has_sigma_cols:
-            try:
-                # Use the first available row with uncertainty data
-                sigma_row = group.dropna(
-                    subset=["sigma_east_mm", "sigma_north_mm", "sigma_up_mm"]
-                )
-                if not sigma_row.empty:
-                    sigma_los_series = sigma_los(sigma_row.iloc[:1], los_vector)
-                    sigma_los_mm = float(sigma_los_series.iloc[0])
-            except (KeyError, IndexError):
-                # If uncertainty computation fails, keep NaN
-                pass
+        if not sigma_row.empty:
+            sigma_los_series = get_sigma_los(sigma_row.iloc[:1], los_vector)
+            sigma_los_mm = float(sigma_los_series.iloc[0])
 
         return pd.Series(
             {

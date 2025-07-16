@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 __all__ = [
     "UncertaintyData",
     "build_covariance_matrix",
-    "sigma_los",
+    "get_sigma_los",
 ]
 
 
@@ -145,7 +145,7 @@ def build_covariance_matrix(
     return cov_matrix
 
 
-def sigma_los(
+def get_sigma_los(
     df: pd.DataFrame,
     los_vector: np.ndarray | pd.Series,
 ) -> pd.Series:

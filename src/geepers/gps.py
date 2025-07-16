@@ -194,8 +194,7 @@ def load_station_enu(
     end_date: str | datetime.date | None = None,
     download_if_missing: bool = True,
     zero_by: str = "mean",  # TODO: remove, or change to Enum
-    validate_schema: bool = True,
-) -> pd.DataFrame:  # type: ignore[return-value]
+) -> pd.DataFrame:
     """Load GPS station data in the east-north-up (ENU) coordinate system.
 
     Parameters
@@ -237,6 +236,7 @@ def load_station_enu(
             raise ValueError(msg)
 
     df = pd.read_csv(gps_data_file, sep=r"\s+", engine="c")
+    # Add station name and standardize column names
     df = _clean_gps_df(df, start_date, end_date, coords="enu")
 
     if zero_by.lower() == "mean":
@@ -249,31 +249,8 @@ def load_station_enu(
         msg = "zero_by must be either 'mean' or 'start'"
         raise ValueError(msg)
 
-    # Prepare data for schema validation
-    if validate_schema:
-        # Add station name and convert date to time for RawObsModel
-        df_for_schema = df.copy()
-        df_for_schema["station"] = station_name
-        df_for_schema["time"] = pd.to_datetime(df_for_schema["date"])
-
-        # Map UNR column names to standard schema names
-        df_for_schema = df_for_schema.rename(
-            columns={
-                "sige": "sigma_east",
-                "sign": "sigma_north",
-                "sigu": "sigma_up",
-            }
-        )
-
-        # Add default correlation coefficients (UNR doesn't provide these)
-        df_for_schema["corr_en"] = 0.0
-        df_for_schema["corr_eu"] = 0.0
-        df_for_schema["corr_nu"] = 0.0
-
-        # Validate against RawObsModel
-        RawObsModel.validate(df_for_schema, lazy=True)
-
-    return df.set_index("date")
+    RawObsModel.validate(df, lazy=True)
+    return df
 
 
 def _clean_gps_df(
@@ -329,6 +306,9 @@ def _clean_gps_df(
                 "sig_e(m)",
                 "sig_n(m)",
                 "sig_u(m)",
+                "__corr_en",
+                "__corr_eu",
+                "__corr_nu",
             ]
         ]
         # Combine the integer e/n/u part with the fractional
@@ -340,6 +320,16 @@ def _clean_gps_df(
         raise ValueError(msg)
 
     df_out = df_out.rename(columns=lambda s: s.replace("_", "").replace("(m)", ""))
+    df_out = df_out.rename(
+        columns={
+            "sige": "sigma_east",
+            "sign": "sigma_north",
+            "sigu": "sigma_up",
+            "corren": "corr_en",
+            "correu": "corr_eu",
+            "corrnu": "corr_nu",
+        }
+    )
     return df_out.reset_index(drop=True)
 
 

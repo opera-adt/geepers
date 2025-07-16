@@ -25,8 +25,7 @@ EPS = 1e-12
 class RawObsModel(DataFrameModel):
     """Typed schema for raw GPS observation data with uncertainty."""
 
-    station: str
-    time: pd.Timestamp
+    date: pd.Timestamp
     east: float
     north: float
     up: float
@@ -44,7 +43,6 @@ class RawObsModel(DataFrameModel):
 class DailyDispModel(DataFrameModel):
     """Typed schema for daily displacement data."""
 
-    station: str
     date: pd.Timestamp
     east_mm: float
     north_mm: float

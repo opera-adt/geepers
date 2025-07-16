@@ -9,7 +9,7 @@ import pytest
 from geepers.uncertainty import (
     UncertaintyData,
     build_covariance_matrix,
-    sigma_los,
+    get_sigma_los,
 )
 
 
@@ -198,7 +198,7 @@ class TestSigmaLOS:
         )
 
         los_vector = np.array([0.0, 0.0, 1.0])  # Pure vertical
-        result = sigma_los(df, los_vector)
+        result = get_sigma_los(df, los_vector)
 
         # Should equal the up component sigma
         assert result.iloc[0] == 3.0
@@ -217,7 +217,7 @@ class TestSigmaLOS:
         )
 
         los_vector = np.array([1.0, 0.0, 0.0])  # Pure east
-        result = sigma_los(df, los_vector)
+        result = get_sigma_los(df, los_vector)
 
         # Should equal the east component sigma
         assert result.iloc[0] == 1.0
@@ -237,7 +237,7 @@ class TestSigmaLOS:
 
         # Typical Sentinel-1 LOS vector (approximate)
         los_vector = np.array([-0.6, 0.0, 0.8])
-        result = sigma_los(df, los_vector)
+        result = get_sigma_los(df, los_vector)
 
         # Should be somewhere between east and up sigmas
         assert 1.0 < result.iloc[0] < 2.0
@@ -254,7 +254,7 @@ class TestSigmaLOS:
         )
 
         los_vector = np.array([0.0, 0.0, 1.0])  # Pure vertical
-        result = sigma_los(df, los_vector)
+        result = get_sigma_los(df, los_vector)
 
         # Should still work and equal the up component sigma
         assert result.iloc[0] == 2.0
@@ -272,7 +272,7 @@ class TestSigmaLOS:
         los_vector = np.array([1.0, 0.0])  # Wrong size
 
         with pytest.raises(ValueError, match="Wrong size"):
-            sigma_los(df, los_vector)
+            get_sigma_los(df, los_vector)
 
     def test_missing_sigma_columns(self):
         """Test error when required sigma columns are missing."""
@@ -286,7 +286,7 @@ class TestSigmaLOS:
         los_vector = np.array([0.0, 0.0, 1.0])
 
         with pytest.raises(KeyError):
-            sigma_los(df, los_vector)
+            get_sigma_los(df, los_vector)
 
     def test_multiple_rows(self):
         """Test sigma_los with multiple rows."""
@@ -302,7 +302,7 @@ class TestSigmaLOS:
         )
 
         los_vector = np.array([0.0, 0.0, 1.0])  # Pure vertical
-        result = sigma_los(df, los_vector)
+        result = get_sigma_los(df, los_vector)
 
         assert len(result) == 2
         assert result.iloc[0] == 2.0  # First row up sigma
