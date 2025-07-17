@@ -10,7 +10,6 @@ from geepers._version import version as __version__
 
 from .gps import *
 from .io import *
-from .los import *
 from .schemas import *
 from .uncertainty import *
 

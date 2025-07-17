@@ -7,7 +7,6 @@ import pandas as pd
 from .gps import read_station_llas
 from .midas import MidasResult, midas
 from .quality import compute_station_quality
-from .schemas import DailyDispModel
 
 EMPTY_MIDAS = MidasResult(np.nan, np.nan, np.nan, np.nan, np.nan, np.array([]))
 
@@ -44,13 +43,12 @@ def calculate_rates(
     # Remove obvious outliers
     df = df[abs(df["value"]) < outlier_threshold]
 
-    # Optional validation for daily displacement data
-    DailyDispModel.validate(df)
-
     # Pivot to get separate GPS and InSAR columns
     df_wide = df.pivot_table(
         index=["station", "date"], columns="measurement", values="value"
     ).reset_index()
+
+    # TODO: Make the schema to validate the pivoted data
 
     # Function to calculate rate for a single station's time series
     def calc_station_metrics(group: pd.DataFrame) -> pd.Series:
@@ -90,7 +88,7 @@ def calculate_rates(
 
         midas_outputs = _dump_midas(gps_midas, prefix="gps_")
 
-        # Compute LOS uncertainty
+        # Compute LOS uncertainty in the rates
         # TODO: this is not implemented for the rate from the observations
         return pd.Series(
             {
@@ -112,6 +110,7 @@ def calculate_rates(
         rates,
         geometry=gdf_stations[gdf_stations.name.isin(rates.index)].geometry.tolist(),
     )
+    # TODO: validate the output
 
     return rates
 

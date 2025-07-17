@@ -23,7 +23,7 @@ from shapely.geometry import box
 
 from geepers import utils
 from geepers.io import XarrayReader
-from geepers.schemas import RawObsModel
+from geepers.schemas import StationObservationSchema
 
 from ._types import PathOrStr
 
@@ -246,7 +246,7 @@ def load_station_enu(
         msg = "zero_by must be either 'mean' or 'start'"
         raise ValueError(msg)
 
-    RawObsModel.validate(df, lazy=True)
+    StationObservationSchema.validate(df, lazy=True)
     return df
 
 

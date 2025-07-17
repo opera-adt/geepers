@@ -5,93 +5,64 @@ of the GPS-InSAR processing pipeline, ensuring consistent column names,
 dtypes, units, and allowed ranges.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 from pandera.pandas import DataFrameModel, Field
+from pandera.typing import Series
 
 __all__ = [
-    "DailyDispModel",
     "MetadataModel",
     "RatesModel",
-    "RawObsModel",
+    "StationObservationSchema",
 ]
 
 # Avoid zero standard deviations in uncertainty columns
-EPS = 1e-12
+EPS = 1e-9
 
 
-# DataFrameModel classes
-class RawObsModel(DataFrameModel):
-    """Typed schema for raw GPS observation data with uncertainty."""
+class StationObservationSchema(DataFrameModel):
+    """GNSS E/N/U observations for a single station."""
 
-    date: pd.Timestamp
-    east: float
-    north: float
-    up: float
-    sigma_east: float = Field(ge=EPS)
-    sigma_north: float = Field(ge=EPS)
-    sigma_up: float = Field(ge=EPS)
-    corr_en: float = Field(ge=-1, le=1)
-    corr_eu: float = Field(ge=-1, le=1)
-    corr_nu: float = Field(ge=-1, le=1)
-
-    class Config:
-        strict = False
-
-
-class DailyDispModel(DataFrameModel):
-    """Typed schema for daily displacement data."""
-
-    date: pd.Timestamp
-    east_mm: float
-    north_mm: float
-    up_mm: float
-    # Optional sigmas after uncertainty propagation
-    sigma_east_mm: float | None = Field(ge=EPS, nullable=True)
-    sigma_north_mm: float | None = Field(ge=EPS, nullable=True)
-    sigma_up_mm: float | None = Field(ge=EPS, nullable=True)
-    # Optional correlation coefficients
-    corr_en: float | None = Field(ge=-1, le=1, nullable=True)
-    corr_eu: float | None = Field(ge=-1, le=1, nullable=True)
-    corr_nu: float | None = Field(ge=-1, le=1, nullable=True)
-
-    class Config:
-        strict = False
+    date: Series[pd.Timestamp] = Field(coerce=True)  # type: ignore[type-var]
+    east: Series[float]
+    north: Series[float]
+    up: Series[float]
+    sigma_east: Series[float] = Field(ge=EPS)
+    sigma_north: Series[float] = Field(ge=EPS)
+    sigma_up: Series[float] = Field(ge=EPS)
+    corr_en: Series[float] = Field(ge=-1, le=1)
+    corr_eu: Series[float] = Field(ge=-1, le=1)
+    corr_nu: Series[float] = Field(ge=-1, le=1)
 
 
 class MetadataModel(DataFrameModel):
-    """Typed schema for station metadata."""
+    """Metadata for a single station."""
 
-    station: str
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
-    alt: float  # altitude in meters
-    plate: str | None = Field(nullable=True)
-
-    class Config:
-        strict = False
+    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    lat: Series[float] = Field(ge=-90, le=90)
+    lon: Series[float] = Field(ge=-180, le=180)
+    alt: Series[float]
+    plate: Series[str] = Field(str_length={"min_value": 2, "max_value": 2})
 
 
 class RatesModel(DataFrameModel):
-    """Typed schema for velocity rates comparison data."""
+    """GNSS velocity rates comparison data."""
 
-    station: str
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
-    alt: float
+    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    lat: Series[float] = Field(ge=-90, le=90)
+    lon: Series[float] = Field(ge=-180, le=180)
+    alt: Series[float]
     # GPS rates and uncertainties (mm/year)
-    gps_velocity: float | None = Field(nullable=True)
-    gps_velocity_l2: float | None = Field(nullable=True)
-    gps_velocity_sigma: float | None = Field(ge=0, nullable=True)
+    gps_velocity: Series[float] = Field(nullable=True)
+    gps_velocity_l2: Series[float] = Field(nullable=True)
+    gps_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
     # InSAR rates and uncertainties (mm/year)
-    insar_velocity: float | None = Field(nullable=True)
-    insar_velocity_l2: float | None = Field(nullable=True)
-    insar_velocity_sigma: float | None = Field(ge=0, nullable=True)
+    insar_velocity: Series[float] = Field(nullable=True)
+    insar_velocity_l2: Series[float] = Field(nullable=True)
+    insar_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
     # LOS uncertainty (mm/year)
-    sigma_los_mm: float | None = Field(ge=0, nullable=True)
+    sigma_los_mm: Series[float] = Field(ge=0, nullable=True)
     # Difference between GPS and InSAR (mm/year)
-    difference: float | None = Field(nullable=True)
+    difference: Series[float] = Field(nullable=True)
 
     class Config:
         strict = False

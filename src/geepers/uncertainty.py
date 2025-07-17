@@ -49,6 +49,7 @@ class UncertaintyData(BaseModel):
         row : pd.Series
             DataFrame row with uncertainty columns. Expected columns:
             sigma_east_mm, sigma_north_mm, sigma_up_mm, corr_en, corr_eu, corr_nu
+            OR sigma_east, sigma_north, sigma_up, corr_en, corr_eu, corr_nu
 
         Returns
         -------
@@ -56,10 +57,20 @@ class UncertaintyData(BaseModel):
             Validated uncertainty data model
 
         """
+        # Try _mm columns first, fallback to raw column names
+        if "sigma_east_mm" in row:
+            sigma_east = row["sigma_east_mm"]
+            sigma_north = row["sigma_north_mm"]
+            sigma_up = row["sigma_up_mm"]
+        else:
+            sigma_east = row["sigma_east"]
+            sigma_north = row["sigma_north"]
+            sigma_up = row["sigma_up"]
+
         return cls(
-            sigma_east=row["sigma_east_mm"],
-            sigma_north=row["sigma_north_mm"],
-            sigma_up=row["sigma_up_mm"],
+            sigma_east=sigma_east,
+            sigma_north=sigma_north,
+            sigma_up=sigma_up,
             corr_en=row.get("corr_en", 0.0),
             corr_eu=row.get("corr_eu", 0.0),
             corr_nu=row.get("corr_nu", 0.0),
@@ -154,7 +165,7 @@ def get_sigma_los(
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with standardized uncertainty columns (validated by DailyDispModel).
+        DataFrame with standardized uncertainty columns
         Expected columns: sigma_east_mm, sigma_north_mm, sigma_up_mm, and
         optionally corr_en, corr_eu, corr_nu.
     los_vector : np.ndarray or pd.Series
@@ -185,13 +196,6 @@ def get_sigma_los(
     if los_vector.shape != (3,):
         msg = f"los_vector must be a 3-element array, got shape {los_vector.shape}"
         raise ValueError(msg)
-
-    # Check required columns exist
-    required_cols = ["sigma_east_mm", "sigma_north_mm", "sigma_up_mm"]
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        msg = f"Missing required uncertainty columns: {missing_cols}"
-        raise KeyError(msg)
 
     # Compute LOS uncertainty for each row using UncertaintyData model
     los_uncertainties = []

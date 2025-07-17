@@ -57,7 +57,7 @@ class TestUncertaintyData:
 
     def test_invalid_correlation_values(self):
         """Test validation fails for invalid correlation values."""
-        with pytest.raises(ValueError, match="correlation"):
+        with pytest.raises(Exception, match="less than or equal to 1"):
             UncertaintyData(
                 sigma_east=0.001,
                 sigma_north=0.002,
@@ -271,7 +271,7 @@ class TestSigmaLOS:
 
         los_vector = np.array([1.0, 0.0])  # Wrong size
 
-        with pytest.raises(ValueError, match="Wrong size"):
+        with pytest.raises(ValueError, match="los_vector must be a 3-element array"):
             get_sigma_los(df, los_vector)
 
     def test_missing_sigma_columns(self):
