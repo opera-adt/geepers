@@ -58,7 +58,7 @@ class StationSchema(DataFrameModel):
     lat: Series[float] = Field(ge=-90, le=90)
     lon: Series[float] = Field(ge=-180, le=180)
     alt: Series[float]
-    plate: Series[Plate]
+    plate: Series[pd.StringDtype] = Field(isin=Plate)
 
 
 class StationObservationSchema(DataFrameModel):
