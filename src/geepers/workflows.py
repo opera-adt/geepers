@@ -150,7 +150,9 @@ def main(
         if df["los_gps"].size > 0:
             df["los_gps"] -= np.nanmean(df["los_gps"])  # remove arbitrary offset
         # Compute the LOS uncertainty
-        df["sigma_los"] = get_sigma_los_df(df, enu_vec)
+        # RuntimeWarning
+        with warnings.catch_warnings(action="ignore", category=RuntimeWarning):
+            df["sigma_los"] = get_sigma_los_df(df, enu_vec)
 
         df_subset = df[["date", "los_gps", "sigma_los"]].set_index("date")
         station_to_los_gps[station_row.Index] = df_subset
