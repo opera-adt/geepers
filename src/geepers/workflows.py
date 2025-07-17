@@ -21,7 +21,7 @@ from geepers.analysis import compare_relative_gps_insar, create_tidy_df
 from geepers.io import XarrayReader
 from geepers.processing import get_quality_reader, process_insar_data
 from geepers.quality import select_gps_reference
-from geepers.uncertainty import get_sigma_los
+from geepers.uncertainty import get_sigma_los_df
 
 logger = logging.getLogger("geepers")
 
@@ -150,7 +150,7 @@ def main(
         if df["los_gps"].size > 0:
             df["los_gps"] -= np.nanmean(df["los_gps"])  # remove arbitrary offset
         # Compute the LOS uncertainty
-        df["sigma_los"] = get_sigma_los(df, enu_vec)
+        df["sigma_los"] = get_sigma_los_df(df, enu_vec)
 
         df_subset = df[["date", "los_gps", "sigma_los"]].set_index("date")
         station_to_los_gps[station_row.Index] = df_subset
