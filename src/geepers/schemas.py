@@ -22,7 +22,7 @@ EPS = 1e-9
 class StationObservationSchema(DataFrameModel):
     """GNSS E/N/U observations for a single station."""
 
-    date: Series[pd.Timestamp] = Field(coerce=True)  # type: ignore[type-var]
+    date: pd.Timestamp = Field(coerce=True)
     east: Series[float]
     north: Series[float]
     up: Series[float]
