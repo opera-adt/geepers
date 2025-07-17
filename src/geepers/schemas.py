@@ -5,19 +5,60 @@ of the GPS-InSAR processing pipeline, ensuring consistent column names,
 dtypes, units, and allowed ranges.
 """
 
+from enum import StrEnum
+
 import pandas as pd
 from pandera.pandas import DataFrameModel, Field
 from pandera.typing import Index, Series
 from pandera.typing.geopandas import GeoSeries as GeoSeriesType
 
 __all__ = [
-    "MetadataSchema",
     "RatesSchema",
     "StationObservationSchema",
+    "StationSchema",
 ]
 
 # Avoid zero standard deviations in uncertainty columns
 EPS = 1e-9
+
+
+class Plate(StrEnum):
+    AF = "AF"  # Africa
+    AN = "AN"  # Antarctica
+    AR = "AR"  # Arabia
+    AU = "AU"  # Australia
+    BG = "BG"  # Bering
+    BU = "BU"  # Burma
+    CA = "CA"  # Caribbean
+    CO = "CO"  # Cocos
+    EU = "EU"  # Eurasian
+    IN = "IN"  # Indian
+    MA = "MA"  # Mariana
+    NA = "NA"  # North America
+    NB = "NB"  # North Bismark
+    NZ = "NZ"  # Nazca
+    OK = "OK"  # Okhotsk
+    ON = "ON"  # Okinawa
+    PA = "PA"  # Pacific
+    PM = "PM"  # Panama
+    PS = "PS"  # Philippine Sea
+    SA = "SA"  # South America
+    SB = "SB"  # South Bismark
+    SC = "SC"  # Scotia
+    SL = "SL"  # Shetland
+    SO = "SO"  # Somalia
+    SU = "SU"  # Sunda
+    WL = "WL"  # Woodlark
+
+
+class StationSchema(DataFrameModel):
+    """Metadata for a single station."""
+
+    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    lat: Series[float] = Field(ge=-90, le=90)
+    lon: Series[float] = Field(ge=-180, le=180)
+    alt: Series[float]
+    plate: Series[Plate]
 
 
 class StationObservationSchema(DataFrameModel):
@@ -33,16 +74,6 @@ class StationObservationSchema(DataFrameModel):
     corr_en: Series[float] = Field(ge=-1, le=1)
     corr_eu: Series[float] = Field(ge=-1, le=1)
     corr_nu: Series[float] = Field(ge=-1, le=1)
-
-
-class MetadataSchema(DataFrameModel):
-    """Metadata for a single station."""
-
-    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
-    lat: Series[float] = Field(ge=-90, le=90)
-    lon: Series[float] = Field(ge=-180, le=180)
-    alt: Series[float]
-    plate: Series[str] = Field(str_length={"min_value": 2, "max_value": 2})
 
 
 class RatesSchema(DataFrameModel):

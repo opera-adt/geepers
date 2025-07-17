@@ -7,7 +7,7 @@ import pytest
 from geopandas import GeoDataFrame, GeoSeries
 from shapely.geometry import Point
 
-from geepers.schemas import MetadataSchema, RatesSchema, StationObservationSchema
+from geepers.schemas import RatesSchema, StationObservationSchema, StationSchema
 
 
 class TestRawObsModel:
@@ -99,7 +99,7 @@ class TestMetadataModel:
         )
 
         # Should not raise
-        validated_df = MetadataSchema.validate(df)
+        validated_df = StationSchema.validate(df)
         assert len(validated_df) == 1
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -118,7 +118,7 @@ class TestMetadataModel:
         with pytest.raises(
             Exception, match="Column 'lat' failed element-wise validator number"
         ):  # Pandera will raise a validation error
-            MetadataSchema.validate(df)
+            StationSchema.validate(df)
 
 
 class TestRatesModel:
