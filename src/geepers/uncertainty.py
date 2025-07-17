@@ -191,11 +191,14 @@ def get_sigma_los(
     where u is the unit LOS vector and Σ is the 3x3 ENU covariance matrix.
 
     """
-    # Validate LOS vector
-    los_vector = np.asarray(los_vector)
-    if los_vector.shape != (3,):
-        msg = f"los_vector must be a 3-element array, got shape {los_vector.shape}"
-        raise ValueError(msg)
+    # In [20]: Sigma = sp.Matrix([
+    #    [sigma_e**2, corr_en, corr_ev],
+    #    [corr_en, sigma_n**2, corr_nv],
+    #    [corr_ev, corr_nv, sigma_v**2]])
+    # In [21]: (u.T @ Sigma @ u)[0, 0].simplify()
+    # Out[21]: u_e*(corr_en*u_n + corr_ev*u_v + sigma_e**2*u_e) + \
+    #    u_n*(corr_en*u_e + corr_nv*u_v + sigma_n**2*u_n) + \
+    #    u_v*(corr_ev*u_e + corr_nv*u_n + sigma_v**2*u_v)
 
     # Compute LOS uncertainty for each row using UncertaintyData model
     los_uncertainties = []
