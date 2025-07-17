@@ -2555,8 +2555,8 @@ packages:
   timestamp: 1748101667956
 - pypi: ./
   name: geepers
-  version: 0.1.0.post1.dev31+gcccdce1.d20250715
-  sha256: 1202ce29fb995271b49491ce51d9bf0a111ac66407701c79534f9c3833557b7e
+  version: 0.1.0.post1.dev43+gf44495d
+  sha256: 7bbf8f12e57d742dc4bda38bc2153066f61a52a9c99e830f6656c965cdcde3cd
   requires_dist:
   - mkdocs ; extra == 'docs'
   - mkdocs-gen-files ; extra == 'docs'
