@@ -83,8 +83,8 @@ class TestRawObsModel:
             StationObservationSchema.validate(df)
 
 
-class TestMetadataModel:
-    """Tests for MetadataModel validation."""
+class TestStationModel:
+    """Tests for StationModel validation."""
 
     def test_valid_metadata(self):
         """Test validation with valid metadata."""
