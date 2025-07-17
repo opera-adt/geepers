@@ -13,6 +13,8 @@ from pandera.typing import Index, Series
 from pandera.typing.geopandas import GeoSeries as GeoSeriesType
 
 __all__ = [
+    "GPSUncertaintySchema",
+    "GridCellSchema",
     "RatesSchema",
     "StationObservationSchema",
     "StationSchema",
@@ -51,23 +53,40 @@ class Plate(StrEnum):
     WL = "WL"  # Woodlark
 
 
-class StationSchema(DataFrameModel):
+class PointSchema(DataFrameModel):
     """Metadata for a single station."""
 
-    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
     lat: Series[float] = Field(ge=-90, le=90)
     lon: Series[float] = Field(ge=-180, le=180)
     alt: Series[float]
+
+
+class StationSchema(PointSchema):
+    """Metadata for a single station."""
+
+    name: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
     plate: Series[pd.StringDtype] = Field(isin=Plate, coerce=True)
 
 
-class StationUncertaintySchema(DataFrameModel):
+class GridCellSchema(PointSchema):
+    """Metadata for a single grid cell from UNR Grid."""
+
+    id: Series[int] = Field(gt=0)
+
+
+class GPSUncertaintySchema(DataFrameModel):
+    """GPS uncertainty and correlation information."""
+
     sigma_east: Series[float] = Field(ge=EPS)
     sigma_north: Series[float] = Field(ge=EPS)
     sigma_up: Series[float] = Field(ge=EPS)
     corr_en: Series[float] = Field(ge=-1, le=1)
     corr_eu: Series[float] = Field(ge=-1, le=1)
     corr_nu: Series[float] = Field(ge=-1, le=1)
+
+
+class StationUncertaintySchema(GPSUncertaintySchema):
+    """Legacy alias for GPSUncertaintySchema for backward compatibility."""
 
 
 class StationObservationSchema(StationUncertaintySchema):
@@ -83,7 +102,7 @@ class RatesSchema(DataFrameModel):
     """GNSS velocity rates comparison data."""
 
     geometry: GeoSeriesType
-    station: Index[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    name: Index[str] = Field(str_length={"min_value": 4, "max_value": 4})
     # GPS rates and uncertainties (mm/year)
     gps_velocity: Series[float] = Field(nullable=True)
     # InSAR rates and uncertainties (mm/year)

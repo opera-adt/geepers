@@ -90,7 +90,7 @@ class TestStationModel:
         """Test validation with valid metadata."""
         df = pd.DataFrame(
             {
-                "station": ["TEST"],
+                "name": ["TEST"],
                 "lat": [34.0],
                 "lon": [-118.0],
                 "alt": [100.0],
@@ -101,13 +101,13 @@ class TestStationModel:
         # Should not raise
         validated_df = StationSchema.validate(df)
         assert len(validated_df) == 1
-        assert validated_df["station"].iloc[0] == "TEST"
+        assert validated_df["name"].iloc[0] == "TEST"
 
     def test_invalid_latitude(self):
         """Test validation fails with invalid latitude."""
         df = pd.DataFrame(
             {
-                "station": ["TEST"],
+                "name": ["TEST"],
                 "lat": [95.0],  # Invalid: > 90
                 "lon": [-118.0],
                 "alt": [100.0],
@@ -128,7 +128,7 @@ class TestRatesModel:
         """Test validation with valid rates data."""
         df = GeoDataFrame(
             {
-                "station": ["TEST"],
+                "name": ["TEST"],
                 "gps_velocity": [1.5],
                 "gps_velocity_l2": [1.6],
                 "gps_velocity_sigma": [0.2],
@@ -146,7 +146,7 @@ class TestRatesModel:
                 "difference": [0.1],
                 "geometry": GeoSeries([Point(-118.0, 34.0)], crs="EPSG:4326"),
             }
-        ).set_index("station")
+        ).set_index("name")
 
         # Should not raise
         validated_df = RatesSchema.validate(df)
