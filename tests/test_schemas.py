@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from geopandas import GeoDataFrame, GeoSeries
+from shapely.geometry import Point
 
-from geepers.schemas import MetadataModel, RatesModel, StationObservationSchema
+from geepers.schemas import MetadataSchema, RatesSchema, StationObservationSchema
 
 
 class TestRawObsModel:
@@ -97,7 +99,7 @@ class TestMetadataModel:
         )
 
         # Should not raise
-        validated_df = MetadataModel.validate(df)
+        validated_df = MetadataSchema.validate(df)
         assert len(validated_df) == 1
         assert validated_df["station"].iloc[0] == "TEST"
 
@@ -109,13 +111,14 @@ class TestMetadataModel:
                 "lat": [95.0],  # Invalid: > 90
                 "lon": [-118.0],
                 "alt": [100.0],
+                "plate": ["NA"],
             }
         )
 
         with pytest.raises(
-            Exception, match="failed element-wise validator"
+            Exception, match="Column 'lat' failed element-wise validator number"
         ):  # Pandera will raise a validation error
-            MetadataModel.validate(df)
+            MetadataSchema.validate(df)
 
 
 class TestRatesModel:
@@ -123,12 +126,9 @@ class TestRatesModel:
 
     def test_valid_rates_data(self):
         """Test validation with valid rates data."""
-        df = pd.DataFrame(
+        df = GeoDataFrame(
             {
                 "station": ["TEST"],
-                "lat": [34.0],
-                "lon": [-118.0],
-                "alt": [100.0],
                 "gps_velocity": [1.5],
                 "gps_velocity_l2": [1.6],
                 "gps_velocity_sigma": [0.2],
@@ -136,31 +136,19 @@ class TestRatesModel:
                 "insar_velocity_l2": [1.3],
                 "insar_velocity_sigma": [0.3],
                 "sigma_los_mm": [0.25],
+                "num_gps": [400],
+                "gps_time_span_years": [1.0],
+                "temporal_coherence": [0.8],
+                "similarity": [0.9],
+                "rms_misfit": [0.1],
+                "gps_outlier_fraction": [0.05],
+                "gps_velocity_scatter": [0.2],
                 "difference": [0.1],
+                "geometry": GeoSeries([Point(-118.0, 34.0)], crs="EPSG:4326"),
             }
-        )
+        ).set_index("station")
 
         # Should not raise
-        validated_df = RatesModel.validate(df)
+        validated_df = RatesSchema.validate(df)
         assert len(validated_df) == 1
-        assert validated_df["station"].iloc[0] == "TEST"
-
-    def test_negative_sigma_values(self):
-        """Test validation fails with negative sigma values."""
-        df = pd.DataFrame(
-            {
-                "station": ["TEST"],
-                "lat": [34.0],
-                "lon": [-118.0],
-                "alt": [100.0],
-                "gps_velocity": [1.5],
-                "gps_velocity_sigma": [-0.2],  # Invalid: should be >= 0
-                "insar_velocity": [1.4],
-                "difference": [0.1],
-            }
-        )
-
-        with pytest.raises(
-            Exception, match="failed element-wise validator"
-        ):  # Pandera will raise a validation error
-            RatesModel.validate(df)
+        assert validated_df.index[0] == "TEST"

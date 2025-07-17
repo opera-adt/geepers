@@ -33,6 +33,9 @@ def create_tidy_df(station_to_merged_df: Mapping[str, pd.DataFrame]) -> pd.DataF
             df_reset, id_vars=["date"], var_name="measurement", value_name="value"
         )
         df_melted["station"] = station
+        if df_melted.empty:
+            logger.warning("No data for station %s", station)
+            continue
         dfs.append(df_melted)
 
     combined_df = pd.concat(dfs, ignore_index=True)

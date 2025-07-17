@@ -7,11 +7,12 @@ dtypes, units, and allowed ranges.
 
 import pandas as pd
 from pandera.pandas import DataFrameModel, Field
-from pandera.typing import Series
+from pandera.typing import Index, Series
+from pandera.typing.geopandas import GeoSeries as GeoSeriesType
 
 __all__ = [
-    "MetadataModel",
-    "RatesModel",
+    "MetadataSchema",
+    "RatesSchema",
     "StationObservationSchema",
 ]
 
@@ -34,7 +35,7 @@ class StationObservationSchema(DataFrameModel):
     corr_nu: Series[float] = Field(ge=-1, le=1)
 
 
-class MetadataModel(DataFrameModel):
+class MetadataSchema(DataFrameModel):
     """Metadata for a single station."""
 
     station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
@@ -44,25 +45,34 @@ class MetadataModel(DataFrameModel):
     plate: Series[str] = Field(str_length={"min_value": 2, "max_value": 2})
 
 
-class RatesModel(DataFrameModel):
+class RatesSchema(DataFrameModel):
     """GNSS velocity rates comparison data."""
 
-    station: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
-    lat: Series[float] = Field(ge=-90, le=90)
-    lon: Series[float] = Field(ge=-180, le=180)
-    alt: Series[float]
+    geometry: GeoSeriesType
+    station: Index[str] = Field(str_length={"min_value": 4, "max_value": 4})
     # GPS rates and uncertainties (mm/year)
     gps_velocity: Series[float] = Field(nullable=True)
-    gps_velocity_l2: Series[float] = Field(nullable=True)
-    gps_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
     # InSAR rates and uncertainties (mm/year)
     insar_velocity: Series[float] = Field(nullable=True)
-    insar_velocity_l2: Series[float] = Field(nullable=True)
-    insar_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
-    # LOS uncertainty (mm/year)
-    sigma_los_mm: Series[float] = Field(ge=0, nullable=True)
-    # Difference between GPS and InSAR (mm/year)
     difference: Series[float] = Field(nullable=True)
-
-    class Config:
-        strict = False
+    # Number of GPS measurements used
+    num_gps: Series[int] = Field(coerce=True)
+    # GPS time span in years
+    gps_time_span_years: Series[float]
+    # Temporal coherence
+    temporal_coherence: Series[float] = Field(ge=0, le=1, nullable=True)
+    # Similarity
+    similarity: Series[float] = Field(ge=-1, le=1, nullable=True)
+    # RMS misfit
+    rms_misfit: Series[float] = Field(nullable=True)
+    # GPS outlier fraction
+    gps_outlier_fraction: Series[float] = Field(nullable=True)
+    # GPS velocity scatter
+    gps_velocity_scatter: Series[float] = Field(nullable=True)
+    # TODO: GPS rate uncertainty (mm/year)
+    # gps_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
+    # TODO:
+    # insar_velocity_sigma: Series[float] = Field(ge=0, nullable=True)
+    # TODO: LOS uncertainty (mm/year)
+    # sigma_los_mm: Series[float] = Field(ge=0, nullable=True)
+    # Difference between GPS and InSAR (mm/year)

@@ -21,7 +21,6 @@ from geepers.analysis import compare_relative_gps_insar, create_tidy_df
 from geepers.io import XarrayReader
 from geepers.processing import get_quality_reader, process_insar_data
 from geepers.quality import select_gps_reference
-from geepers.schemas import StationObservationSchema
 from geepers.uncertainty import get_sigma_los
 
 logger = logging.getLogger("geepers")
@@ -127,17 +126,16 @@ def main(
     los_reader = XarrayReader.from_file(los_enu_file, units="unitless")
     station_to_los_gps: dict[str, pd.DataFrame] = {}
 
-    for station_row, _df in tqdm(
+    for station_row, df in tqdm(
         zip(df_gps_stations.itertuples(), df_gps_list, strict=True),
         total=len(df_gps_stations),
         desc="Projecting GPS -> LOS",
     ):
-        if _df is None:
+        if df is None:
             warnings.warn(
                 f"Failed to download {station_row.Index}; skipping.", stacklevel=2
             )
             continue
-        df = StationObservationSchema.validate(_df)
 
         enu_vec = np.nan_to_num(
             los_reader.read_lon_lat(station_row.lon, station_row.lat)
