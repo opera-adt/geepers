@@ -41,10 +41,7 @@ _DEPRECATION_MSG = (
 
 
 def get_stations_within_image(
-    reader: XarrayReader,
-    mask_invalid: bool = True,
-    bad_vals: Sequence[float] | None = None,
-    exclude_stations: Sequence[str] | None = None,
+    reader: XarrayReader, exclude_stations: Sequence[str] | None = None
 ) -> gpd.GeoDataFrame:
     """Find GPS stations within a given geocoded image.
 
@@ -53,12 +50,22 @@ def get_stations_within_image(
         `geepers.gps_sources.unr.UnrSource.get_stations_within_image` instead.
     """
     warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
-    return _unr_source.get_stations_within_image(
-        reader=reader,
-        mask_invalid=mask_invalid,
-        bad_vals=bad_vals,
-        exclude_stations=exclude_stations,
-    )
+    import rasterio.warp
+
+    if reader.crs != "EPSG:4326":
+        bounds = rasterio.warp.transform_bounds(
+            reader.crs, "EPSG:4326", *reader.da.rio.bounds()
+        )
+    else:
+        bounds = reader.da.rio.bounds()
+
+    result = _unr_source.stations(bbox=bounds)
+
+    # Apply additional filters if specified
+    if exclude_stations is not None:
+        result = result[~result["name"].isin(exclude_stations)]
+
+    return result
 
 
 def load_station_enu(
@@ -75,8 +82,9 @@ def load_station_enu(
         `geepers.gps_sources.unr.UnrSource.load_station_enu` instead.
     """
     warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
-    return _unr_source.load_station_enu(
-        station_name=station_name,
+    return _unr_source.timeseries(
+        station_name,
+        frame="ENU",
         start_date=start_date,
         end_date=end_date,
         download_if_missing=download_if_missing,

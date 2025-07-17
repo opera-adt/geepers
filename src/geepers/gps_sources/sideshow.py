@@ -17,6 +17,7 @@ __all__ = ["SideshowSource"]
 
 # JPL Sideshow constants
 SITE_LIST_URL = "https://sideshow.jpl.nasa.gov/post/tables/table2.html"
+SITE_LIST_XYZ_URL = "https://sideshow.jpl.nasa.gov/post/tables/table1.html"
 STATION_URL_BASE = (
     "https://sideshow.jpl.nasa.gov/pub/JPL_GPS_Timeseries/repro2018a/post/point/"
 )
@@ -34,9 +35,9 @@ class SideshowSource(BaseGpsSource):
         station_id: str,
         /,
         frame: Literal["ENU", "XYZ"] = "ENU",
-        start_date: str | None = None,
-        end_date: str | None = None,
-        download_if_missing: bool = True,
+        start_date: str | None = None,  # noqa: ARG002
+        end_date: str | None = None,  # noqa: ARG002
+        download_if_missing: bool = True,  # noqa: ARG002
     ) -> pd.DataFrame:
         """Load GPS station time series data.
 
@@ -73,7 +74,7 @@ class SideshowSource(BaseGpsSource):
 
         """
         if frame == "XYZ":
-            msg = "ECEF frame not supported for Sideshow data"
+            msg = "XYZ frame not supported for Sideshow data"
             raise ValueError(msg)
 
         msg = f"Sideshow station data loading not yet implemented for {station_id}"

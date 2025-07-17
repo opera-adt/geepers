@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import requests
 
@@ -36,7 +38,7 @@ class UnrSource(BaseGpsSource):
         self,
         station_id: str,
         /,
-        frame: Literal["ENU", "ECEF"] = "ENU",
+        frame: Literal["ENU", "XYZ"] = "ENU",
         start_date: str | None = None,
         end_date: str | None = None,
         download_if_missing: bool = True,
@@ -49,7 +51,7 @@ class UnrSource(BaseGpsSource):
         ----------
         station_id : str
             The station identifier.
-        frame : {"ENU", "ECEF"}, optional
+        frame : {"ENU", "XYZ"}, optional
             Coordinate frame for the data. Default is "ENU".
         start_date : str, optional
             Start date for data filtering (ISO format).
@@ -68,8 +70,8 @@ class UnrSource(BaseGpsSource):
             DataFrame validated against StationObservationSchema.
 
         """
-        if frame not in ["ENU", "ECEF"]:
-            msg = f"Unsupported frame: {frame}. Use 'ENU' or 'ECEF'"
+        if frame not in ["ENU", "XYZ"]:
+            msg = f"Unsupported frame: {frame}. Use 'ENU' or 'XYZ'"
             raise ValueError(msg)
 
         station_id = station_id.upper()
@@ -80,7 +82,7 @@ class UnrSource(BaseGpsSource):
         else:
             if frame == "ENU":
                 gps_data_file = GPS_DIR / f"{station_id}.tenv3"
-            else:
+            else:  # frame in ("XYZ")
                 gps_data_file = GPS_DIR / f"{station_id}.txyz2"
 
         if not gps_data_file.exists():
@@ -94,7 +96,9 @@ class UnrSource(BaseGpsSource):
                 raise ValueError(msg)
 
         df = pd.read_csv(gps_data_file, sep=r"\s+", engine="c")
-        df = self._clean_gps_df(df, start_date, end_date, frame=frame)
+        df = self._clean_gps_df(
+            df, start_date, end_date, coords="enu" if frame == "ENU" else "xyz"
+        )
 
         if frame == "ENU" and zero_by:
             if zero_by.lower() == "mean":
@@ -121,12 +125,28 @@ class UnrSource(BaseGpsSource):
             GeoDataFrame with station metadata including lon, lat, alt columns.
 
         """
-        return self._read_station_llas_internal(to_geodataframe=True)
+        today = datetime.date.today().strftime("%Y%m%d")
+        filename = STATION_LLH_FILE.format(today=today)
+        lla_path = Path(filename)
+
+        try:
+            df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
+        except FileNotFoundError:
+            logger.info(f"Downloading from {STATION_LLH_URL} to {lla_path}")
+            self._download_station_locations(lla_path, STATION_LLH_URL)
+            df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
+
+        df.columns = ["name", "lat", "lon", "alt"]
+        df.loc[:, "lon"] = df.lon - (np.round(df.lon / 360) * 360)
+
+        return gpd.GeoDataFrame(
+            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326"
+        )
 
     def download_station_data(
         self,
         station_id: str,
-        frame: Literal["ENU", "ECEF"] = "ENU",
+        frame: Literal["ENU", "XYZ"] = "ENU",
         plate_fixed: bool = False,
     ) -> None:
         """Download GPS station data from the Nevada Geodetic Laboratory.
@@ -135,7 +155,7 @@ class UnrSource(BaseGpsSource):
         ----------
         station_id : str
             The station identifier.
-        frame : {"ENU", "ECEF"}, optional
+        frame : {"ENU", "XYZ"}, optional
             The coordinate system of the data to download. Default is "ENU".
         plate_fixed : bool, optional
             Whether to download plate-fixed data. Only applicable for "ENU" frame.
@@ -151,13 +171,13 @@ class UnrSource(BaseGpsSource):
             else:
                 url = GPS_BASE_URL.format(station=station_id)
                 filename = GPS_DIR / f"{station_id}.tenv3"
-        elif frame == "ECEF":
+        elif frame == "XYZ":
             url = (
                 f"https://geodesy.unr.edu/gps_timeseries/txyz/IGS14/{station_id}.txyz2"
             )
             filename = GPS_DIR / f"{station_id}.txyz2"
         else:
-            msg = "frame must be either 'ENU' or 'ECEF'"
+            msg = "frame must be 'ENU' or 'XYZ'"
             raise ValueError(msg)
 
         response = requests.get(url)
@@ -169,8 +189,6 @@ class UnrSource(BaseGpsSource):
 
     def _get_station_plate(self, station_id: str) -> str:
         """Get the tectonic plate for a given GPS station."""
-        import re
-
         url = f"https://geodesy.unr.edu/NGLStationPages/stations/{station_id}.sta"
         response = requests.get(url)
         response.raise_for_status()
@@ -233,35 +251,6 @@ class UnrSource(BaseGpsSource):
         )
         return df_out.reset_index(drop=True)
 
-    def _read_station_llas_internal(
-        self,
-        filename: PathOrStr | None = None,
-        to_geodataframe: bool = False,
-    ) -> pd.DataFrame | gpd.GeoDataFrame:
-        """Internal method to read station location information."""
-        today = datetime.date.today().strftime("%Y%m%d")
-        filename = filename or STATION_LLH_FILE.format(today=today)
-        lla_path = Path(filename)
-
-        try:
-            df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
-        except FileNotFoundError:
-            logger.info(f"Downloading from {STATION_LLH_URL} to {lla_path}")
-            self._download_station_locations(lla_path, STATION_LLH_URL)
-            df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
-
-        df.columns = ["name", "lat", "lon", "alt"]
-        import numpy as np
-
-        df.loc[:, "lon"] = df.lon - (np.round(df.lon / 360) * 360)
-
-        if to_geodataframe:
-            return gpd.GeoDataFrame(
-                df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326"
-            )
-        else:
-            return df
-
     def _download_station_locations(self, filename: PathOrStr, url: str) -> None:
         """Download the station location file from the Nevada Geodetic Laboratory."""
         resp = requests.get(url)
@@ -269,7 +258,3 @@ class UnrSource(BaseGpsSource):
 
         with open(filename, "w") as f:
             f.write(resp.text)
-
-
-# Create instance for backward compatibility
-_unr_source = UnrSource()

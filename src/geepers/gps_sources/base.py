@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from typing import Literal
 
 import geopandas as gpd
@@ -130,7 +130,7 @@ class BaseGpsSource(ABC):
 
         return gdf
 
-    def coordinate(self, station_id: str) -> tuple[float, float, float]:
+    def coordinates(self, station_id: str) -> tuple[float, float, float]:
         """Get coordinates for a single station.
 
         Parameters
@@ -157,85 +157,16 @@ class BaseGpsSource(ABC):
         row = stations_df[stations_df["name"] == station_id].iloc[0]
         return row["lon"], row["lat"], row["alt"]
 
-    # Deprecated methods with warnings - remove in next minor release
-    def load_station_enu(
-        self,
-        station_name: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        download_if_missing: bool = True,
-        zero_by: str = "mean",
-    ) -> pd.DataFrame:
-        """Load GPS station data in east-north-up coordinates.
-
-        .. deprecated::
-            Use `timeseries(station_id, frame="ENU")` instead.
-        """
-        import warnings
-
-        warnings.warn(
-            "load_station_enu is deprecated. Use timeseries(station_id, frame='ENU')"
-            " instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.timeseries(
-            station_name,
-            frame="ENU",
-            start_date=start_date,
-            end_date=end_date,
-            download_if_missing=download_if_missing,
-        )
-
-    def get_stations_within_image(
-        self,
-        reader,
-        mask_invalid: bool = True,
-        bad_vals: Sequence[float] | None = None,
-        exclude_stations: Sequence[str] | None = None,
-    ) -> gpd.GeoDataFrame:
-        """Find GPS stations within a geocoded image bounds.
-
-        .. deprecated::
-            Use `stations(bbox=...)` instead.
-        """
-        import warnings
-
-        warnings.warn(
-            "get_stations_within_image is deprecated. Use stations(bbox=...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Convert reader bounds to bbox
-        import rasterio.warp
-
-        if reader.crs != "EPSG:4326":
-            bounds = rasterio.warp.transform_bounds(
-                reader.crs, "EPSG:4326", *reader.da.rio.bounds()
-            )
-        else:
-            bounds = reader.da.rio.bounds()
-
-        result = self.stations(bbox=bounds)
-
-        # Apply additional filters if specified
-        if exclude_stations is not None:
-            result = result[~result["name"].isin(exclude_stations)]
-
-        return result
-
     def read_station_llas(
         self,
-        to_geodataframe: bool = False,
-        **kwargs,
+        to_geodataframe: bool = True,
+        filename=None,  # noqa: ARG002
     ) -> pd.DataFrame | gpd.GeoDataFrame:
         """Read station location information.
 
         .. deprecated::
             Use `stations()` instead.
         """
-        import warnings
-
         warnings.warn(
             "read_station_llas is deprecated. Use stations() instead.",
             DeprecationWarning,
@@ -251,14 +182,12 @@ class BaseGpsSource(ABC):
         """Get longitude and latitude for a station.
 
         .. deprecated::
-            Use `coordinate(station_id)[:2]` instead.
+            Use `coordinates(station_id)[:2]` instead.
         """
-        import warnings
-
         warnings.warn(
-            "station_lonlat is deprecated. Use coordinate(station_id)[:2] instead.",
+            "station_lonlat is deprecated. Use coordinates(station_id)[:2] instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        lon, lat, _ = self.coordinate(station_name)
+        lon, lat, _ = self.coordinates(station_name)
         return lon, lat

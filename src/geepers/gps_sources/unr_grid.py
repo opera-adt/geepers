@@ -34,12 +34,12 @@ class UnrGridSource(BaseGpsSource):
 
     def timeseries(
         self,
-        station_id: str | list[str],
+        station_id: str | list[str],  # noqa: ARG002
         /,
         frame: Literal["ENU", "XYZ"] = "ENU",
-        start_date: str | None = None,
-        end_date: str | None = None,
-        download_if_missing: bool = True,
+        start_date: str | None = None,  # noqa: ARG002
+        end_date: str | None = None,  # noqa: ARG002
+        download_if_missing: bool = True,  # noqa: ARG002
     ) -> pd.DataFrame:
         """Load grid point time series data.
 
@@ -69,8 +69,11 @@ class UnrGridSource(BaseGpsSource):
 
         """
         if frame == "XYZ":
-            msg = "ECEF frame not supported for grid data"
+            msg = "XYZ frame not supported for grid data"
             raise ValueError(msg)
+
+        msg = "Grid point ENU loading not yet implemented"
+        raise NotImplementedError(msg)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         """Read raw grid point data from the source.
