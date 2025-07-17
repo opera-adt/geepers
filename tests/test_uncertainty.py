@@ -44,9 +44,9 @@ class TestBuildCovarianceMatrix:
         np.testing.assert_almost_equal(cov[1, 1], 0.04)  # sigma_north^2
         np.testing.assert_almost_equal(cov[2, 2], 0.09)  # sigma_up^2
         # Check off-diagonal elements
-        np.testing.assert_almost_equal(cov[0, 1], 0.5)
-        np.testing.assert_almost_equal(cov[0, 2], 0.3)
-        np.testing.assert_almost_equal(cov[1, 2], 0.2)
+        np.testing.assert_almost_equal(cov[0, 1], 0.5 * 0.1 * 0.2)
+        np.testing.assert_almost_equal(cov[0, 2], 0.3 * 0.1 * 0.3)
+        np.testing.assert_almost_equal(cov[1, 2], 0.2 * 0.2 * 0.3)
         # Check symmetry
         np.testing.assert_array_equal(cov, cov.T)
 
@@ -140,7 +140,7 @@ class TestSigmaLOS:
         los_vector = np.array([-0.6, 0.1, 0.75])
         result = get_sigma_los_df(df, los_vector)
 
-        # Should be somewhere between east and up sigmas
+        # Should be between the largest and smallest component sigmas
         assert 1.0 < result.iloc[0] < 2.0
 
     def test_invalid_los_vector(self):

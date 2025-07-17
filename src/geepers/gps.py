@@ -292,6 +292,9 @@ def _clean_gps_df(
     if end_date:
         df = df[df["date"] <= pd.to_datetime(end_date)]
 
+    # NOTE: recently they added
+    # _latitude(deg) _longitude(deg) __height(m)
+    # TODO: check if we should use this here
     if coords == "enu":
         df_integer = df[["_e0(m)", "____n0(m)", "u0(m)"]]
         df_out = df[

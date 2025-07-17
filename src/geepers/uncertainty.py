@@ -59,9 +59,21 @@ def build_covariance_matrix(
     """
     return np.array(
         [
-            [sigma_east**2, corr_en, corr_eu],
-            [corr_en, sigma_north**2, corr_nu],
-            [corr_eu, corr_nu, sigma_up**2],
+            [
+                sigma_east**2,
+                corr_en * sigma_east * sigma_north,
+                corr_eu * sigma_east * sigma_up,
+            ],
+            [
+                corr_en * sigma_east * sigma_north,
+                sigma_north**2,
+                corr_nu * sigma_north * sigma_up,
+            ],
+            [
+                corr_eu * sigma_east * sigma_up,
+                corr_nu * sigma_north * sigma_up,
+                sigma_up**2,
+            ],
         ]
     )
 
@@ -105,12 +117,15 @@ def get_sigma_los(
     # For faster broadcasting, we unpack the u^T @ Sigma @ u formula
     # which can be verified with sympy:
     # In [18]: (u.T @ Sigma @ u)[0, 0]
-    # Out[18]: u_e*(corr_en*u_n + corr_ev*u_v + sigma_e*u_e) + ...
+    # Out[18]: u_e*(sigma_en*u_n + sigma_ev*u_v + sigma_e*u_e) + ...
 
+    sigma_en = corr_en * sigma_east * sigma_north  # type: ignore[operator]
+    sigma_eu = corr_eu * sigma_east * sigma_up  # type: ignore[operator]
+    sigma_nu = corr_nu * sigma_north * sigma_up  # type: ignore[operator]
     los_variance = (
-        u_e * (corr_en * u_n + corr_eu * u_u + sigma_east**2 * u_e)
-        + u_n * (corr_en * u_e + corr_nu * u_u + sigma_north**2 * u_n)
-        + u_u * (corr_eu * u_e + corr_nu * u_n + sigma_up**2 * u_u)
+        u_e * (sigma_east**2 * u_e + sigma_en * u_n + sigma_eu * u_u)
+        + u_n * (sigma_en * u_e + sigma_north**2 * u_n + sigma_nu * u_u)
+        + u_u * (sigma_eu * u_e + sigma_nu * u_n + sigma_up**2 * u_u)
     )
     return np.sqrt(los_variance)
 
