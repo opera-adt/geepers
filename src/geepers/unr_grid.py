@@ -1,4 +1,3 @@
-import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import cache
 from pathlib import Path
@@ -185,23 +184,3 @@ def parse_data_file(file_path: Path) -> pd.DataFrame:
         ],
     )
     return df
-
-
-def decimal_year_to_datetime(decimal_year: float) -> datetime.datetime:
-    """Convert a decimal year to a datetime object (approximate).
-
-    Parameters
-    ----------
-    decimal_year : float
-        Year expressed as a decimal (e.g., 2014.5).
-
-    Returns
-    -------
-    datetime.datetime
-        Corresponding calendar datetime (approximate to nearest day).
-
-    """
-    year = int(decimal_year)
-    fraction = decimal_year - year
-    day_of_year = round(fraction * 365.25)
-    return datetime.datetime(year, 1, 1) + datetime.timedelta(days=day_of_year)

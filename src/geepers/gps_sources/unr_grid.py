@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -15,6 +14,7 @@ import requests
 from tqdm import tqdm
 
 from geepers.schemas import GridCellSchema, StationObservationSchema
+from geepers.utils import decimal_year_to_datetime
 
 from .base import BaseGpsSource
 
@@ -24,9 +24,9 @@ if TYPE_CHECKING:
 __all__ = ["UnrGridSource"]
 
 LOOKUP_FILE_URL = "https://geodesy.unr.edu/grid_timeseries/grid_latlon_lookup.txt"
-GRID_DATA_BASE_URL = (
-    "https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/IGS14/"
-)
+GRID_DATA_BASE_URL = "https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/{plate}/{grid_id:06d}_{plate}.tenv8"
+# https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/NA/000007_NA.tenv8
+# https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/IGS14/000003_IGS14.tenv8
 
 
 class UnrGridSource(BaseGpsSource):
@@ -34,12 +34,14 @@ class UnrGridSource(BaseGpsSource):
 
     def timeseries(
         self,
-        station_id: str | list[str],  # noqa: ARG002
+        station_id: str,
         /,
         frame: Literal["ENU", "XYZ"] = "ENU",
-        start_date: str | None = None,  # noqa: ARG002
-        end_date: str | None = None,  # noqa: ARG002
-        download_if_missing: bool = True,  # noqa: ARG002
+        start_date: str | None = None,
+        end_date: str | None = None,
+        zero_by: Literal["mean", "start"] = "mean",
+        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
+        download_if_missing: bool = True,
     ) -> pd.DataFrame:
         """Load grid point time series data.
 
@@ -54,6 +56,10 @@ class UnrGridSource(BaseGpsSource):
             Start date for data filtering (ISO format).
         end_date : str, optional
             End date for data filtering (ISO format).
+        zero_by : Literal["mean", "start"], optional
+            How to zero the data. Either "mean" or "start".
+        plate : Literal["NA", "PA", "IGS14"], optional
+            Plate for the data. Default is "IGS14".
         download_if_missing : bool, optional
             Whether to download data if not found locally.
 
@@ -72,8 +78,10 @@ class UnrGridSource(BaseGpsSource):
             msg = "XYZ frame not supported for grid data"
             raise ValueError(msg)
 
-        msg = "Grid point ENU loading not yet implemented"
-        raise NotImplementedError(msg)
+        url = GRID_DATA_BASE_URL.format(plate=plate, grid_id=station_id)
+        df = self.parse_data_file(url)
+        df = self._zero_data(df, zero_by)
+        return StationObservationSchema.validate(df, lazy=True)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         """Read raw grid point data from the source.
@@ -198,22 +206,11 @@ class UnrGridSource(BaseGpsSource):
             ):
                 pass
 
-    def parse_data_file(self, file_path: Path) -> pd.DataFrame:
-        """Parse a .tenv8 time-series data file into a DataFrame.
-
-        Parameters
-        ----------
-        file_path : Path
-            Path to the .tenv8 file.
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with columns validated against GPSUncertaintySchema.
-
-        """
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def _read_data_file(uri: str | Path) -> pd.DataFrame:
         df = pd.read_csv(
-            file_path,
+            uri,
             delim_whitespace=True,
             header=None,
             names=[
@@ -227,9 +224,25 @@ class UnrGridSource(BaseGpsSource):
                 "rapid_flag",
             ],
         )
+        return df
 
+    def parse_data_file(self, uri: str | Path) -> pd.DataFrame:
+        """Parse a .tenv8 time-series data file into a DataFrame.
+
+        Parameters
+        ----------
+        uri : str | Path
+            Path or URL to the .tenv8 file.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with columns validated against GPSUncertaintySchema.
+
+        """
+        df = self._read_data_file(uri)
         # Convert decimal year to datetime
-        df["date"] = df["decimal_year"].apply(self._decimal_year_to_datetime)
+        df["date"] = df["decimal_year"].apply(decimal_year_to_datetime)
 
         # Add placeholder correlation values (not in .tenv8 format)
         df["corr_en"] = 0.0
@@ -266,26 +279,6 @@ class UnrGridSource(BaseGpsSource):
             names=["grid_point", "longitude", "latitude"],
         )
         return df.set_index("grid_point")
-
-    @staticmethod
-    def _decimal_year_to_datetime(decimal_year: float) -> datetime.datetime:
-        """Convert a decimal year to a datetime object (approximate).
-
-        Parameters
-        ----------
-        decimal_year : float
-            Year expressed as a decimal (e.g., 2014.5).
-
-        Returns
-        -------
-        datetime.datetime
-            Corresponding calendar datetime (approximate to nearest day).
-
-        """
-        year = int(decimal_year)
-        fraction = decimal_year - year
-        day_of_year = round(fraction * 365.25)
-        return datetime.datetime(year, 1, 1) + datetime.timedelta(days=day_of_year)
 
 
 # Create instance for backward compatibility

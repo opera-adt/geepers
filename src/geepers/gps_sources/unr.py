@@ -23,7 +23,7 @@ __all__ = ["UnrSource"]
 
 # Constants
 GPS_BASE_URL = "https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/{station}.tenv3"
-GPS_DIR = utils.get_cache_dir()
+GPS_DIR = utils.get_cache_dir() / "unr"
 GPS_DIR.mkdir(exist_ok=True, parents=True)
 STATION_LLH_URL = "https://geodesy.unr.edu/NGLStationPages/llh.out"
 STATION_LLH_FILE = str(GPS_DIR / "station_llh_all_{today}.csv")
@@ -41,8 +41,8 @@ class UnrSource(BaseGpsSource):
         frame: Literal["ENU", "XYZ"] = "ENU",
         start_date: str | None = None,
         end_date: str | None = None,
+        zero_by: Literal["mean", "start"] = "mean",
         download_if_missing: bool = True,
-        zero_by: str = "mean",
         plate_fixed: bool = False,
     ) -> pd.DataFrame:
         """Load GPS station time series data.
@@ -59,7 +59,7 @@ class UnrSource(BaseGpsSource):
             End date for data filtering (ISO format).
         download_if_missing : bool, optional
             Whether to download data if not found locally.
-        zero_by : str, optional
+        zero_by : Literal["mean", "start"], optional
             How to zero the data. Either "mean" or "start".
         plate_fixed : bool, optional
             Whether to use plate-fixed coordinates.

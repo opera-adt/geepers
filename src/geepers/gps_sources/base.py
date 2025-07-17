@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import difflib
 import warnings
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
 
+from geepers import utils
+from geepers._types import PathOrStr
 from geepers.schemas import PointSchema
 
 __all__ = ["BaseGpsSource"]
@@ -17,6 +21,25 @@ __all__ = ["BaseGpsSource"]
 
 class BaseGpsSource(ABC):
     """Base class for GPS data sources providing standardized interface."""
+
+    def __init__(self, cache_dir: PathOrStr | None = None):
+        """Initialize the GPS data source.
+
+        Parameters
+        ----------
+        cache_dir : PathOrStr, optional
+            Base directory to store cached data.
+            Default is None, which uses `utils.get_cache_dir()`.
+            Subclasses create directories under this base directory.
+
+        """
+        if cache_dir is None:
+            self._base_cache_dir = utils.get_cache_dir()
+        else:
+            self._base_cache_dir = Path(cache_dir)
+        subdir = self.__class__.__name__.lower().replace("source", "")
+        self._cache_dir = self._base_cache_dir / subdir
+        self._cache_dir.mkdir(exist_ok=True, parents=True)
 
     @abstractmethod
     def timeseries(
@@ -26,6 +49,7 @@ class BaseGpsSource(ABC):
         frame: Literal["ENU", "XYZ"] = "ENU",
         start_date: str | None = None,
         end_date: str | None = None,
+        zero_by: Literal["mean", "start"] = "mean",
         download_if_missing: bool = True,
     ) -> pd.DataFrame:
         """Load GPS station time series data.
@@ -40,6 +64,8 @@ class BaseGpsSource(ABC):
             Start date for data filtering (ISO format).
         end_date : str, optional
             End date for data filtering (ISO format).
+        zero_by : Literal["mean", "start"], optional
+            How to zero the data. Either "mean" or "start".
         download_if_missing : bool, optional
             Whether to download data if not found locally.
 
@@ -130,6 +156,26 @@ class BaseGpsSource(ABC):
 
         return gdf
 
+    def _zero_data(
+        self,
+        df: pd.DataFrame,
+        zero_by: Literal["mean", "start"] = "mean",
+        columns: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """Zero the data in a DataFrame."""
+        if columns is None:
+            columns = ["east", "north", "up"]
+        if zero_by.lower() == "mean":
+            mean_val = df[columns].mean()
+            df[columns] -= mean_val
+        elif zero_by.lower() == "start":
+            start_val = df[columns].iloc[:10].mean()
+            df[columns] -= start_val
+        else:
+            msg = "zero_by must be either 'mean' or 'start'"
+            raise ValueError(msg)
+        return df
+
     def coordinates(self, station_id: str) -> tuple[float, float, float]:
         """Get coordinates for a single station.
 
@@ -147,8 +193,6 @@ class BaseGpsSource(ABC):
         stations_df = self.stations()
         station_id = station_id.upper()
         if station_id not in stations_df["name"].values:
-            import difflib
-
             closest_names = difflib.get_close_matches(
                 station_id, stations_df["name"], n=5
             )
