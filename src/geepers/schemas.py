@@ -61,19 +61,22 @@ class StationSchema(DataFrameModel):
     plate: Series[pd.StringDtype] = Field(isin=Plate, coerce=True)
 
 
-class StationObservationSchema(DataFrameModel):
-    """GNSS E/N/U observations for a single station."""
-
-    date: pd.Timestamp = Field(coerce=True)
-    east: Series[float]
-    north: Series[float]
-    up: Series[float]
+class StationUncertaintySchema(DataFrameModel):
     sigma_east: Series[float] = Field(ge=EPS)
     sigma_north: Series[float] = Field(ge=EPS)
     sigma_up: Series[float] = Field(ge=EPS)
     corr_en: Series[float] = Field(ge=-1, le=1)
     corr_eu: Series[float] = Field(ge=-1, le=1)
     corr_nu: Series[float] = Field(ge=-1, le=1)
+
+
+class StationObservationSchema(StationUncertaintySchema):
+    """GNSS E/N/U observations with uncertainties for a single station."""
+
+    date: pd.Timestamp = Field(coerce=True)
+    east: Series[float]
+    north: Series[float]
+    up: Series[float]
 
 
 class RatesSchema(DataFrameModel):
