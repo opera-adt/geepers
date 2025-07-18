@@ -64,7 +64,7 @@ class PointSchema(DataFrameModel):
 class StationSchema(PointSchema):
     """Metadata for a single station."""
 
-    name: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    id: Series[str] = Field(str_length={"min_value": 4, "max_value": 4})
     plate: Series[pd.StringDtype] = Field(isin=Plate, coerce=True)
 
 
@@ -102,7 +102,7 @@ class RatesSchema(DataFrameModel):
     """GNSS velocity rates comparison data."""
 
     geometry: GeoSeriesType
-    name: Index[str] = Field(str_length={"min_value": 4, "max_value": 4})
+    id: Index[str] = Field(str_length={"min_value": 4, "max_value": 4})
     # GPS rates and uncertainties (mm/year)
     gps_velocity: Series[float] = Field(nullable=True)
     # InSAR rates and uncertainties (mm/year)

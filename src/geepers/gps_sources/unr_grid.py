@@ -81,7 +81,7 @@ class UnrGridSource(BaseGpsSource):
 
         # TODO: how to handle fetching/saving, vs using pandas to read...
         if download_if_missing:
-            local_file = self.download_data_files([station_id], plate=plate)[0]
+            local_file = self._download_file(station_id, plate=plate)
             df = self.parse_data_file(local_file)
         else:
             uri = GRID_DATA_BASE_URL.format(plate=plate, grid_id=station_id)
@@ -146,6 +146,44 @@ class UnrGridSource(BaseGpsSource):
 
         return gdf
 
+    def _download_file(
+        self,
+        grid_id: str,
+        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
+        output_dir: Path | None = None,
+    ) -> Path:
+        """Download ont .tenv8 data file.
+
+        Parameters
+        ----------
+        grid_id: str
+            Grid point ID to download.
+        plate : Literal["NA", "PA", "IGS14"], optional
+            Plate for the data. Default is "IGS14".
+        output_dir : Path | None, optional
+            Directory to store downloaded data files.
+            If None, the cache directory is used.
+
+        Returns
+        -------
+        Path
+            Paths to downloaded data files.
+
+        """
+        if output_dir is None:
+            output_dir = self._cache_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        url = GRID_DATA_BASE_URL.format(plate=plate, grid_id=grid_id)
+        dest = output_dir / url.rsplit("/", 1)[-1]
+        if not dest.exists():
+            resp = requests.get(url, stream=True)
+            resp.raise_for_status()
+            with dest.open("wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return dest
+
     def download_data_files(
         self,
         grid_id_list: list[str] | None = None,
@@ -180,20 +218,11 @@ class UnrGridSource(BaseGpsSource):
         if grid_id_list is None:
             grid_id_list = self.stations().index.tolist()
 
-        def _download(grid_id: str) -> Path:
-            url = GRID_DATA_BASE_URL.format(plate=plate, grid_id=grid_id)
-            dest = output_dir / url.rsplit("/", 1)[-1]
-            if not dest.exists():
-                resp = requests.get(url, stream=True)
-                resp.raise_for_status()
-                with dest.open("wb") as f:
-                    for chunk in resp.iter_content(chunk_size=8192):
-                        f.write(chunk)
-            return dest
-
         return thread_map(
-            _download,
+            self._download_file,
             grid_id_list,
+            plate=plate,
+            output_dir=output_dir,
             max_workers=max_workers,
             desc="Downloading data files",
         )
@@ -203,7 +232,7 @@ class UnrGridSource(BaseGpsSource):
     def _read_data_file(uri: str | Path) -> pd.DataFrame:
         df = pd.read_csv(
             uri,
-            delim_whitespace=True,
+            sep=r"\s+",
             header=None,
             names=[
                 "decimal_year",
@@ -268,7 +297,7 @@ class UnrGridSource(BaseGpsSource):
         """Download and cache the UNR grid latitude/longitude lookup table."""
         df = pd.read_csv(
             LOOKUP_FILE_URL,
-            delim_whitespace=True,
+            sep=r"\s+",
             names=["grid_point", "longitude", "latitude"],
         )
         return df.set_index("grid_point")

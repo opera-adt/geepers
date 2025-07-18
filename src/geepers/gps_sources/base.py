@@ -5,12 +5,15 @@ from __future__ import annotations
 import difflib
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import box
+from tqdm.auto import tqdm
+from tqdm.contrib.concurrent import thread_map
 
 from geepers import utils
 from geepers._types import PathOrStr
@@ -21,6 +24,59 @@ __all__ = ["BaseGpsSource"]
 
 class BaseGpsSource(ABC):
     """Base class for GPS data sources providing standardized interface."""
+
+    def timeseries_many(
+        self,
+        /,
+        ids: Iterable[str] | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        mask: gpd.GeoSeries | None = None,
+        frame: Literal["ENU", "XYZ"] = "ENU",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        zero_by: Literal["mean", "start"] = "mean",
+        download_if_missing: bool = True,
+        *,
+        max_workers: int = 8,
+    ):
+        if bbox is not None:
+            gdf_stations = self.stations(bbox=bbox)
+            ids = gdf_stations["id"]
+        elif mask is not None:
+            gdf_stations = self.stations(mask=mask)
+            ids = gdf_stations["id"]
+
+        if ids is None:
+            gdf_stations = self.stations()
+            ids = gdf_stations["id"]
+
+        # Function to load one id
+        def _load_one(sid: str) -> pd.DataFrame:
+            df = self.timeseries(
+                sid,
+                frame=frame,
+                start_date=start_date,
+                end_date=end_date,
+                zero_by=zero_by,
+                download_if_missing=download_if_missing,
+            )
+            df.insert(0, "id", sid)  # keep id as a column for melt/pivot
+            row = gdf_stations[gdf_stations["id"] == sid]
+            for col in ("lon", "lat", "alt", "geometry"):
+                df[col] = row.iloc[0][col]
+            return df
+
+        # (Optional) parallel map
+        if max_workers:
+            dfs = thread_map(
+                _load_one, ids, max_workers=max_workers, desc="Loading GPS data"
+            )
+        else:
+            dfs = [_load_one(sid) for sid in tqdm(ids)]
+
+        big = pd.concat(dfs, ignore_index=True)
+
+        return gpd.GeoDataFrame(big, geometry="geometry", crs="EPSG:4326")
 
     def __init__(self, cache_dir: PathOrStr | None = None):
         """Initialize the GPS data source.
@@ -205,13 +261,13 @@ class BaseGpsSource(ABC):
         """
         stations_df = self.stations()
         station_id = station_id.upper()
-        if station_id not in stations_df["name"].values:
+        if station_id not in stations_df["id"].values:
             closest_names = difflib.get_close_matches(
-                station_id, stations_df["name"], n=5
+                station_id, stations_df["id"], n=5
             )
             msg = f"No station named {station_id} found. Closest: {closest_names}"
             raise ValueError(msg)
-        row = stations_df[stations_df["name"] == station_id].iloc[0]
+        row = stations_df[stations_df["id"] == station_id].iloc[0]
         return row["lon"], row["lat"], row["alt"]
 
     def read_station_llas(
@@ -235,7 +291,7 @@ class BaseGpsSource(ABC):
             return pd.DataFrame(result.drop(columns="geometry"))
         return result
 
-    def station_lonlat(self, station_name: str) -> tuple[float, float]:
+    def station_lonlat(self, station_id: str) -> tuple[float, float]:
         """Get longitude and latitude for a station.
 
         .. deprecated::
@@ -246,5 +302,5 @@ class BaseGpsSource(ABC):
             DeprecationWarning,
             stacklevel=2,
         )
-        lon, lat, _ = self.coordinates(station_name)
+        lon, lat, _ = self.coordinates(station_id)
         return lon, lat

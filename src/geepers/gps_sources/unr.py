@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from functools import cache
 from pathlib import Path
 from typing import Literal
 
@@ -136,7 +137,9 @@ class UnrSource(BaseGpsSource):
             self._download_station_locations(lla_path, STATION_LLH_URL)
             df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
 
-        df.columns = ["name", "lat", "lon", "alt"]
+        processed_stations = self.get_global_station_list()
+        df = df[df[0].isin(processed_stations)]
+        df.columns = ["id", "lat", "lon", "alt"]
         df.loc[:, "lon"] = df.lon - (np.round(df.lon / 360) * 360)
 
         return gpd.GeoDataFrame(
@@ -255,3 +258,21 @@ class UnrSource(BaseGpsSource):
 
         with open(filename, "w") as f:
             f.write(resp.text)
+
+    def get_global_station_list(self) -> list[str]:
+        """Get the list of "processed" stations from UNR.
+
+        Source: https://geodesy.unr.edu/NGLStationPages/GlobalStationList
+
+        Note that this may be smaller than the lat/lon/alt list at
+        https://geodesy.unr.edu/NGLStationPages/llh.out.
+        """
+        return self._read_global_station_list().values.ravel().tolist()
+
+    @staticmethod
+    @cache
+    def _read_global_station_list() -> pd.DataFrame:
+        """Read the global station list from UNR."""
+        return pd.read_html(
+            "https://geodesy.unr.edu/NGLStationPages/GlobalStationList"
+        )[0]

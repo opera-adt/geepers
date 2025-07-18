@@ -133,7 +133,7 @@ class SideshowSource(BaseGpsSource):
     def _read_station_data(self) -> gpd.GeoDataFrame:
         lines = self._fetch_station_data()
         stations = {
-            "name": lines[::2, 0],
+            "id": lines[::2, 0],
             "lat": lines[::2, 2].astype(float),
             "lon": lines[::2, 3].astype(float),
             "alt": lines[::2, 4].astype(float) / 1000,  # JPL height is in millimeters

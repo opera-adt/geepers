@@ -112,7 +112,7 @@ def main(
     else:
         bounds = insar_reader.da.rio.bounds()
     df_gps_stations = unr_source.stations(bbox=bounds)
-    df_gps_stations.set_index("name", inplace=True)
+    df_gps_stations.set_index("id", inplace=True)
 
     start_date = insar_reader.da.time[0].to_pandas()
     end_date = insar_reader.da.time[-1].to_pandas()
@@ -135,23 +135,19 @@ def main(
     los_reader = XarrayReader.from_file(los_enu_file, units="unitless")
     station_to_los_gps: dict[str, pd.DataFrame] = {}
 
-    for station_row, df in tqdm(
+    for station_id, df in tqdm(
         zip(df_gps_stations.itertuples(), df_gps_list, strict=True),
         total=len(df_gps_stations),
         desc="Projecting GPS -> LOS",
     ):
         if df is None:
-            warnings.warn(
-                f"Failed to download {station_row.Index}; skipping.", stacklevel=2
-            )
+            warnings.warn(f"Failed to download {station_id}; skipping.", stacklevel=2)
             continue
 
-        enu_vec = np.nan_to_num(
-            los_reader.read_lon_lat(station_row.lon, station_row.lat)
-        )
+        enu_vec = np.nan_to_num(los_reader.read_lon_lat(station_id.lon, station_id.lat))
         assert enu_vec.shape == (3,)
         if np.allclose(enu_vec, 0):
-            logger.info(f"{station_row.Index} lies has nodata in LOS raster; skipping.")
+            logger.info(f"{station_id} lies has nodata in LOS raster; skipping.")
             continue
 
         e, n, u = enu_vec
@@ -164,7 +160,7 @@ def main(
             df["sigma_los"] = get_sigma_los_df(df, enu_vec)
 
         df_subset = df[["date", "los_gps", "sigma_los"]].set_index("date")
-        station_to_los_gps[station_row.Index] = df_subset
+        station_to_los_gps[station_id.Index] = df_subset
 
     # Sample InSAR rasters at station locations
     logger.info("Sampling InSAR rasters at station locations")
@@ -178,10 +174,10 @@ def main(
     # Merge GPS and InSAR tables per station
     logger.info("Merging GPS and InSAR tables per station")
     station_to_merged: dict[str, pd.DataFrame] = {}
-    for name in tqdm(station_to_los_gps, desc="Merging GPS and InSAR"):
-        station_to_merged[name] = pd.merge(
-            station_to_los_gps[name],
-            station_to_insar[name],
+    for station_id in tqdm(station_to_los_gps, desc="Merging GPS and InSAR"):
+        station_to_merged[station_id] = pd.merge(
+            station_to_los_gps[station_id],
+            station_to_insar[station_id],
             how="left",
             left_index=True,
             right_index=True,

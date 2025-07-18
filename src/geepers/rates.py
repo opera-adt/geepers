@@ -50,7 +50,7 @@ def calculate_rates(
 
     # Pivot to get separate GPS and InSAR columns
     df_wide = df.pivot_table(
-        index=["station", "date"], columns="measurement", values="value"
+        index=["id", "date"], columns="measurement", values="value"
     ).reset_index()
 
     # TODO: Make the schema to validate the pivoted data
@@ -104,14 +104,14 @@ def calculate_rates(
             }
         )
 
-    # Calculate rates for each station
-    rates = df_wide.groupby("station").apply(calc_station_metrics, include_groups=False)  # type: ignore[call-overload]
+    # Calculate rates for each station id
+    rates = df_wide.groupby("id").apply(calc_station_metrics, include_groups=False)  # type: ignore[call-overload]
     # Get the longitude and latitude of each station
     unr_source = UnrSource()
     gdf_stations = unr_source.stations()
     rates = gpd.GeoDataFrame(
         rates,
-        geometry=gdf_stations[gdf_stations.name.isin(rates.index)].geometry.tolist(),
+        geometry=gdf_stations[gdf_stations.id.isin(rates.index)].geometry.tolist(),
     )
 
     rates = RatesSchema.validate(rates, lazy=True)
