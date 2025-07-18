@@ -81,6 +81,9 @@ pytest-xdist = "*"
 ruff = "*"
 matplotlib = ">=3.10.3"
 ipython = ">=9.3.0"
+lxml = "*"
+ipdb = "*"
+
 
 [tool.pixi.environments]
 test = ["test"]
