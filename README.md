@@ -133,8 +133,6 @@ data = grid.timeseries(
     zero_by='mean'
 )
 
-# Get grid geometry
-geometry = grid.get_grid_geometry()
 ```
 
 Data characteristics:

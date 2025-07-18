@@ -166,4 +166,6 @@ filterwarnings = [
   # https://github.com/dateutil/dateutil/pull/1285 will be released, but not yet
   "ignore:datetime.datetime.utcfromtimestamp.*:DeprecationWarning",
   "ignore:.*shapely.geos.*:DeprecationWarning",
+  # Ignore deprecation warnings from gps module during testing of deprecated functionality
+  "ignore:The 'geepers.gps' module is deprecated.*:DeprecationWarning",
 ]

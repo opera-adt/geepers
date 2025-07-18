@@ -209,10 +209,7 @@ class UnrSource(BaseGpsSource):
         """Clean and preprocess the GPS DataFrame."""
         df["date"] = pd.to_datetime(df["YYMMMDD"], format="%y%b%d")
 
-        if start_date:
-            df = df[df["date"] >= pd.to_datetime(start_date)]
-        if end_date:
-            df = df[df["date"] <= pd.to_datetime(end_date)]
+        df = self._filter_by_date(df, start_date, end_date)
 
         if coords == "enu":
             df_integer = df[["_e0(m)", "____n0(m)", "u0(m)"]]

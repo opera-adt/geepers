@@ -156,6 +156,19 @@ class BaseGpsSource(ABC):
 
         return gdf
 
+    def _filter_by_date(
+        self,
+        df: pd.DataFrame,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        """Filter DataFrame by date range."""
+        if start_date:
+            df = df[df["date"] >= pd.to_datetime(start_date)]
+        if end_date:
+            df = df[df["date"] <= pd.to_datetime(end_date)]
+        return df
+
     def _zero_data(
         self,
         df: pd.DataFrame,
@@ -167,10 +180,10 @@ class BaseGpsSource(ABC):
             columns = ["east", "north", "up"]
         if zero_by.lower() == "mean":
             mean_val = df[columns].mean()
-            df[columns] -= mean_val
+            df.loc[:, columns] -= mean_val
         elif zero_by.lower() == "start":
             start_val = df[columns].iloc[:10].mean()
-            df[columns] -= start_val
+            df.loc[:, columns] -= start_val
         else:
             msg = "zero_by must be either 'mean' or 'start'"
             raise ValueError(msg)

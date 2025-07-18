@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -11,7 +9,7 @@ from typing import TYPE_CHECKING, Literal
 import geopandas as gpd
 import pandas as pd
 import requests
-from tqdm import tqdm
+from tqdm.contrib.concurrent import thread_map
 
 from geepers.schemas import GridCellSchema, StationObservationSchema
 from geepers.utils import decimal_year_to_datetime
@@ -24,7 +22,10 @@ if TYPE_CHECKING:
 __all__ = ["UnrGridSource"]
 
 LOOKUP_FILE_URL = "https://geodesy.unr.edu/grid_timeseries/grid_latlon_lookup.txt"
-GRID_DATA_BASE_URL = "https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/{plate}/{grid_id:06d}_{plate}.tenv8"
+FILENAME_TEMPLATE = "{plate}/{grid_id:06d}_{plate}.tenv8"
+GRID_DATA_BASE_URL = (
+    f"https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/{FILENAME_TEMPLATE}"
+)
 # https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/NA/000007_NA.tenv8
 # https://geodesy.unr.edu/grid_timeseries/time_variable_gridded/IGS14/000003_IGS14.tenv8
 
@@ -40,28 +41,28 @@ class UnrGridSource(BaseGpsSource):
         start_date: str | None = None,
         end_date: str | None = None,
         zero_by: Literal["mean", "start"] = "mean",
-        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
         download_if_missing: bool = True,
+        *,
+        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
     ) -> pd.DataFrame:
         """Load grid point time series data.
 
         Parameters
         ----------
-        station_id : str | list[str]
-            The grid point identifier(s) (6-digit string).
-            If a list is provided, the data for all grid points will be loaded.
+        station_id : str
+            The grid point identifier (6-digit string).
         frame : {"ENU", "XYZ"}, optional
             Coordinate frame for the data. Default is "ENU".
         start_date : str, optional
-            Start date for data filtering (ISO format).
+            Start date for data filtering (ISO format). Currently not implemented.
         end_date : str, optional
-            End date for data filtering (ISO format).
+            End date for data filtering (ISO format). Currently not implemented.
         zero_by : Literal["mean", "start"], optional
             How to zero the data. Either "mean" or "start".
+        download_if_missing : bool, optional
+            Whether to download data if not found locally. Currently not implemented.
         plate : Literal["NA", "PA", "IGS14"], optional
             Plate for the data. Default is "IGS14".
-        download_if_missing : bool, optional
-            Whether to download data if not found locally.
 
         Returns
         -------
@@ -70,17 +71,24 @@ class UnrGridSource(BaseGpsSource):
 
         Raises
         ------
-        NotImplementedError
-            Grid point ENU loading not yet implemented.
+        ValueError
+            If XYZ frame is requested (not supported for grid data).
 
         """
         if frame == "XYZ":
             msg = "XYZ frame not supported for grid data"
             raise ValueError(msg)
 
-        url = GRID_DATA_BASE_URL.format(plate=plate, grid_id=station_id)
-        df = self.parse_data_file(url)
-        df = self._zero_data(df, zero_by)
+        # TODO: how to handle fetching/saving, vs using pandas to read...
+        if download_if_missing:
+            local_file = self.download_data_files([station_id], plate=plate)[0]
+            df = self.parse_data_file(local_file)
+        else:
+            uri = GRID_DATA_BASE_URL.format(plate=plate, grid_id=station_id)
+            df = self.parse_data_file(uri)
+
+        df = self._filter_by_date(df, start_date, end_date)
+        df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
         return StationObservationSchema.validate(df, lazy=True)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
@@ -138,73 +146,57 @@ class UnrGridSource(BaseGpsSource):
 
         return gdf
 
-    def get_grid_geometry(self) -> gpd.GeoSeries:
-        """Get the grid geometry.
-
-        Returns
-        -------
-        gpd.GeoSeries
-            GeoSeries with Point geometries for each grid cell.
-
-        """
-        df = self._read_grid_file()
-        return gpd.GeoSeries.from_xy(df.longitude, df.latitude, crs="EPSG:4326")
-
-    def list_remote_data_files(self) -> list[str]:
-        """Retrieve available .tenv8 filenames from the UNR grid data directory.
-
-        Returns
-        -------
-        list[str]
-            Filenames matching the pattern '######_IGS14.tenv8'.
-
-        """
-        response = requests.get(GRID_DATA_BASE_URL)
-        response.raise_for_status()
-
-        # Extract .tenv8 filenames from HTML
-        pattern = r"(\d{6}_IGS14\.tenv8)"
-        matches = re.findall(pattern, response.text)
-        return sorted(set(matches))
-
     def download_data_files(
         self,
-        output_dir: Path,
-        file_list: list[str] | None = None,
+        grid_id_list: list[str] | None = None,
+        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
         max_workers: int = 8,
-    ) -> None:
+        output_dir: Path | None = None,
+    ) -> list[Path]:
         """Download .tenv8 data files in parallel, showing progress.
 
         Parameters
         ----------
-        output_dir : Path
-            Directory to store downloaded data files.
-        file_list : list[str], optional
-            Specific filenames to download. If None, files are listed remotely.
+        grid_id_list : list[str], optional
+            Specific grid point IDs to download.
+            If None, all grid points are downloaded.
+        plate : Literal["NA", "PA", "IGS14"], optional
+            Plate for the data. Default is "IGS14".
         max_workers : int, optional
             Number of threads to use for downloading in parallel.
+        output_dir : Path | None, optional
+            Directory to store downloaded data files.
+            If None, the cache directory is used.
+
+        Returns
+        -------
+        list[Path]
+            List of paths to downloaded data files.
 
         """
+        if output_dir is None:
+            output_dir = self._cache_dir
         output_dir.mkdir(parents=True, exist_ok=True)
-        if file_list is None:
-            file_list = self.list_remote_data_files()
+        if grid_id_list is None:
+            grid_id_list = self.stations().index.tolist()
 
-        def _download(fname: str) -> None:
-            url = f"{GRID_DATA_BASE_URL}{fname}"
-            dest = output_dir / fname
+        def _download(grid_id: str) -> Path:
+            url = GRID_DATA_BASE_URL.format(plate=plate, grid_id=grid_id)
+            dest = output_dir / url.rsplit("/", 1)[-1]
             if not dest.exists():
                 resp = requests.get(url, stream=True)
                 resp.raise_for_status()
                 with dest.open("wb") as f:
                     for chunk in resp.iter_content(chunk_size=8192):
                         f.write(chunk)
+            return dest
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(_download, fn): fn for fn in file_list}
-            for _ in tqdm(
-                as_completed(futures), total=len(futures), desc="Downloading data files"
-            ):
-                pass
+        return thread_map(
+            _download,
+            grid_id_list,
+            max_workers=max_workers,
+            desc="Downloading data files",
+        )
 
     @staticmethod
     @lru_cache(maxsize=128)
@@ -241,6 +233,7 @@ class UnrGridSource(BaseGpsSource):
 
         """
         df = self._read_data_file(uri)
+
         # Convert decimal year to datetime
         df["date"] = df["decimal_year"].apply(decimal_year_to_datetime)
 

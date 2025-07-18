@@ -95,12 +95,8 @@ class SideshowSource(BaseGpsSource):
         df = df.drop(columns=["decimal_year"])
         # Move date to first column:
         df = df[["date", *df.columns[:-1].to_list()]]
-        if start_date:
-            df = df[df["date"] >= pd.to_datetime(start_date)]
-        if end_date:
-            df = df[df["date"] <= pd.to_datetime(end_date)]
-
-        df = self._zero_data(df, zero_by)
+        df = self._filter_by_date(df, start_date, end_date)
+        df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
         return StationObservationSchema.validate(df, lazy=True)
 
     @staticmethod

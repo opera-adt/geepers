@@ -4,7 +4,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from .gps import read_station_llas
+from .gps_sources.unr import UnrSource
 from .midas import MidasResult, midas
 from .quality import compute_station_quality
 from .schemas import RatesSchema
@@ -107,7 +107,8 @@ def calculate_rates(
     # Calculate rates for each station
     rates = df_wide.groupby("station").apply(calc_station_metrics, include_groups=False)  # type: ignore[call-overload]
     # Get the longitude and latitude of each station
-    gdf_stations = read_station_llas(to_geodataframe=True)
+    unr_source = UnrSource()
+    gdf_stations = unr_source.stations()
     rates = gpd.GeoDataFrame(
         rates,
         geometry=gdf_stations[gdf_stations.name.isin(rates.index)].geometry.tolist(),

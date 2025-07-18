@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import geopandas as gpd
 import pandas as pd
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ._types import PathOrStr
 
 __all__ = [
+    "download_station_data",
     "get_stations_within_image",
     "load_station_enu",
     "read_station_llas",
@@ -33,6 +34,9 @@ __all__ = [
 # Create global UNR source instance
 _unr_source = UnrSource()
 
+# Legacy GPS_DIR attribute for backward compatibility with tests
+GPS_DIR = None
+
 # Deprecation warning message
 _DEPRECATION_MSG = (
     "The 'geepers.gps' module is deprecated. "
@@ -41,7 +45,9 @@ _DEPRECATION_MSG = (
 
 
 def get_stations_within_image(
-    reader: XarrayReader, exclude_stations: Sequence[str] | None = None
+    reader: XarrayReader,
+    exclude_stations: Sequence[str] | None = None,
+    mask_invalid: bool = True,  # noqa: ARG001
 ) -> gpd.GeoDataFrame:
     """Find GPS stations within a given geocoded image.
 
@@ -73,7 +79,7 @@ def load_station_enu(
     start_date: str | None = None,
     end_date: str | None = None,
     download_if_missing: bool = True,
-    zero_by: str = "mean",
+    zero_by: Literal["mean", "start"] = "mean",
 ) -> pd.DataFrame:
     """Load GPS station data in the east-north-up (ENU) coordinate system.
 
@@ -118,3 +124,16 @@ def station_lonlat(station_name: str) -> tuple[float, float]:
     """
     warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
     return _unr_source.station_lonlat(station_name)
+
+
+def download_station_data(
+    station_name: str, coords: Literal["enu", "xyz"] = "enu"
+) -> None:
+    """Download GPS station data to local cache.
+
+    .. deprecated::
+        This function is deprecated. Use
+        `geepers.gps_sources.unr.UnrSource.download_station_data` instead.
+    """
+    warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+    return _unr_source.download_station_data(station_name, coords=coords)

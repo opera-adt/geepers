@@ -18,6 +18,7 @@ from tqdm.contrib.concurrent import thread_map
 import geepers.gps
 import geepers.rates
 from geepers.analysis import compare_relative_gps_insar, create_tidy_df
+from geepers.gps_sources.unr import UnrSource
 from geepers.io import XarrayReader
 from geepers.processing import get_quality_reader, process_insar_data
 from geepers.quality import select_gps_reference
@@ -100,9 +101,17 @@ def main(
         similarity_files, insar_reader.da.time, file_date_fmt
     )
 
-    df_gps_stations = geepers.gps.get_stations_within_image(
-        insar_reader, mask_invalid=False
-    )
+    # Get GPS stations within image bounds using new API
+    unr_source = UnrSource()
+    import rasterio.warp
+
+    if insar_reader.crs != "EPSG:4326":
+        bounds = rasterio.warp.transform_bounds(
+            insar_reader.crs, "EPSG:4326", *insar_reader.da.rio.bounds()
+        )
+    else:
+        bounds = insar_reader.da.rio.bounds()
+    df_gps_stations = unr_source.stations(bbox=bounds)
     df_gps_stations.set_index("name", inplace=True)
 
     start_date = insar_reader.da.time[0].to_pandas()
@@ -110,8 +119,8 @@ def main(
 
     def _load_or_none(name: str) -> pd.DataFrame | None:
         try:
-            return geepers.gps.load_station_enu(
-                station_name=name, start_date=start_date, end_date=end_date
+            return unr_source.timeseries(
+                name, frame="ENU", start_date=start_date, end_date=end_date
             )
         except requests.HTTPError:
             return None
