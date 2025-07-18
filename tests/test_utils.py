@@ -172,7 +172,7 @@ class TestDecimalYearToDatetime:
             names=columns,
         )
         ddf["datetime"] = ddf.apply(
-            lambda row: datetime(row.year, row.mm, row.dd, row.hh), axis=1
+            lambda row: datetime.datetime(row.year, row.mm, row.dd, row.hh), axis=1
         )
         return ddf
 
@@ -180,7 +180,7 @@ class TestDecimalYearToDatetime:
         dts = dec_year_df["decimalyr"].apply(utils.decimal_year_to_datetime)
         expected_dts = dec_year_df["datetime"]
 
-        seconds_difference = (expected_dts - dts).total_seconds()
+        seconds_difference = (expected_dts - dts).dt.total_seconds()
         assert seconds_difference.max() < 3600  # within one hour
 
         # All dates should match

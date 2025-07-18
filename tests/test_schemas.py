@@ -17,7 +17,7 @@ class TestRawObsModel:
         """Test validation with valid raw observation data."""
         df = pd.DataFrame(
             {
-                "station": ["TEST", "TEST"],
+                "id": ["TEST", "TEST"],
                 "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
                 "east": [0.001, 0.002],
                 "north": [0.003, 0.004],
@@ -34,13 +34,13 @@ class TestRawObsModel:
         # Should not raise
         validated_df = StationObservationSchema.validate(df)
         assert len(validated_df) == 2
-        assert validated_df["station"].iloc[0] == "TEST"
+        assert validated_df["id"].iloc[0] == "TEST"
 
     def test_invalid_correlation_values(self):
         """Test validation fails with invalid correlation values."""
         df = pd.DataFrame(
             {
-                "station": ["TEST"],
+                "id": ["TEST"],
                 "date": pd.to_datetime(["2023-01-01"]),
                 "east": [0.001],
                 "north": [0.003],
@@ -63,7 +63,7 @@ class TestRawObsModel:
         """Test validation fails with zero sigma values."""
         df = pd.DataFrame(
             {
-                "station": ["TEST"],
+                "id": ["TEST"],
                 "date": pd.to_datetime(["2023-01-01"]),
                 "east": [0.001],
                 "north": [0.003],
@@ -90,7 +90,7 @@ class TestStationModel:
         """Test validation with valid metadata."""
         df = pd.DataFrame(
             {
-                "name": ["TEST"],
+                "id": ["TEST"],
                 "lat": [34.0],
                 "lon": [-118.0],
                 "alt": [100.0],
@@ -101,13 +101,13 @@ class TestStationModel:
         # Should not raise
         validated_df = StationSchema.validate(df)
         assert len(validated_df) == 1
-        assert validated_df["name"].iloc[0] == "TEST"
+        assert validated_df["id"].iloc[0] == "TEST"
 
     def test_invalid_latitude(self):
         """Test validation fails with invalid latitude."""
         df = pd.DataFrame(
             {
-                "name": ["TEST"],
+                "id": ["TEST"],
                 "lat": [95.0],  # Invalid: > 90
                 "lon": [-118.0],
                 "alt": [100.0],
@@ -128,7 +128,7 @@ class TestRatesModel:
         """Test validation with valid rates data."""
         df = GeoDataFrame(
             {
-                "name": ["TEST"],
+                "id": ["TEST"],
                 "gps_velocity": [1.5],
                 "gps_velocity_l2": [1.6],
                 "gps_velocity_sigma": [0.2],
@@ -146,7 +146,7 @@ class TestRatesModel:
                 "difference": [0.1],
                 "geometry": GeoSeries([Point(-118.0, 34.0)], crs="EPSG:4326"),
             }
-        ).set_index("name")
+        ).set_index("id")
 
         # Should not raise
         validated_df = RatesSchema.validate(df)

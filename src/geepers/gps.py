@@ -69,7 +69,7 @@ def get_stations_within_image(
 
     # Apply additional filters if specified
     if exclude_stations is not None:
-        result = result[~result["name"].isin(exclude_stations)]
+        result = result[~result["id"].isin(exclude_stations)]
 
     return result
 
@@ -136,4 +136,4 @@ def download_station_data(
         `geepers.gps_sources.unr.UnrSource.download_station_data` instead.
     """
     warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
-    return _unr_source.download_station_data(station_name, coords=coords)
+    return _unr_source.download_station_data(station_name, frame=coords.upper())  # type: ignore[arg-type]

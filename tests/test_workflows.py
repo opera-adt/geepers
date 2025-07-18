@@ -36,15 +36,15 @@ def test_main(tmp_path, monkeypatch):
         "CNPK",
         "CRIM",
     ]
-    assert set(df.station) == set(expected_stations)
+    assert set(df.id) == set(expected_stations)
     expected_entry = {
-        "station": "HLNA",
+        "id": "HLNA",
         "date": "2016-07-23",
         "measurement": "los_gps",
         "value": 0.0092162717033488,
     }
     pd.testing.assert_series_equal(
-        df[df.station == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
+        df[df.id == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
     )
 
 
