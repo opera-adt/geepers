@@ -1,6 +1,9 @@
 import datetime
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 from geepers import utils
 
 
@@ -141,3 +144,44 @@ def test_read_geo_csv(tmp_path):
     gdf.to_csv(tmp_path / "test.csv", index=False)
     gdf2 = utils.read_geo_csv(tmp_path / "test.csv")
     assert gdf.equals(gdf2)
+
+
+class TestDecimalYearToDatetime:
+    # Compare to the provided mapping
+    # https://geodesy.unr.edu/NGLStationPages/decyr.txt
+    @pytest.fixture
+    def dec_year_df(self):
+        columns = [
+            "date",
+            "decimalyr",
+            "year",
+            "mm",
+            "dd",
+            "hh",
+            "day",
+            "mjday",
+            "week",
+            "d",
+            "J2000_sec",
+        ]
+        ddf = pd.read_csv(
+            "https://geodesy.unr.edu/NGLStationPages/decyr.txt",
+            sep=r"\s+",
+            header=None,
+            skiprows=1,
+            names=columns,
+        )
+        ddf["datetime"] = ddf.apply(
+            lambda row: datetime(row.year, row.mm, row.dd, row.hh), axis=1
+        )
+        return ddf
+
+    def test_decimal_year_to_datetime(self, dec_year_df):
+        dts = dec_year_df["decimalyr"].apply(utils.decimal_year_to_datetime)
+        expected_dts = dec_year_df["datetime"]
+
+        seconds_difference = (expected_dts - dts).total_seconds()
+        assert seconds_difference.max() < 3600  # within one hour
+
+        # All dates should match
+        assert (dec_year_df.datetime.dt.date != dts.dt.date).sum() == 0

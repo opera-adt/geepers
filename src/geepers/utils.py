@@ -179,7 +179,11 @@ def read_geo_csv(filename: Path | str) -> gpd.GeoDataFrame:
 
 
 def decimal_year_to_datetime(decimal_year: float) -> datetime.datetime:
-    """Convert a decimal year to a datetime object (approximate).
+    """Convert a decimal year to a datetime object.
+
+    See https://geodesy.unr.edu/NGLStationPages/DecimalYearConvention for
+    more information, or https://geodesy.unr.edu/NGLStationPages/decyr.txt
+    for a mapping from decimal year to datetime (with hour precision).
 
     Parameters
     ----------
@@ -192,7 +196,8 @@ def decimal_year_to_datetime(decimal_year: float) -> datetime.datetime:
         Corresponding calendar datetime (approximate to nearest day).
 
     """
-    year = int(decimal_year)
-    fraction = decimal_year - year
-    day_of_year = round(fraction * 365.25)
-    return datetime.datetime(year, 1, 1) + datetime.timedelta(days=day_of_year)
+    start_year = 1990
+    seconds_per_year = 365.25 * 24 * 3600
+    return datetime.datetime(1990, 1, 1) + datetime.timedelta(
+        seconds=(decimal_year - start_year) * seconds_per_year
+    )
