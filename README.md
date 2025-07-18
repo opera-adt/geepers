@@ -53,6 +53,11 @@ print(stations[['name', 'lat', 'lon']].head())
 # Load time series data for a specific station
 timeseries = unr.timeseries('P123', frame='ENU', zero_by='mean')
 print(timeseries.head())
+
+# Load data for many stations into one GeoDataFrame
+
+df_many = unr.timeseries_many(bbox=(-115, 32, -105, 37))
+print(df_many.head())
 ```
 
 ## Example: Comparing GPS and InSAR Data
@@ -174,48 +179,47 @@ Data characteristics:
 from geepers.gps_sources import UnrSource
 import matplotlib.pyplot as plt
 
-# Define study region (e.g., California)
-bbox = (-125, 32, -114, 42)  # (west, south, east, north)
-
+# Define study region (e.g., Southern California)
+bbox = (-121, 34, -117, 36)  # (west, south, east, north)
 # Get GPS stations in the region
 unr = UnrSource()
 stations = unr.stations(bbox=bbox)
 print(f"Found {len(stations)} stations in California")
 
 # Load data for all stations
-station_data = {}
-for station_name in stations['name'][:5]:  # First 5 stations
-    try:
-        data = unr.timeseries(station_name, zero_by='mean')
-        station_data[station_name] = data
-        print(f"Loaded {len(data)} observations for {station_name}")
-    except Exception as e:
-        print(f"Failed to load {station_name}: {e}")
+df_all = unr.timeseries_many(bbox=bbox)
+print(df_all.head())
+#      id       date      east     north        up  sigma_east  sigma_north  sigma_up   corr_en   corr_eu   corr_nu         lon        lat         alt                     geometry
+# 0  CHIR 2010-08-20  0.054361  0.027192 -0.007630    0.000737     0.000847  0.003072  0.058084 -0.134020 -0.073392 -109.366439  32.005681  1614.17452  POINT (-109.36644 32.00568)
+# 1  CHIR 2010-08-21  0.056075  0.028543 -0.022277    0.000742     0.000844  0.003166  0.075097 -0.176761 -0.122798 -109.366439  32.005681  1614.17452  POINT (-109.36644 32.00568)
+# ...
 
-# Plot time series
+
+# Plot time series from 2 example stations
+df = df_all[df_all.id.isin (["BAK1", "P809"])]
+df_wide = df.pivot(index="date", columns=["id"], values=["east", "north", "up"])
+
 fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
-for station_name, data in station_data.items():
-    for i, component in enumerate(['east', 'north', 'up']):
-        axes[i].plot(data['date'], data[component],
-                    label=station_name, alpha=0.7)
-        axes[i].set_ylabel(f'{component.title()} (mm)')
-        axes[i].legend()
+for i, component in enumerate(['east', 'north', 'up']):
+    df_wide[component].plot(ax=axes[i])
+    axes[i].set_ylabel(f'{component.title()} (mm)')
 
-plt.xlabel('Date')
-plt.title('GPS Time Series - California Stations')
 plt.tight_layout()
 plt.show()
 ```
+
+![](docs/images/readme_ca_example1.png)
 
 ### 2. Spatial GPS Visualization
 
 ```python
 import geopandas as gpd
 import matplotlib.pyplot as plt
+from geepers.gps_sources import UnrSource
 
 # Get stations and plot on map
 unr = UnrSource()
-stations = unr.stations(bbox=(-125, 32, -114, 42))
+stations = unr.stations(bbox=(-121, 34, -117, 36))
 
 # Create a simple map
 fig, ax = plt.subplots(figsize=(10, 8))
@@ -225,7 +229,7 @@ stations.plot(ax=ax, markersize=50, alpha=0.6)
 import contextily as ctx
 ctx.add_basemap(ax, crs=stations.crs, source=ctx.providers.OpenStreetMap.Mapnik)
 
-ax.set_title('GPS Stations in California')
+ax.set_title('GPS Stations in Southern California')
 ax.set_xlabel('Longitude')
 ax.set_ylabel('Latitude')
 plt.show()

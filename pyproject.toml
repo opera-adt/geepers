@@ -28,7 +28,7 @@ license = { file = "LICENSE.txt" }
 # see section: setuptools_scm
 # https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
 # dependencies will be read from text files
-dynamic = ["version", "optional-dependencies"]
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/isce-framework/geepers"
@@ -70,7 +70,10 @@ pandera = ">=0.25.0"
 [tool.pixi.tasks]
 check = "pre-commit run -a"
 test = "pytest"
+docs = "mkdocs serve"
 
+
+# pixi install -e test
 [tool.pixi.feature.test.dependencies]
 pre-commit = "*"
 pytest = "*"
@@ -83,14 +86,30 @@ matplotlib = ">=3.10.3"
 ipython = ">=9.3.0"
 lxml = "*"
 ipdb = "*"
+contextily = "*"
+
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-gen-files = "*"
+mkdocs-jupyter = "*"
+mkdocs-literate-nav = "*"
+mkdocs-material = "*"
+pymdown-extensions = "*"
+matplotlib = ">=3.10.3"
+ipython = ">=9.3.0"
+lxml = "*"
+contextily = ">=1.6.2,<2"
+
+# pixi install -e docs
+[tool.pixi.feature.docs.pypi-dependencies]
+mkdocstrings = { extras = ["python"] }
+mkdocs-section-index = "*"
 
 
 [tool.pixi.environments]
 test = ["test"]
+docs = ["docs"]
 
-# extra requirements: `pip install .[docs]` or `pip install .[docs]`
-[tool.setuptools.dynamic.optional-dependencies.docs]
-file = ["docs/requirements.txt"]
 
 [tool.setuptools_scm]
 # https://github.com/pypa/setuptools_scm#configuration-parameters
