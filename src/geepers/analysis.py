@@ -28,7 +28,7 @@ def create_tidy_df(station_to_merged_df: Mapping[str, pd.DataFrame]) -> pd.DataF
     """
     dfs: list[pd.DataFrame] = []
     for station, df in station_to_merged_df.items():
-        df_reset = df.reset_index(names=["date"])
+        df_reset = df.reset_index(names="date")
         df_melted = pd.melt(
             df_reset, id_vars=["date"], var_name="measurement", value_name="value"
         )
