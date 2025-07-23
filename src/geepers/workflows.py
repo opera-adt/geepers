@@ -138,19 +138,21 @@ def main(
     los_reader = XarrayReader.from_file(los_enu_file, units="unitless")
     station_to_los_gps: dict[str, pd.DataFrame] = {}
 
-    for station_id, df in tqdm(
+    for station_row, df in tqdm(
         zip(df_gps_stations.itertuples(), df_gps_list, strict=True),
         total=len(df_gps_stations),
         desc="Projecting GPS -> LOS",
     ):
         if df is None:
-            warnings.warn(f"Failed to download {station_id}; skipping.", stacklevel=2)
+            warnings.warn(f"Failed to download {station_row}; skipping.", stacklevel=2)
             continue
 
-        enu_vec = np.nan_to_num(los_reader.read_lon_lat(station_id.lon, station_id.lat))
+        enu_vec = np.nan_to_num(
+            los_reader.read_lon_lat(station_row.lon, station_row.lat)
+        )
         assert enu_vec.shape == (3,)
         if np.allclose(enu_vec, 0):
-            logger.info(f"{station_id} lies has nodata in LOS raster; skipping.")
+            logger.info(f"{station_row} lies has nodata in LOS raster; skipping.")
             continue
 
         e, n, u = enu_vec
@@ -163,7 +165,7 @@ def main(
             df["sigma_los"] = get_sigma_los_df(df, enu_vec)
 
         df_subset = df[["date", "los_gps", "sigma_los"]].set_index("date")
-        station_to_los_gps[station_id.Index] = df_subset
+        station_to_los_gps[station_row.Index] = df_subset
 
     # Sample InSAR rasters at station locations
     logger.info("Sampling InSAR rasters at station locations")
