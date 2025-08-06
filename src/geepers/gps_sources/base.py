@@ -39,6 +39,10 @@ class BaseGpsSource(ABC):
         *,
         max_workers: int = 8,
     ):
+        if bbox is None and mask is None and ids is None:
+            msg = "Must provide ids, bbox or mask"
+            raise ValueError(msg)
+        gdf_stations = self.stations()
         if bbox is not None:
             gdf_stations = self.stations(bbox=bbox)
             ids = gdf_stations["id"]
@@ -47,7 +51,6 @@ class BaseGpsSource(ABC):
             ids = gdf_stations["id"]
 
         if ids is None:
-            gdf_stations = self.stations()
             ids = gdf_stations["id"]
 
         # Function to load one id
