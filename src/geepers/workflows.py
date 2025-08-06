@@ -104,16 +104,30 @@ def main(
             msg = "Must provide either timeseries_files or timeseries_stack"
             raise ValueError(msg)
         insar_reader = XarrayReader.from_file(timeseries_stack, data_var=stack_data_var)
+        reader_temporal_coherence: XarrayReader | None = XarrayReader.from_file(
+            timeseries_stack, data_var="temporal_coherence"
+        )
+        reader_similarity: XarrayReader | None = XarrayReader.from_file(
+            timeseries_stack, data_var="phase_similarity"
+        )
+
     else:
         insar_reader = XarrayReader.from_file_list(timeseries_files, file_date_fmt)
-
+        reader_temporal_coherence = get_quality_reader(
+            temporal_coherence_files, insar_reader.da.time, file_date_fmt
+        )
+        reader_similarity = get_quality_reader(
+            similarity_files, insar_reader.da.time, file_date_fmt
+        )
     logger.info("Created %s", insar_reader)
-    reader_temporal_coherence = get_quality_reader(
-        temporal_coherence_files, insar_reader.da.time, file_date_fmt
-    )
-    reader_similarity = get_quality_reader(
-        similarity_files, insar_reader.da.time, file_date_fmt
-    )
+    if reader_temporal_coherence is not None:
+        logger.info("Created %s", reader_temporal_coherence)
+    else:
+        logger.info("No temporal coherence reader provided.")
+    if reader_similarity is not None:
+        logger.info("Created %s", reader_similarity)
+    else:
+        logger.info("No similarity reader provided.")
 
     # Get GPS stations within image bounds using new API
     source = UnrSource() if gps_source == "unr" else SideshowSource()
