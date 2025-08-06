@@ -33,9 +33,8 @@ def sample_insar(
     stations_df : pd.DataFrame
         DataFrame with 'lon' and 'lat' columns.
     buffer_pixels : int
-        Number of pixels to buffer around each station. If 0, uses fast
-        vectorized single-pixel sampling. If >0, samples a window and
-        computes median.
+        Number of pixels to buffer around each station.
+        If >0, samples a window and computes median.
 
     Returns
     -------
@@ -68,10 +67,10 @@ def process_insar_data(
 
     Parameters
     ----------
-    reader : RasterStackReader
-        *RasterStackReader* opened on the displacement stack.
+    reader : XarrayReader
+        `XarrayReader` opened on the displacement stack.
     df_gps_stations
-        DataFrame indexed by station name with at least ``lon`` and ``lat``
+        DataFrame indexed by station name with at least `lon` and `lat`
         columns (decimal degrees).
     reader_temporal_coherence, reader_similarity
         Optional readers to sample alongside displacement to
@@ -84,8 +83,8 @@ def process_insar_data(
     Returns
     -------
     dict[str, pandas.DataFrame]
-        A mapping from station name to a dataframe that contains *los_insar*
-        (in **metres**), *temporal_coherence* and *similarity* columns indexed
+        A mapping from station name to a dataframe that contains `los_insar`
+        (in meters), `temporal_coherence` and `similarity` columns indexed
         by acquisition date.
 
     """
