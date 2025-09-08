@@ -44,7 +44,7 @@ class UnrGridSource(BaseGpsSource):
         zero_by: Literal["mean", "start"] = "mean",
         download_if_missing: bool = True,
         *,
-        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
+        plate: Literal["NA", "PA", "IGS14", "IGS20"] = "IGS14",
     ) -> pd.DataFrame:
         """Load grid point time series data.
 
@@ -62,7 +62,7 @@ class UnrGridSource(BaseGpsSource):
             How to zero the data. Either "mean" or "start".
         download_if_missing : bool, optional
             Whether to download data if not found locally. Currently not implemented.
-        plate : Literal["NA", "PA", "IGS14"], optional
+        plate : Literal["NA", "PA", "IGS14", "IGS20"], optional
             Plate for the data. Default is "IGS14".
 
         Returns
@@ -150,7 +150,7 @@ class UnrGridSource(BaseGpsSource):
     def _download_file(
         self,
         grid_id: str,
-        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
+        plate: Literal["NA", "PA", "IGS14", "IGS20"] = "IGS14",
         output_dir: Path | None = None,
         session: requests.Session | None = None,
     ) -> Path:
@@ -160,7 +160,7 @@ class UnrGridSource(BaseGpsSource):
         ----------
         grid_id: str
             Grid point ID to download.
-        plate : Literal["NA", "PA", "IGS14"], optional
+        plate : Literal["NA", "PA", "IGS14", "IGS20], optional
             Plate for the data. Default is "IGS14".
         output_dir : Path | None, optional
             Directory to store downloaded data files.
@@ -194,7 +194,7 @@ class UnrGridSource(BaseGpsSource):
     def download_data_files(
         self,
         grid_id_list: list[str] | None = None,
-        plate: Literal["NA", "PA", "IGS14"] = "IGS14",
+        plate: Literal["NA", "PA", "IGS14", "IGS20"] = "IGS14",
         max_workers: int = 8,
         output_dir: Path | None = None,
     ) -> list[Path]:
@@ -205,7 +205,7 @@ class UnrGridSource(BaseGpsSource):
         grid_id_list : list[str], optional
             Specific grid point IDs to download.
             If None, all grid points are downloaded.
-        plate : Literal["NA", "PA", "IGS14"], optional
+        plate : Literal["NA", "PA", "IGS14", "IGS20"], optional
             Plate for the data. Default is "IGS14".
         max_workers : int, optional
             Number of threads to use for downloading in parallel.
@@ -298,8 +298,10 @@ class UnrGridSource(BaseGpsSource):
                 "corr_nu",
             ]
         ]
+        # UNR Grid is in millimeters instead of meters:
+        df_out.loc[:, ["east", "north", "up"]] /= 1000
 
-        StationObservationSchema.validate(df_out, lazy=True)
+        StationObservationSchema.validate(df_out, lazy=True, inplace=True)
 
         return df_out
 

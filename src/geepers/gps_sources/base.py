@@ -211,7 +211,7 @@ class BaseGpsSource(ABC):
         gdf.reset_index(drop=True, inplace=True)
 
         # Validate basic point schema
-        PointSchema.validate(gdf, lazy=True)
+        PointSchema.validate(gdf, lazy=True, inplace=True)
 
         return gdf
 

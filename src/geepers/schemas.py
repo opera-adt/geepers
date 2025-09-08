@@ -6,10 +6,11 @@ dtypes, units, and allowed ranges.
 """
 
 from enum import StrEnum
+from typing import Self
 
 import pandas as pd
 from pandera.pandas import DataFrameModel, Field
-from pandera.typing import Index, Series
+from pandera.typing import DataFrame, Index, Series
 from pandera.typing.geopandas import GeoSeries as GeoSeriesType
 
 __all__ = [
@@ -86,12 +87,36 @@ class GPSUncertaintySchema(DataFrameModel):
 
 
 class StationObservationSchema(GPSUncertaintySchema):
-    """GNSS E/N/U observations with uncertainties for a single station."""
+    """GNSS E/N/U observations (in meters) with uncertainties for a single station."""
 
     date: pd.Timestamp = Field(coerce=True)
     east: Series[float]
     north: Series[float]
     up: Series[float]
+
+    @classmethod
+    def validate(
+        cls,
+        check_obj: pd.DataFrame,
+        head: int | None = None,
+        tail: int | None = None,
+        sample: int | None = None,
+        random_state: int | None = None,
+        lazy: bool = False,
+        inplace: bool = False,
+    ) -> DataFrame[Self]:
+        out = super().validate(
+            check_obj=check_obj,
+            head=head,
+            tail=tail,
+            sample=sample,
+            random_state=random_state,
+            lazy=lazy,
+            inplace=inplace,
+        )
+        # Document the units of the GPS columns in `.attrs`
+        out.attrs["units"] = "meters"
+        return out
 
 
 class RatesSchema(DataFrameModel):
