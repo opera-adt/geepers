@@ -22,7 +22,14 @@ from .base import BaseGpsSource
 __all__ = ["UnrSource"]
 
 # Constants
-GPS_BASE_URL = "https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/{station}.tenv3"
+GPS_BASE_URL = (
+    # URLS dont match!!
+    # Old one was
+    # https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/TXKM.tenv3
+    # New IGS20 is
+    # https://geodesy.unr.edu/gps_timeseries/IGS20/tenv3/IGS20/LAVR.tenv3
+    "https://geodesy.unr.edu/gps_timeseries/{reference}/tenv3/{reference}/{station}.tenv3"
+)
 GPS_DIR = utils.get_cache_dir() / "unr"
 GPS_DIR.mkdir(exist_ok=True, parents=True)
 STATION_LLH_URL = "https://geodesy.unr.edu/NGLStationPages/llh.out"
@@ -165,6 +172,7 @@ class UnrSource(BaseGpsSource):
         self,
         station_id: str,
         frame: Literal["ENU", "XYZ"] = "ENU",
+        reference: Literal["IGS14", "IGS20"] = "IGS20",
         plate_fixed: bool = False,
         plate: str | None = None,
     ) -> None:
@@ -176,6 +184,8 @@ class UnrSource(BaseGpsSource):
             The station identifier.
         frame : {"ENU", "XYZ"}, optional
             The coordinate system of the data to download. Default is "ENU".
+        reference : {"IGS14", "IGS20"}
+            Geodetic reference of processed data.
         plate_fixed : bool, optional
             Whether to download plate-fixed data. Only applicable for "ENU" frame.
         plate : str, optional
@@ -193,12 +203,12 @@ class UnrSource(BaseGpsSource):
                 url = f"https://geodesy.unr.edu/gps_timeseries/tenv3/plates/{plate}/{station_id}.{plate}.tenv3"
                 filename = GPS_DIR / plate / f"{station_id}.tenv3"
             else:
-                url = GPS_BASE_URL.format(station=station_id)
+                url = GPS_BASE_URL.format(station=station_id, reference=reference)
+                # Hack to get around bad url structure
+                url = url.replace("gps_timeseries/IGS14", "gps_timeseries")
                 filename = GPS_DIR / f"{station_id}.tenv3"
         elif frame == "XYZ":
-            url = (
-                f"https://geodesy.unr.edu/gps_timeseries/txyz/IGS14/{station_id}.txyz2"
-            )
+            url = f"https://geodesy.unr.edu/gps_timeseries/txyz/{reference}/{station_id}.txyz2"
             filename = GPS_DIR / f"{station_id}.txyz2"
         else:
             msg = "frame must be 'ENU' or 'XYZ'"
