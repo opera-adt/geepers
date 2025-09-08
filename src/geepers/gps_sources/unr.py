@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import re
 from functools import cache
 from pathlib import Path
 from typing import Literal
@@ -45,6 +44,7 @@ class UnrSource(BaseGpsSource):
         zero_by: Literal["mean", "start"] = "mean",
         download_if_missing: bool = True,
         plate_fixed: bool = False,
+        plate_name: str | None = None,
     ) -> pd.DataFrame:
         """Load GPS station time series data.
 
@@ -64,6 +64,10 @@ class UnrSource(BaseGpsSource):
             How to zero the data. Either "mean" or "start".
         plate_fixed : bool, optional
             Whether to use plate-fixed coordinates.
+        plate_name : str, optional
+            If `plate_fixed=True`, specify which plate to use.
+            Some stations have multiple plates.
+            If None, uses the first plate found.
 
         Returns
         -------
@@ -77,9 +81,20 @@ class UnrSource(BaseGpsSource):
 
         station_id = station_id.upper()
 
+        plate = None
         if plate_fixed and frame == "ENU":
-            plate = self._get_station_plate(station_id)
-            gps_data_file = GPS_DIR / f"{station_id}_{plate}.tenv3"
+            plates = self._get_station_plates(station_id)
+            if plate_name:
+                if plate_name not in plates:
+                    msg = (
+                        f"Plate {plate_name} not found for {station_id}, which has"
+                        f" plates {plates}"
+                    )
+                    raise ValueError(msg)
+                plate = plate_name
+            else:
+                plate = plates[0]
+            gps_data_file = GPS_DIR / plate / f"{station_id}.tenv3"
         else:
             if frame == "ENU":
                 gps_data_file = GPS_DIR / f"{station_id}.tenv3"
@@ -90,7 +105,7 @@ class UnrSource(BaseGpsSource):
             if download_if_missing:
                 logger.info(f"Downloading {station_id} to {gps_data_file}")
                 self.download_station_data(
-                    station_id, frame=frame, plate_fixed=plate_fixed
+                    station_id, frame=frame, plate_fixed=plate_fixed, plate=plate
                 )
             else:
                 msg = f"{gps_data_file} does not exist, download_if_missing = False"
@@ -151,6 +166,7 @@ class UnrSource(BaseGpsSource):
         station_id: str,
         frame: Literal["ENU", "XYZ"] = "ENU",
         plate_fixed: bool = False,
+        plate: str | None = None,
     ) -> None:
         """Download GPS station data from the Nevada Geodetic Laboratory.
 
@@ -162,15 +178,20 @@ class UnrSource(BaseGpsSource):
             The coordinate system of the data to download. Default is "ENU".
         plate_fixed : bool, optional
             Whether to download plate-fixed data. Only applicable for "ENU" frame.
+        plate : str, optional
+            If using plate_fixed, specify which plate to use (in the case of a station
+            on multiple plates).
+            If None, uses the first plate from the UNR results.
 
         """
         station_id = station_id.upper()
 
         if frame == "ENU":
             if plate_fixed:
-                plate = self._get_station_plate(station_id)
+                if plate is None:
+                    plate = self._get_station_plates(station_id)[0]
                 url = f"https://geodesy.unr.edu/gps_timeseries/tenv3/plates/{plate}/{station_id}.{plate}.tenv3"
-                filename = GPS_DIR / f"{station_id}_{plate}.tenv3"
+                filename = GPS_DIR / plate / f"{station_id}.tenv3"
             else:
                 url = GPS_BASE_URL.format(station=station_id)
                 filename = GPS_DIR / f"{station_id}.tenv3"
@@ -190,17 +211,22 @@ class UnrSource(BaseGpsSource):
         filename.write_text(response.text)
         logger.info(f"Saved {url} to {filename}")
 
-    def _get_station_plate(self, station_id: str) -> str:
+    def _get_station_plates(self, station_id: str) -> list[str]:
         """Get the tectonic plate for a given GPS station."""
-        url = f"https://geodesy.unr.edu/NGLStationPages/stations/{station_id}.sta"
+        # A text file that gives the plate associated with each station is available:
+        url = "https://geodesy.unr.edu/gps_timeseries/Plates/sta_frames.txt"
+        # This directory also contains files for each frame ("plate_??.txt" where
+        # ?? is the 2-character plate designation) that list the stations
+        # associated with each plate.
         response = requests.get(url)
         response.raise_for_status()
+        for line in response.text.splitlines():
+            cur_id, *plates = line.split(" ")
+            if cur_id == station_id:
+                return plates
 
-        match = re.search(r"tenv3\/plates\/(?P<plate>[A-Z]{2})", response.text)
-        if not match:
-            msg = f"Could not find plate name on {url}"
-            raise ValueError(msg)
-        return match.group("plate")
+        msg = f"Failed to find {station_id} at {url}"
+        raise ValueError(msg)
 
     def _clean_gps_df(
         self,
