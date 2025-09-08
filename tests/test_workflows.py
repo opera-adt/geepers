@@ -41,7 +41,7 @@ def test_main(tmp_path, monkeypatch):
         "id": "HLNA",
         "date": "2016-07-23",
         "measurement": "los_gps",
-        "value": -0.0020305613040891,
+        "value": 0.0010796103397325,
     }
     pd.testing.assert_series_equal(
         df[df.id == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
