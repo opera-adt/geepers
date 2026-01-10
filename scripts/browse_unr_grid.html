@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UNR Gridded Time Series Viewer</title>
-    
+
     <!-- Simple embedded favicon to prevent 404 errors -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🗺️%3C/text%3E%3C/svg%3E">
 
@@ -640,7 +640,7 @@
 <body>
     <!-- Performance indicator (can be hidden in production) -->
     <div id="performance-indicator" class="performance-indicator hidden">
-        Cache: <span id="cache-status">0</span> | 
+        Cache: <span id="cache-status">0</span> |
         Load: <span id="load-time">0ms</span> |
         Render: <span id="render-time">0ms</span>
     </div>
@@ -684,7 +684,7 @@
                         Date: <span id="loading-indicator" class="loading hidden"></span>
                     </label>
                     <input type="range" id="date-slider" class="date-slider">
-                    
+
                     <div class="playback-controls">
                         <button id="play-btn" class="playback-btn" title="Play/Pause">
                             <i class="fas fa-play"></i>
@@ -699,7 +699,7 @@
                             <i class="fas fa-refresh"></i>
                         </button>
                     </div>
-                    
+
                     <div class="mt-2">
                         <label class="text-xs text-gray-600">Playback Speed:</label>
                         <select id="speed-selector" class="text-xs mt-1">
@@ -746,7 +746,7 @@
                         <option value="greens">Greens</option>
                         <option value="oranges">Oranges</option>
                     </select>
-                    
+
                     <div class="mt-2">
                         <label class="flex items-center gap-2 text-xs">
                             <input type="checkbox" id="invert-colors" class="rounded">
@@ -1026,22 +1026,22 @@
                                 <div>File size: ~<span id="preview-file-size">-</span></div>
                             </div>
                         </div>
-                        
+
                         <button id="export-start-btn" class="btn btn-primary w-full">
                             <i class="fas fa-play"></i>
                             Start Map Animation Export
                         </button>
-                        
+
                         <button id="export-stop-btn" class="btn btn-danger w-full hidden">
                             <i class="fas fa-stop"></i>
                             Stop Export
                         </button>
-                        
+
                         <button id="export-download-btn" class="btn btn-success w-full hidden">
                             <i class="fas fa-download"></i>
                             Download Video
                         </button>
-                        
+
                         <div id="export-progress" class="hidden">
                             <div class="text-xs text-gray-600 mb-1">
                                 Export Progress: <span id="progress-text">0%</span>
@@ -1100,7 +1100,7 @@
         // --- END CONFIGURATION ---
 
         // --- PERFORMANCE OPTIMIZATIONS ---
-        
+
         // Data cache with LRU eviction
         class DataCache {
             constructor(maxSize = 50) {
@@ -1109,7 +1109,7 @@
                 this.accessOrder = new Map();
                 this.accessCounter = 0;
             }
-            
+
             get(key) {
                 if (this.cache.has(key)) {
                     this.accessOrder.set(key, ++this.accessCounter);
@@ -1117,7 +1117,7 @@
                 }
                 return null;
             }
-            
+
             set(key, value) {
                 if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
                     this.evictLRU();
@@ -1125,30 +1125,30 @@
                 this.cache.set(key, value);
                 this.accessOrder.set(key, ++this.accessCounter);
             }
-            
+
             evictLRU() {
                 let lruKey = null;
                 let lruAccess = Infinity;
-                
+
                 for (const [key, access] of this.accessOrder) {
                     if (access < lruAccess) {
                         lruAccess = access;
                         lruKey = key;
                     }
                 }
-                
+
                 if (lruKey) {
                     this.cache.delete(lruKey);
                     this.accessOrder.delete(lruKey);
                 }
             }
-            
+
             clear() {
                 this.cache.clear();
                 this.accessOrder.clear();
                 this.accessCounter = 0;
             }
-            
+
             size() {
                 return this.cache.size;
             }
@@ -1185,7 +1185,7 @@
                 this.pending = false;
                 this.callbacks = [];
             }
-            
+
             schedule(callback) {
                 this.callbacks.push(callback);
                 if (!this.pending) {
@@ -1212,7 +1212,7 @@
         let currentScale;
         let currentBasemap;
         let basemapLayers = {};
-        
+
         // Performance optimization variables
         let dataCache = new DataCache(50);
         let renderScheduler = new RenderScheduler();
@@ -1221,11 +1221,11 @@
         let enableCulling = true;
         let showPerformance = false;
         let timeseriesSampling = 'smart'; // 'smart', 'weekly', 'monthly', 'all'
-        
+
         // Viewport culling
         let currentBounds = null;
         let visibleMarkers = new Set();
-        
+
         // Map animation export variables
         let isExporting = false;
         let exportCancelled = false;
@@ -1244,7 +1244,7 @@
         let messageBox, messageText, playBtn, prevBtn, nextBtn, resetBtn, speedSelector;
         let enableCachingCheckbox, enableCullingCheckbox, showPerformanceCheckbox;
         let cacheSizeSlider, cacheSizeDisplay, performanceIndicator, timeseriesSamplingSelector;
-        
+
         // Map animation export UI elements
         let exportStartBtn, exportStopBtn, exportDownloadBtn;
         let exportStartDate, exportEndDate, exportDateStep, exportResolution;
@@ -1308,7 +1308,7 @@
         // --- INITIALIZE UI ELEMENTS ---
         function initializeUIElements() {
             console.log('Initializing UI elements...');
-            
+
             // Date and playback controls
             dateSlider = document.getElementById('date-slider');
             dateLabel = document.getElementById('date-label');
@@ -1318,7 +1318,7 @@
             nextBtn = document.getElementById('next-btn');
             resetBtn = document.getElementById('reset-btn');
             speedSelector = document.getElementById('speed-selector');
-            
+
             // Property and visual controls
             propertySelector = document.getElementById('property-selector');
             colorSchemeSelector = document.getElementById('color-scheme-selector');
@@ -1327,11 +1327,11 @@
             colorMinInput = document.getElementById('color-min');
             colorMaxInput = document.getElementById('color-max');
             autoScaleBtn = document.getElementById('auto-scale-btn');
-            
+
             // Message system
             messageBox = document.getElementById('message-box');
             messageText = document.getElementById('message-text');
-            
+
             // Performance controls
             enableCachingCheckbox = document.getElementById('enable-caching');
             enableCullingCheckbox = document.getElementById('enable-culling');
@@ -1340,7 +1340,7 @@
             cacheSizeDisplay = document.getElementById('cache-size');
             performanceIndicator = document.getElementById('performance-indicator');
             timeseriesSamplingSelector = document.getElementById('timeseries-sampling');
-            
+
             // Map animation export controls
             exportStartBtn = document.getElementById('export-start-btn');
             exportStopBtn = document.getElementById('export-stop-btn');
@@ -1363,7 +1363,7 @@
             previewFrameCount = document.getElementById('preview-frame-count');
             previewDuration = document.getElementById('preview-duration');
             previewFileSize = document.getElementById('preview-file-size');
-            
+
             console.log('UI elements initialized');
         }
 
@@ -1375,15 +1375,15 @@
             document.querySelectorAll('.tab-button').forEach(btn => {
                 btn.classList.remove('active');
             });
-            
+
             // Hide all tab panels
             document.querySelectorAll('.tab-panel').forEach(panel => {
                 panel.classList.remove('active');
             });
-            
+
             // Activate the selected tab button
             document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-            
+
             // Show the selected tab panel
             document.getElementById(`${tabName}-tab`).classList.add('active');
         }
@@ -1406,7 +1406,7 @@
         function toggleCollapsible(sectionId) {
             const content = document.getElementById(sectionId);
             const icon = document.getElementById(sectionId + '-icon');
-            
+
             content.classList.toggle('collapsed');
             icon.style.transform = content.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
         }
@@ -1428,27 +1428,27 @@
         /**
          * Map Animation Export Functions
          */
-        
+
         function updateExportPreview() {
             const startDate = new Date(exportStartDate.value);
             const endDate = new Date(exportEndDate.value);
             const step = parseInt(exportDateStep.value);
             const frameDuration = parseFloat(exportFrameDuration.value);
             const fps = parseInt(exportFramerate.value);
-            
+
             if (startDate && endDate && endDate > startDate) {
                 const diffTime = Math.abs(endDate - startDate);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 const frameCount = Math.ceil(diffDays / step);
                 const totalDuration = frameCount * frameDuration;
-                
+
                 // Estimate file size (rough calculation)
                 const resolution = exportResolution.value;
                 const [width, height] = resolution.split('x').map(Number);
                 const pixelCount = width * height;
                 const bitrate = Math.min(8000, Math.max(1000, pixelCount / 500)); // Adaptive bitrate
                 const fileSizeMB = (totalDuration * bitrate * 1000) / (8 * 1024 * 1024);
-                
+
                 previewDateRange.textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
                 previewFrameCount.textContent = frameCount;
                 previewDuration.textContent = `${totalDuration.toFixed(1)}s`;
@@ -1464,22 +1464,22 @@
         function createExportCanvas() {
             const resolution = exportResolution.value;
             const [width, height] = resolution.split('x').map(Number);
-            
+
             if (exportCanvas) {
                 exportCanvas.remove();
             }
-            
+
             exportCanvas = document.createElement('canvas');
             exportCanvas.width = width;
             exportCanvas.height = height;
             exportCanvas.style.display = 'none'; // Hide from view
             document.body.appendChild(exportCanvas); // Add to DOM for stream to work
-            
+
             exportContext = exportCanvas.getContext('2d');
-            
+
             // Create a stream from the canvas at the specified framerate
             const frameRate = parseInt(exportFramerate.value);
-            
+
             try {
                 exportStream = exportCanvas.captureStream(frameRate);
                 console.log('Canvas stream created with', frameRate, 'fps');
@@ -1488,7 +1488,7 @@
                 console.error('Failed to create canvas stream:', error);
                 throw error;
             }
-            
+
             return { width, height };
         }
 
@@ -1501,19 +1501,19 @@
                 'video/webm;codecs=vp8',
                 'video/webm',
                 'video/mp4;codecs=h264,aac',
-                'video/mp4;codecs=h264', 
+                'video/mp4;codecs=h264',
                 'video/mp4',
                 'video/x-matroska;codecs=avc1',
                 ''
             ];
-            
+
             for (const mimeType of mimeTypes) {
                 if (MediaRecorder.isTypeSupported(mimeType)) {
                     console.log('Using MIME type:', mimeType);
                     return mimeType;
                 }
             }
-            
+
             console.warn('No supported video MIME type found');
             return '';
         }
@@ -1522,42 +1522,42 @@
             if (!exportCanvas || !exportContext) {
                 throw new Error('Export canvas not initialized');
             }
-            
+
             const width = exportCanvas.width;
             const height = exportCanvas.height;
-            
+
             try {
                 // Clear canvas with a visible background
                 exportContext.fillStyle = '#e8f4f8';
                 exportContext.fillRect(0, 0, width, height);
-                
+
                 // Add a visible test pattern to verify canvas is working
                 exportContext.fillStyle = '#ff0000';
                 exportContext.fillRect(10, 10, 50, 50);
-                
+
                 // Add frame timestamp for debugging
                 const timestamp = new Date().toISOString();
                 exportContext.fillStyle = '#000000';
                 exportContext.font = 'bold 16px Arial';
                 exportContext.textAlign = 'left';
                 exportContext.fillText(`Frame: ${timestamp}`, 20, 80);
-                
+
                 // Render the actual map content
                 await renderBasicMapRepresentation(exportContext, width, height);
-                
+
                 // Add overlays if enabled
                 if (exportIncludeDate.checked) {
                     await addDateOverlay(exportContext, width, height);
                 }
-                
+
                 if (exportIncludeLegend.checked) {
                     await addLegendOverlay(exportContext, width, height);
                 }
-                
+
                 if (exportIncludeScale.checked) {
                     await addScaleOverlay(exportContext, width, height);
                 }
-                
+
                 // Force canvas update and verify content
                 const imageData = exportContext.getImageData(0, 0, width, height);
                 let hasContent = false;
@@ -1567,19 +1567,19 @@
                         break;
                     }
                 }
-                
+
                 if (!hasContent) {
                     console.warn('Canvas appears to be empty');
                 } else {
                     console.log('Canvas frame captured successfully');
                 }
-                
+
             } catch (error) {
                 console.error('Error capturing map frame:', error);
                 // Create a error frame that's definitely visible
                 exportContext.fillStyle = '#ffcccb';
                 exportContext.fillRect(0, 0, width, height);
-                
+
                 exportContext.fillStyle = '#8b0000';
                 exportContext.font = 'bold 24px Arial';
                 exportContext.textAlign = 'center';
@@ -1591,12 +1591,12 @@
             // Clear the canvas
             ctx.fillStyle = '#f0f0f0';
             ctx.fillRect(0, 0, targetWidth, targetHeight);
-            
+
             // Get element dimensions
             const rect = element.getBoundingClientRect();
             const scaleX = targetWidth / rect.width;
             const scaleY = targetHeight / rect.height;
-            
+
             // Try to use the newer browser APIs if available
             if ('getDisplayMedia' in navigator.mediaDevices) {
                 // For now, we'll create a basic representation
@@ -1609,19 +1609,19 @@
         }
         async function renderBasicMapRepresentation(ctx, width, height) {
             if (!map) return;
-            
+
             const bounds = map.getBounds();
             const property = propertySelector.value;
             const selectedBasemap = basemapSelector.value;
-            
+
             // Simple, clean background based on basemap selection
             drawCleanBackground(ctx, width, height, selectedBasemap);
-            
+
             // Draw data points (this is what matters most)
             if (currentData && currentData.features) {
                 drawDataPoints(ctx, width, height, bounds, property);
             }
-            
+
             // Add minimal geographic reference
             drawMinimalReference(ctx, width, height, bounds);
         }
@@ -1646,22 +1646,22 @@
 
         function drawDataPoints(ctx, width, height, bounds, property) {
             const pointSize = Math.max(4, Math.min(12, map.getZoom() - 2));
-            
+
             currentData.features.forEach(feature => {
                 const [lng, lat] = feature.geometry.coordinates;
-                
+
                 // Check if point is in current bounds
                 if (lat >= bounds.getSouth() && lat <= bounds.getNorth() &&
                     lng >= bounds.getWest() && lng <= bounds.getEast()) {
-                    
+
                     // Convert lat/lng to canvas coordinates
                     const x = ((lng - bounds.getWest()) / (bounds.getEast() - bounds.getWest())) * width;
                     const y = ((bounds.getNorth() - lat) / (bounds.getNorth() - bounds.getSouth())) * height;
-                    
+
                     // Get color from current scale
                     const value = feature.properties[property];
                     let color = '#808080';
-                    
+
                     if (value != null && !isNaN(value) && currentScale) {
                         try {
                             color = currentScale(value).hex();
@@ -1669,13 +1669,13 @@
                             color = '#808080';
                         }
                     }
-                    
+
                     // Draw point with good visibility
                     ctx.fillStyle = color;
                     ctx.beginPath();
                     ctx.arc(x, y, pointSize, 0, 2 * Math.PI);
                     ctx.fill();
-                    
+
                     // Add subtle outline for definition
                     ctx.strokeStyle = 'rgba(255,255,255,0.6)';
                     ctx.lineWidth = 1;
@@ -1689,11 +1689,11 @@
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.font = '12px Arial';
             ctx.textAlign = 'left';
-            
+
             // Corner coordinates
             ctx.fillText(`${bounds.getNorth().toFixed(2)}°N`, 10, 20);
             ctx.fillText(`${bounds.getWest().toFixed(2)}°W`, 10, height - 10);
-            
+
             ctx.textAlign = 'right';
             ctx.fillText(`${bounds.getEast().toFixed(2)}°E`, width - 10, height - 10);
             ctx.fillText(`${bounds.getSouth().toFixed(2)}°S`, width - 10, 20);
@@ -1702,7 +1702,7 @@
         async function addDateOverlay(ctx, width, height) {
             const dateIndex = parseInt(dateSlider.value);
             const currentDate = allDates[dateIndex];
-            
+
             if (currentDate) {
                 // Format date nicely
                 const dateObj = new Date(currentDate + 'T00:00:00');
@@ -1711,11 +1711,11 @@
                     month: 'long',
                     day: 'numeric'
                 });
-                
+
                 // Draw date overlay
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(20, height - 80, 300, 60);
-                
+
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 24px Inter';
                 ctx.textAlign = 'left';
@@ -1729,30 +1729,30 @@
             const legendHeight = 120;
             const x = width - legendWidth - 20;
             const y = 20;
-            
+
             // Background
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
             ctx.fillRect(x, y, legendWidth, legendHeight);
             ctx.strokeStyle = '#cccccc';
             ctx.strokeRect(x, y, legendWidth, legendHeight);
-            
+
             // Title
             ctx.fillStyle = '#000000';
             ctx.font = 'bold 14px Inter';
             ctx.textAlign = 'left';
             ctx.fillText('Color Scale', x + 10, y + 20);
-            
+
             // Property name
             ctx.font = '12px Inter';
             ctx.fillText(propertySelector.value.toUpperCase(), x + 10, y + 40);
-            
-            // Gradient bar 
+
+            // Gradient bar
             if (currentScale) {
                 const gradientHeight = 60;
                 const gradientWidth = 20;
                 const gradientX = x + 10;
                 const gradientY = y + 50;
-                
+
                 // Draw gradient steps
                 for (let i = 0; i < gradientHeight; i++) {
                     const ratio = i / gradientHeight;
@@ -1760,11 +1760,11 @@
                     const colorMax = parseFloat(colorMaxInput.value) || 0.03;
                     const value = colorMin + (colorMax - colorMin) * (1 - ratio);
                     const color = currentScale(value).hex();
-                    
+
                     ctx.fillStyle = color;
                     ctx.fillRect(gradientX, gradientY + i, gradientWidth, 1);
                 }
-                
+
                 // Labels
                 ctx.fillStyle = '#000000';
                 ctx.font = '10px Inter';
@@ -1782,7 +1782,7 @@
             ctx.fillRect(20, height - 150, 150, 40);
             ctx.strokeStyle = '#000000';
             ctx.strokeRect(20, height - 150, 150, 40);
-            
+
             // Scale line
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
@@ -1790,8 +1790,8 @@
             ctx.moveTo(30, height - 120);
             ctx.lineTo(130, height - 120);
             ctx.stroke();
-            
-            // Scale text 
+
+            // Scale text
             ctx.fillStyle = '#000000';
             ctx.font = '12px Inter';
             ctx.textAlign = 'center';
@@ -1800,70 +1800,70 @@
 
         async function startMapAnimationExport() {
             if (isExporting) return;
-            
+
             try {
                 isExporting = true;
                 exportCancelled = false;
-                
+
                 // Show progress UI
                 exportStartBtn.classList.add('hidden');
                 exportStopBtn.classList.remove('hidden');
                 exportProgress.classList.remove('hidden');
                 exportDownloadBtn.classList.add('hidden');
-                
+
                 // Create export canvas and media recorder
                 createExportCanvas();
-                
+
                 const options = {
                     mimeType: 'video/webm;codecs=vp9',
                     videoBitsPerSecond: 2000000
                 };
-                
+
                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
                     options.mimeType = 'video/webm;codecs=vp8';
                     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
                         options.mimeType = 'video/webm';
                     }
                 }
-                
+
                 exportRecordedChunks = [];
                 exportMediaRecorder = new MediaRecorder(exportStream, options);
-                
+
                 exportMediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
                         exportRecordedChunks.push(event.data);
                     }
                 };
-                
+
                 exportMediaRecorder.onstop = () => {
                     if (!exportCancelled) {
                         const blob = new Blob(exportRecordedChunks, { type: 'video/webm' });
                         const url = URL.createObjectURL(blob);
-                        
+
                         exportDownloadBtn.classList.remove('hidden');
                         exportDownloadBtn.onclick = () => downloadExportedVideo(url, blob);
-                        
+
                         showMessage('Map animation export completed successfully!', 'success');
                     }
-                    
+
                     // Reset UI
                     exportStartBtn.classList.remove('hidden');
                     exportStopBtn.classList.add('hidden');
                     exportProgress.classList.add('hidden');
                     isExporting = false;
                 };
-                
+
                 // Start recording
                 exportMediaRecorder.start();
-                
+
                 // Generate animation frames
                 await generateAnimationFrames();
-                
+
                 // Stop recording
                 if (!exportCancelled) {
                     exportMediaRecorder.stop();
                 }
-                
+
             } catch (error) {
                 console.error('Export error:', error);
                 showMessage('Failed to export map animation: ' + error.message, 'error');
@@ -1876,43 +1876,43 @@
             const endDate = new Date(exportEndDate.value);
             const step = parseInt(exportDateStep.value);
             const frameDuration = parseFloat(exportFrameDuration.value) * 1000;
-            
+
             const dates = [];
             const currentDate = new Date(startDate);
-            
+
             // Generate date list
             while (currentDate <= endDate) {
                 dates.push(currentDate.toISOString().split('T')[0]);
                 currentDate.setDate(currentDate.getDate() + step);
             }
-            
+
             console.log(`Generating ${dates.length} frames`);
-            
+
             // Store original settings
             const originalPaused = isPlaying;
             if (isPlaying) pausePlayback();
-            
+
             // Render each frame
             for (let i = 0; i < dates.length && !exportCancelled; i++) {
                 const date = dates[i];
                 const progress = ((i + 1) / dates.length) * 100;
-                
+
                 console.log(`Processing frame ${i + 1}/${dates.length}: ${date}`);
-                
+
                 // Update progress
                 progressBar.style.width = progress + '%';
                 progressText.textContent = Math.round(progress) + '%';
                 progressCurrentDate.textContent = date;
-                
+
                 // Find date index and update map
                 const dateIndex = allDates.indexOf(date);
                 if (dateIndex >= 0) {
                     dateSlider.value = dateIndex;
                     await updateMap();
-                    
+
                     // Wait for map to render
                     await new Promise(resolve => setTimeout(resolve, 200));
-                    
+
                     // Capture frame using requestAnimationFrame for better timing
                     await new Promise(resolve => {
                         requestAnimationFrame(async () => {
@@ -1920,30 +1920,30 @@
                             resolve();
                         });
                     });
-                    
+
                     // Wait between frames - important for MediaRecorder
                     await new Promise(resolve => setTimeout(resolve, Math.max(100, frameDuration)));
                 }
             }
-            
+
             console.log('Frame generation complete');
-            
+
             // Restore original playback state
             if (originalPaused) startPlayback();
         }
 
         function stopMapAnimationExport() {
             exportCancelled = true;
-            
+
             if (exportMediaRecorder && exportMediaRecorder.state === 'recording') {
                 exportMediaRecorder.stop();
             }
-            
+
             exportStartBtn.classList.remove('hidden');
             exportStopBtn.classList.add('hidden');
             exportProgress.classList.add('hidden');
             exportDownloadBtn.classList.add('hidden');
-            
+
             isExporting = false;
             showMessage('Map animation export cancelled.', 'error');
         }
@@ -1954,20 +1954,20 @@
             const resolution = exportResolution.value;
             const property = propertySelector.value;
             const filename = `map-animation-${property}-${resolution}-${timestamp}.webm`;
-            
+
             const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
-            
+
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            
+
             setTimeout(() => {
                 URL.revokeObjectURL(url);
             }, 1000);
-            
+
             exportDownloadBtn.classList.add('hidden');
             showMessage(`Map animation saved as "${filename}" (${fileSizeMB} MB)`, 'success');
         }
@@ -1977,7 +1977,7 @@
          */
         async function loadGeoJSONData(date) {
             const startTime = performance.now();
-            
+
             // Check cache first
             if (enableCaching) {
                 const cached = dataCache.get(date);
@@ -1987,24 +1987,24 @@
                     return cached;
                 }
             }
-            
+
             try {
                 const response = await fetch(`${geojsonDirectory}/${date}.geojson`);
                 if (!response.ok) {
                     throw new Error(`File not found: ${date}.geojson (Status: ${response.status})`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Cache the data
                 if (enableCaching) {
                     dataCache.set(date, data);
                 }
-                
+
                 performanceMetrics.loadTime = Math.round(performance.now() - startTime);
                 updatePerformanceMetrics();
                 return data;
-                
+
             } catch (error) {
                 performanceMetrics.loadTime = Math.round(performance.now() - startTime);
                 updatePerformanceMetrics();
@@ -2017,9 +2017,9 @@
          */
         async function preloadAdjacentDates(currentIndex) {
             if (!enableCaching) return;
-            
+
             const preloadPromises = [];
-            
+
             // Preload next 3 and previous 3 dates
             for (let i = -3; i <= 3; i++) {
                 const index = currentIndex + i;
@@ -2032,7 +2032,7 @@
                     }
                 }
             }
-            
+
             // Execute preloads in parallel but don't wait for them
             if (preloadPromises.length > 0) {
                 Promise.all(preloadPromises).catch(() => {}); // Background preloading
@@ -2046,33 +2046,33 @@
             const lat = coordinates[1];
             const lng = coordinates[0];
             const tolerance = 0.0001;
-            
+
             const timeSeriesData = [];
-            
+
             // Determine sampling strategy based on setting
             let indices = [];
             const totalDays = allDates.length;
-            
+
             switch (timeseriesSampling) {
                 case 'all':
                     // Load all available data points
                     indices = Array.from({ length: totalDays }, (_, i) => i);
                     break;
-                    
+
                 case 'weekly':
                     // Sample weekly (every 7 days)
                     for (let i = 0; i < totalDays; i += 7) {
                         indices.push(i);
                     }
                     break;
-                    
+
                 case 'monthly':
                     // Sample monthly (every 30 days)
                     for (let i = 0; i < totalDays; i += 30) {
                         indices.push(i);
                     }
                     break;
-                    
+
                 case 'smart':
                 default:
                     // Smart sampling: use more points for shorter time ranges, fewer for longer
@@ -2083,14 +2083,14 @@
                     }
                     break;
             }
-            
+
             // Parallel loading with batch size (adjust batch size based on sampling mode)
             const batchSize = timeseriesSampling === 'all' ? 3 : 8; // Smaller batches for 'all' mode
-            
+
             for (let batchStart = 0; batchStart < indices.length; batchStart += batchSize) {
                 const batchEnd = Math.min(batchStart + batchSize, indices.length);
                 const batchPromises = [];
-                
+
                 for (let b = batchStart; b < batchEnd; b++) {
                     const i = indices[b];
                     const date = allDates[i];
@@ -2098,10 +2098,10 @@
                         loadGeoJSONData(date).then(data => {
                             const matchingFeature = data.features.find(feature => {
                                 const coords = feature.geometry.coordinates;
-                                return Math.abs(coords[1] - lat) < tolerance && 
+                                return Math.abs(coords[1] - lat) < tolerance &&
                                        Math.abs(coords[0] - lng) < tolerance;
                             });
-                            
+
                             if (matchingFeature && matchingFeature.properties[property] != null) {
                                 return {
                                     date: new Date(date),
@@ -2112,10 +2112,10 @@
                         }).catch(() => null)
                     );
                 }
-                
+
                 const batchResults = await Promise.all(batchPromises);
                 timeSeriesData.push(...batchResults.filter(result => result !== null));
-                
+
                 // Small delay between batches to prevent overwhelming the browser
                 // Longer delay for 'all' mode to be more conservative
                 if (batchEnd < indices.length) {
@@ -2123,7 +2123,7 @@
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
-            
+
             return timeSeriesData.sort((a, b) => a.date - b.date);
         }
 
@@ -2132,28 +2132,28 @@
          */
         function getColorScale(selectedScheme, invert, min, max) {
             const cacheKey = `${selectedScheme}-${invert}-${min}-${max}`;
-            
+
             if (colorScaleCache.has(cacheKey)) {
                 return colorScaleCache.get(cacheKey);
             }
-            
+
             let schemeColors = [...colorSchemes[selectedScheme]];
             if (invert) {
                 schemeColors = schemeColors.reverse();
             }
-            
+
             const scale = chroma.scale(schemeColors)
                 .domain([min, max])
                 .mode('lab');
-            
+
             colorScaleCache.set(cacheKey, scale);
-            
+
             // Limit cache size
             if (colorScaleCache.size > 100) {
                 const firstKey = colorScaleCache.keys().next().value;
                 colorScaleCache.delete(firstKey);
             }
-            
+
             return scale;
         }
 
@@ -2162,7 +2162,7 @@
          */
         function isPointInViewport(coords) {
             if (!enableCulling || !currentBounds) return true;
-            
+
             const latlng = L.latLng(coords[1], coords[0]);
             return currentBounds.contains(latlng);
         }
@@ -2173,11 +2173,11 @@
         function updateViewportBounds() {
             if (map) {
                 currentBounds = map.getBounds();
-                
+
                 // Expand bounds slightly for smoother panning
                 const latSpan = currentBounds.getNorth() - currentBounds.getSouth();
                 const lngSpan = currentBounds.getEast() - currentBounds.getWest();
-                
+
                 currentBounds = L.latLngBounds(
                     [currentBounds.getSouth() - latSpan * 0.1, currentBounds.getWest() - lngSpan * 0.1],
                     [currentBounds.getNorth() + latSpan * 0.1, currentBounds.getEast() + lngSpan * 0.1]
@@ -2230,9 +2230,9 @@
                 const dataIndex = Math.floor((i / (numXTicks - 1)) * (data.length - 1));
                 const point = points[dataIndex];
                 const date = data[dataIndex].date;
-                return { 
-                    label: date.getFullYear().toString().slice(-2) + '/' + (date.getMonth() + 1).toString().padStart(2, '0'), 
-                    x: point.x 
+                return {
+                    label: date.getFullYear().toString().slice(-2) + '/' + (date.getMonth() + 1).toString().padStart(2, '0'),
+                    x: point.x
                 };
             });
 
@@ -2240,36 +2240,36 @@
                 <svg width="${width}" height="${height}" style="background: white; border-radius: 4px;" id="${chartId}">
                     <!-- Background -->
                     <rect width="${width}" height="${height}" fill="white" rx="4"/>
-                    
+
                     <!-- Grid lines -->
                     ${yTicks.map(tick => `<line x1="${margin.left}" y1="${tick.y}" x2="${width - margin.right}" y2="${tick.y}" stroke="#e5e7eb" stroke-width="1"/>`).join('')}
-                    
+
                     <!-- Axes -->
                     <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" stroke="#374151" stroke-width="1"/>
                     <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" stroke="#374151" stroke-width="1"/>
-                    
+
                     <!-- Data line -->
                     <path d="${pathData}" fill="none" stroke="#3b82f6" stroke-width="2"/>
-                    
+
                     <!-- Data points -->
                     ${points.map(point => `
                         <circle cx="${point.x}" cy="${point.y}" r="3" fill="#3b82f6" class="data-point" data-index="${point.index}" style="cursor: pointer;"/>
                     `).join('')}
-                    
+
                     <!-- Y-axis labels -->
                     ${yTicks.map(tick => `<text x="${margin.left - 5}" y="${tick.y + 3}" text-anchor="end" font-size="10" font-family="Inter" fill="#6b7280">${tick.value}</text>`).join('')}
-                    
+
                     <!-- X-axis labels -->
                     ${xTicks.map(tick => `<text x="${tick.x}" y="${height - margin.bottom + 15}" text-anchor="middle" font-size="10" font-family="Inter" fill="#6b7280">${tick.label}</text>`).join('')}
-                    
+
                     <!-- Title -->
                     <text x="${width / 2}" y="15" text-anchor="middle" font-size="11" font-family="Inter" font-weight="600" fill="#1f2937">${property.toUpperCase()} Time Series (${timeseriesSampling})</text>
-                    
+
                     <!-- Embedded hover info area -->
                     <rect x="5" y="${height - 35}" width="${width - 10}" height="25" fill="rgba(0,0,0,0.05)" stroke="rgba(0,0,0,0.1)" stroke-width="1" rx="3" id="info-bg-${chartId}" style="opacity: 0;"/>
                     <text x="10" y="${height - 22}" font-size="10" font-family="Inter" font-weight="500" fill="#1f2937" id="info-date-${chartId}" style="opacity: 0;"></text>
                     <text x="10" y="${height - 10}" font-size="10" font-family="Inter" font-weight="600" fill="#3b82f6" id="info-value-${chartId}" style="opacity: 0;"></text>
-                    
+
                     <!-- Hover line indicator -->
                     <line x1="0" y1="${margin.top}" x2="0" y2="${height - margin.bottom}" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" id="hover-line-${chartId}" style="opacity: 0;"/>
                 </svg>
@@ -2282,35 +2282,35 @@
                 const infoDate = document.getElementById(`info-date-${chartId}`);
                 const infoValue = document.getElementById(`info-value-${chartId}`);
                 const hoverLine = document.getElementById(`hover-line-${chartId}`);
-                
+
                 if (chart && infoBg && infoDate && infoValue && hoverLine) {
                     const dataPoints = chart.querySelectorAll('.data-point');
-                    
+
                     const showInfo = (index) => {
                         const point = points[index];
                         const dataPoint = data[index];
-                        
+
                         // Format date
                         const formattedDate = dataPoint.date.toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric'
                         });
-                        
+
                         // Update info display
                         infoDate.textContent = formattedDate;
                         infoValue.textContent = `${property}: ${dataPoint.value.toFixed(4)}`;
-                        
+
                         // Position hover line
                         hoverLine.setAttribute('x1', point.x);
                         hoverLine.setAttribute('x2', point.x);
-                        
+
                         // Show all hover elements
                         infoBg.style.opacity = '1';
                         infoDate.style.opacity = '1';
                         infoValue.style.opacity = '1';
                         hoverLine.style.opacity = '0.7';
-                        
+
                         // Highlight the specific point
                         dataPoints.forEach(dp => {
                             dp.setAttribute('r', '3');
@@ -2319,26 +2319,26 @@
                         dataPoints[index].setAttribute('r', '5');
                         dataPoints[index].setAttribute('fill', '#1d4ed8');
                     };
-                    
+
                     const hideInfo = () => {
                         infoBg.style.opacity = '0';
                         infoDate.style.opacity = '0';
                         infoValue.style.opacity = '0';
                         hoverLine.style.opacity = '0';
-                        
+
                         // Reset all points
                         dataPoints.forEach(dp => {
                             dp.setAttribute('r', '3');
                             dp.setAttribute('fill', '#3b82f6');
                         });
                     };
-                    
+
                     // Add event listeners to data points
                     dataPoints.forEach((point, index) => {
                         point.addEventListener('mouseenter', () => showInfo(index));
                         point.addEventListener('mouseleave', hideInfo);
                     });
-                    
+
                     // Add chart-wide hover for smooth interaction
                     chart.addEventListener('mouseleave', hideInfo);
                 }
@@ -2408,7 +2408,7 @@
                 updateVisibleDataStats();
                 updateMarkerSizes();
             }, 150));
-            
+
             // Initialize viewport bounds
             updateViewportBounds();
         }
@@ -2499,13 +2499,13 @@
         function showMessage(text, type = 'error') {
             messageText.textContent = text;
             messageBox.className = 'message-box p-3 text-sm rounded-lg border mt-3';
-            
+
             if (type === 'error') {
                 messageBox.classList.add('text-red-700', 'bg-red-100', 'border-red-200');
             } else {
                 messageBox.classList.add('text-green-700', 'bg-green-100', 'border-green-200');
             }
-            
+
             messageBox.classList.remove('hidden');
             setTimeout(hideMessage, 5000);
         }
@@ -2522,9 +2522,9 @@
             if (dateDisplay && date) {
                 // Format date nicely
                 const dateObj = new Date(date + 'T00:00:00');
-                const options = { 
-                    year: 'numeric', 
-                    month: 'long', 
+                const options = {
+                    year: 'numeric',
+                    month: 'long',
                     day: 'numeric',
                     weekday: 'short'
                 };
@@ -2537,7 +2537,7 @@
          */
         function updateDataSummary(useVisibleOnly = true) {
             const property = propertySelector.value;
-            
+
             if (!currentData || !currentData.features) {
                 document.getElementById('summary-points').textContent = '0';
                 document.getElementById('summary-valid').textContent = '0';
@@ -2558,7 +2558,7 @@
 
             const visiblePoints = features.length;
             const values = [];
-            
+
             // Value extraction
             for (let i = 0; i < features.length; i++) {
                 const value = features[i].properties[property];
@@ -2566,12 +2566,12 @@
                     values.push(value);
                 }
             }
-            
+
             const validPoints = values.length;
             const min = values.length > 0 ? Math.min(...values).toFixed(3) : '-';
             const max = values.length > 0 ? Math.max(...values).toFixed(3) : '-';
 
-            document.getElementById('summary-points').textContent = useVisibleOnly ? 
+            document.getElementById('summary-points').textContent = useVisibleOnly ?
                 `${visiblePoints}/${totalPoints}` : totalPoints;
             document.getElementById('summary-valid').textContent = validPoints;
             document.getElementById('summary-min').textContent = min;
@@ -2582,10 +2582,10 @@
 
         function updateVisibleDataStats() {
             if (!currentData || !currentData.features) return;
-            
+
             const property = propertySelector.value;
             const summaryData = updateDataSummary(true);
-            
+
             if (summaryData && summaryData.values && summaryData.values.length > 0) {
                 const values = summaryData.values;
                 const colorMin = parseFloat(colorMinInput.value) || Math.min(...values);
@@ -2600,7 +2600,7 @@
         async function updateMap() {
             hideMessage();
             showLoading();
-            
+
             const dateIndex = parseInt(dateSlider.value, 10);
             const selectedDate = allDates[dateIndex];
             const property = propertySelector.value;
@@ -2620,12 +2620,12 @@
 
             try {
                 currentData = await loadGeoJSONData(selectedDate);
-                
+
                 renderScheduler.schedule(() => {
                     renderData(property);
                     updateDataSummary(true);
                 });
-                
+
                 // Preload adjacent dates in background
                 preloadAdjacentDates(dateIndex);
 
@@ -2637,7 +2637,7 @@
             } catch (error) {
                 console.error('Error loading GeoJSON:', error);
                 showMessage(error.message);
-                
+
                 if (geoJsonLayer) {
                     map.removeLayer(geoJsonLayer);
                     geoJsonLayer = null;
@@ -2645,13 +2645,13 @@
                 currentData = null;
                 updateDataSummary(false);
                 updateColorLegend();
-                
+
                 document.getElementById('date-label').innerHTML = `
                     <i class="fas fa-calendar text-red-500"></i>
                     Date: ${selectedDate} <i class="fas fa-exclamation-triangle text-red-500" title="Data not available"></i>
                 `;
             }
-            
+
             hideLoading();
         }
 
@@ -2660,7 +2660,7 @@
          */
         function renderData(property) {
             const renderStart = performance.now();
-            
+
             if (!currentData || !currentData.features || currentData.features.length === 0) {
                 if (geoJsonLayer) {
                     map.removeLayer(geoJsonLayer);
@@ -2677,7 +2677,7 @@
             let colorMax = parseFloat(colorMaxInput.value);
 
             const values = currentData.features.map(f => f.properties[property]).filter(v => v != null && !isNaN(v));
-            
+
             if (isNaN(colorMin) || isNaN(colorMax)) {
                 if (values.length > 0) {
                     colorMin = Math.min(...values);
@@ -2703,15 +2703,15 @@
             // Filter features for viewport culling if enabled
             let featuresToRender = currentData.features;
             if (enableCulling && currentBounds) {
-                featuresToRender = currentData.features.filter(feature => 
+                featuresToRender = currentData.features.filter(feature =>
                     isPointInViewport(feature.geometry.coordinates)
                 );
             }
 
             // Create GeoJSON layer
-            geoJsonLayer = L.geoJSON({ 
-                type: "FeatureCollection", 
-                features: featuresToRender 
+            geoJsonLayer = L.geoJSON({
+                type: "FeatureCollection",
+                features: featuresToRender
             }, {
                 pointToLayer: function (feature, latlng) {
                     const value = feature.properties[property];
@@ -2732,7 +2732,7 @@
                 onEachFeature: function (feature, layer) {
                     const coords = feature.geometry.coordinates;
                     const currentProp = propertySelector.value;
-                    
+
                     let popupContent = `
                         <div style="font-family: Inter, sans-serif; max-width: 300px;">
                             <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #1f2937;">
@@ -2742,18 +2742,18 @@
                                 <strong>Location:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}
                             </div>
                     `;
-                    
+
                     const numericProps = ['east', 'north', 'up', 'sigma_east', 'sigma_north', 'sigma_up'];
                     popupContent += '<div style="font-size: 12px; margin-bottom: 12px;">';
                     for (const key in feature.properties) {
                         const value = feature.properties[key];
                         const isNumeric = numericProps.includes(key);
                         const isCurrent = key === currentProp;
-                        
+
                         const style = isCurrent ? 'font-weight: 600; color: #3b82f6;' : 'color: #374151;';
-                        const displayValue = (isNumeric && typeof value === 'number') ? 
+                        const displayValue = (isNumeric && typeof value === 'number') ?
                             value.toFixed(3) : value;
-                        
+
                         popupContent += `
                             <div style="display: flex; justify-content: space-between; margin-bottom: 2px; ${style}">
                                 <span>${key}:</span>
@@ -2762,7 +2762,7 @@
                         `;
                     }
                     popupContent += '</div>';
-                    
+
                     popupContent += `
                         <div style="border-top: 1px solid #e5e7eb; padding-top: 8px;">
                             <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px; color: #1f2937;">
@@ -2775,21 +2775,21 @@
                             </div>
                         </div>
                     `;
-                    
+
                     popupContent += '</div>';
-                    
+
                     const popup = L.popup({
                         maxWidth: 320,
                         className: 'custom-popup'
                     }).setContent(popupContent);
-                    
+
                     layer.bindPopup(popup);
-                    
+
                     // Time series loading
                     layer.on('popupopen', async function() {
                         const chartId = `timeseries-${coords[1]}-${coords[0]}`;
                         const chartContainer = document.getElementById(chartId);
-                        
+
                         if (chartContainer) {
                             try {
                                 const timeSeriesData = await generateTimeSeriesData(coords, currentProp);
@@ -2809,7 +2809,7 @@
             geoJsonLayer.eachLayer(layer => visibleMarkers.add(layer));
 
             updateVisibleDataStats();
-            
+
             performanceMetrics.renderTime = Math.round(performance.now() - renderStart);
             updatePerformanceMetrics();
         }
@@ -2819,10 +2819,10 @@
          */
         function updateMarkerSizes() {
             if (!geoJsonLayer) return;
-            
+
             const zoom = map.getZoom();
             const radius = Math.max(3, Math.min(12, zoom - 2));
-            
+
             geoJsonLayer.eachLayer(function(layer) {
                 if (layer.setRadius) {
                     layer.setRadius(radius);
@@ -2880,21 +2880,21 @@
 
         function startPlayback() {
             if (isPlaying) return;
-            
+
             isPlaying = true;
             playBtn.innerHTML = '<i class="fas fa-pause"></i>';
             playBtn.classList.add('active');
-            
+
             const speed = parseInt(speedSelector.value);
             playInterval = setInterval(() => {
                 const currentIndex = parseInt(dateSlider.value);
                 const maxIndex = parseInt(dateSlider.max);
-                
+
                 if (currentIndex >= maxIndex) {
                     pausePlayback();
                     return;
                 }
-                
+
                 dateSlider.value = currentIndex + 1;
                 updateMap();
             }, speed);
@@ -2904,7 +2904,7 @@
             isPlaying = false;
             playBtn.innerHTML = '<i class="fas fa-play"></i>';
             playBtn.classList.remove('active');
-            
+
             if (playInterval) {
                 clearInterval(playInterval);
                 playInterval = null;
@@ -2941,7 +2941,7 @@
          */
         function setupControls() {
             console.log('Setting up controls...');
-            
+
             // Initialize all DOM elements first
             initializeUIElements();
 
@@ -2991,7 +2991,7 @@
             basemapSelector.addEventListener('change', (e) => switchBasemap(e.target.value));
             colorMinInput.addEventListener('change', debouncedRenderUpdate);
             colorMaxInput.addEventListener('change', debouncedRenderUpdate);
-            
+
             autoScaleBtn.addEventListener('click', () => {
                 colorMinInput.value = '';
                 colorMaxInput.value = '';
@@ -3037,7 +3037,7 @@
                     const newSize = parseInt(e.target.value);
                     cacheSizeDisplay.textContent = newSize;
                     dataCache.maxSize = newSize;
-                    
+
                     while (dataCache.size() > newSize) {
                         dataCache.evictLRU();
                     }
@@ -3062,7 +3062,7 @@
             if (exportStartBtn) {
                 exportStartBtn.addEventListener('click', startMapAnimationExport);
             }
-            
+
             if (exportStopBtn) {
                 exportStopBtn.addEventListener('click', stopMapAnimationExport);
             }
@@ -3087,7 +3087,7 @@
             // Keyboard shortcuts (including tab switching)
             document.addEventListener('keydown', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-                
+
                 switch (e.code) {
                     case 'Space':
                         e.preventDefault();
@@ -3147,23 +3147,23 @@
             // Initialize export preview and performance metrics display
             updateExportPreview();
             updatePerformanceMetrics();
-            
+
             console.log('Controls setup complete');
         }
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             console.log('Initializing optimized GeoJSON viewer...');
-            
+
             // Note: MouseEvent.mozPressure deprecation warnings come from Leaflet library itself
             // This is a known issue in Leaflet 1.9.4 - it will be fixed in future Leaflet versions
-            
+
             // Initialize map first
             initMap();
-            
+
             // Setup all controls and event listeners
             setupControls();
-            
+
             // Load initial data and set initial date
             updateMap().then(() => {
                 // Ensure legend date is set on first load
@@ -3173,7 +3173,7 @@
                     updateLegendDate(selectedDate);
                 }
             });
-            
+
             console.log('Initialization complete');
             console.log(`Performance features: Caching=${enableCaching}, Culling=${enableCulling}`);
             console.log(`Cache size limit: ${dataCache.maxSize} files`);
