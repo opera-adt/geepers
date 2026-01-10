@@ -211,14 +211,31 @@ def main(
     logger.info("Merging GPS and InSAR tables per station")
     station_to_merged: dict[str, pd.DataFrame] = {}
     for station_id in tqdm(station_to_los_gps, desc="Merging GPS and InSAR"):
+        gps = station_to_los_gps[station_id].copy()
+        insar = station_to_insar[station_id].copy()
+        # Preserve the InSAR epoch as a column for deduplication
+        insar = insar.assign(insar_time=insar.index)
+
         # Use asof merge in case GPS is datetime and insar is date
-        station_to_merged[station_id] = pd.merge_asof(
-            left=station_to_los_gps[station_id],
-            right=station_to_insar[station_id],
+        merged = pd.merge_asof(
+            left=gps.sort_index(),
+            right=insar.sort_index(),
             tolerance=pd.Timedelta("1D"),
             direction="nearest",
             left_index=True,
             right_index=True,
+        )
+
+        # Keep only the closest GPS row per InSAR epoch
+        # This prevents duplicate InSAR values when multiple GPS days
+        # match to the same InSAR acquisition
+        dt = pd.Series(merged.index - merged["insar_time"], index=merged.index).abs()
+        keep_idx = dt.groupby(merged["insar_time"]).idxmin()
+        merged_one_per_insar = merged.loc[keep_idx].sort_index()
+
+        # Drop the helper column
+        station_to_merged[station_id] = merged_one_per_insar.drop(
+            columns=["insar_time"]
         )
 
     # Save results

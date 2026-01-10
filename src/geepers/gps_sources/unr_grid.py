@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from sys import version
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 import geopandas as gpd
 import pandas as pd
@@ -25,7 +25,9 @@ __all__ = ["UnrGridSource"]
 
 VALID_VERSIONS = {"0.1", "0.2"}
 DEFAULT_VERSION = "0.2"
-LOOKUP_FILE_URL = "https://geodesy.unr.edu/grid_timeseries/Version{version}/grid_latlon_lookup.txt"
+LOOKUP_FILE_URL = (
+    "https://geodesy.unr.edu/grid_timeseries/Version{version}/grid_latlon_lookup.txt"
+)
 FILENAME_TEMPLATE = "{plate}/{grid_id:06d}_{plate}.tenv8"
 GRID_DATA_BASE_URL = (
     "https://geodesy.unr.edu/grid_timeseries/Version{version}/"
@@ -37,16 +39,18 @@ GRID_DATA_BASE_URL = (
 
 class UnrGridSource(BaseGpsSource):
     """UNR Grid GPS data source for gridded time series data."""
-    def __init__(self, 
-                 version: Literal["0.1", "0.2"] = "0.2",
-                 cache_dir: Optional[str | Path] = None,):
+
+    def __init__(
+        self,
+        version: Literal["0.1", "0.2"] = "0.2",
+        cache_dir: str | Path | None = None,
+    ):
         """Initialize UNR Grid GPS data source."""
-        
         # Initialize BaseGpsSource
         super().__init__(cache_dir=cache_dir)
 
         # Store UNR version
-        self.version = version 
+        self.version = version
 
     def timeseries(
         self,
@@ -96,8 +100,9 @@ class UnrGridSource(BaseGpsSource):
 
         # TODO: how to handle fetching/saving, vs using pandas to read...
         if download_if_missing:
-            local_file = self._download_file(station_id, plate=plate,
-                                             version=self.version)
+            local_file = self._download_file(
+                station_id, plate=plate, version=self.version
+            )
             df = self.parse_data_file(local_file)
         else:
             filename = FILENAME_TEMPLATE.format(plate=plate, grid_id=station_id)
@@ -199,15 +204,12 @@ class UnrGridSource(BaseGpsSource):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if plate == "IGS14" and version == "0.2":
-            # Warning: IGS14 plate is not available in UNR version 0.2. 
+            # Warning: IGS14 plate is not available in UNR version 0.2.
             # Using IGS20 instead.
             plate = "IGS20"
 
         filename = FILENAME_TEMPLATE.format(plate=plate, grid_id=grid_id)
-        url = GRID_DATA_BASE_URL.format(
-            version=version,
-            filename=filename
-        )
+        url = GRID_DATA_BASE_URL.format(version=version, filename=filename)
         dest = output_dir / url.rsplit("/", 1)[-1]
         if not dest.exists():
             if session is None:
@@ -336,16 +338,16 @@ class UnrGridSource(BaseGpsSource):
         return StationObservationSchema.validate(df_out, lazy=True)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache
     def _read_grid_file(version: str = "0.2") -> pd.DataFrame:
         """Download and cache the UNR grid latitude/longitude lookup table."""
         if version not in VALID_VERSIONS:
             msg = (
                 f"Unsupported version '{version}'. "
                 f"Valid options are: {', '.join(VALID_VERSIONS)}."
-                )
-            raise ValueError(msg) 
-        
+            )
+            raise ValueError(msg)
+
         url = LOOKUP_FILE_URL.format(version=version)
         df = pd.read_csv(
             url,
@@ -355,7 +357,7 @@ class UnrGridSource(BaseGpsSource):
         if version == "0.2":
             # Version 0.2 maps latitudes from 0 to 360
             # convert to -180 to 180, to be consistent with version 0.1
-            df['longitude'] = ((df['longitude'] + 180) % 360) - 180 
+            df["longitude"] = ((df["longitude"] + 180) % 360) - 180
         return df.set_index("grid_point")
 
 
