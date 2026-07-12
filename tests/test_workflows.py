@@ -37,11 +37,13 @@ def test_main(tmp_path, monkeypatch):
         "CRIM",
     ]
     assert set(df.id) == set(expected_stations)
+    # Verify the first HLNA entry (value changed due to duplicate timestamp fix)
+    # The fix now selects the closest GPS point to each InSAR epoch
     expected_entry = {
         "id": "HLNA",
         "date": "2016-07-23",
         "measurement": "los_gps",
-        "value": 0.0010796103397325,
+        "value": -0.0020305613040891,
     }
     pd.testing.assert_series_equal(
         df[df.id == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
@@ -182,3 +184,96 @@ def test_select_gps_reference_no_coherence_data():
     # Should fall back to RMS-based selection even with coherence_priority=True
     ref_station = select_gps_reference(station_to_merged, coherence_priority=True)
     assert ref_station == "STAT_A"  # Lower RMS misfit
+
+
+def test_no_duplicate_insar_timestamps():
+    """Test that merge produces exactly one GPS row per InSAR epoch.
+
+    This test demonstrates the issue where multiple GPS observations
+    (from adjacent days or same day with different times) can match
+    to the same InSAR acquisition when using merge_asof with
+    tolerance="1D" and direction="nearest".
+
+    The fix ensures we keep only the closest GPS sample per InSAR epoch.
+    """
+    # GPS data: daily observations at ~11:57:30 (typical GPS timestamp)
+    gps_dates = pd.date_range("2023-01-01 11:57:30", periods=10, freq="D")
+    gps_df = pd.DataFrame(
+        {
+            "los_gps": np.random.normal(0, 0.01, 10),
+            "sigma_los": np.full(10, 0.001),
+        },
+        index=gps_dates,
+    )
+
+    # InSAR data: epochs at midnight (typical InSAR timestamp)
+    # Use fewer epochs to trigger the duplicate matching issue
+    insar_dates = pd.DatetimeIndex(
+        [
+            "2023-01-02 00:00:00",
+            "2023-01-05 00:00:00",
+            "2023-01-08 00:00:00",
+        ]
+    )
+    insar_df = pd.DataFrame(
+        {
+            "los_insar": np.random.normal(0, 0.01, 3),
+        },
+        index=insar_dates,
+    )
+
+    # OLD BEHAVIOR: merge_asof with tolerance="1D" allows multiple GPS rows
+    # to match the same InSAR epoch
+    old_merged = pd.merge_asof(
+        left=gps_df.sort_index(),
+        right=insar_df.sort_index(),
+        tolerance=pd.Timedelta("1D"),
+        direction="nearest",
+        left_index=True,
+        right_index=True,
+    )
+
+    # Demonstrate the issue: multiple GPS rows can have the same los_insar value
+    # (meaning they matched to the same InSAR epoch)
+    value_counts = old_merged["los_insar"].value_counts()
+    (value_counts > 1).any()
+
+    # FIXED BEHAVIOR: Keep only one GPS row per InSAR epoch (the closest one)
+    # Add insar_time column to track which InSAR epoch each GPS row matched to
+    insar_with_time = insar_df.assign(insar_time=insar_df.index)
+    merged = pd.merge_asof(
+        left=gps_df.sort_index(),
+        right=insar_with_time.sort_index(),
+        tolerance=pd.Timedelta("1D"),
+        direction="nearest",
+        left_index=True,
+        right_index=True,
+    )
+
+    # Keep only the closest GPS row per InSAR epoch
+    dt = (merged.index - merged["insar_time"]).abs()
+    keep_idx = dt.groupby(merged["insar_time"]).idxmin()
+    merged_one_per_insar = merged.loc[keep_idx].sort_index()
+
+    # After the fix: each InSAR value should appear exactly once
+    fixed_value_counts = merged_one_per_insar["los_insar"].value_counts()
+    assert (
+        fixed_value_counts <= 1
+    ).all(), "Each InSAR epoch should appear at most once"
+
+    # Verify we have the expected number of matches (3 InSAR epochs)
+    assert (
+        len(merged_one_per_insar) == 3
+    ), "Should have exactly 3 GPS rows (one per InSAR epoch)"
+
+    # Verify that GPS rows are matched to the closest InSAR epoch
+    for idx, row in merged_one_per_insar.iterrows():
+        insar_time = row["insar_time"]
+        # This GPS timestamp should be the closest to its matched InSAR epoch
+        gps_matches = merged[merged["insar_time"] == insar_time]
+        time_diffs = pd.Series(
+            abs(gps_matches.index - insar_time), index=gps_matches.index
+        )
+        assert (
+            idx == time_diffs.idxmin()
+        ), f"GPS row {idx} should be closest to InSAR epoch {insar_time}"

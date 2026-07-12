@@ -139,23 +139,17 @@ def select_gps_reference(
         for station, df in station_to_merged_df.items()
     }
 
-    # Get total time for the InSAR data
-    max_insar_time = pd.Series(
-        [d.index.max() for d in station_to_merged_df.values()]
-    ).max()
-    min_insar_time = pd.Series(
-        [d.index.min() for d in station_to_merged_df.values()]
-    ).min()
-
-    # los_insar
-    total_time = max_insar_time - min_insar_time
-    total_days = total_time.total_seconds() / (24 * 3600)
+    # Get total number of InSAR epochs across all stations
+    # Use the maximum number of unique InSAR epochs from any station
+    max_insar_epochs = max(
+        df["los_insar"].notna().sum() for df in station_to_merged_df.values()
+    )
 
     # Filter stations with insufficient overlap
     candidate_stations = {
         station: quality
         for station, quality in qualities.items()
-        if quality.num_gps >= (min_coverage_fraction * total_days)
+        if quality.num_gps >= (min_coverage_fraction * max_insar_epochs)
     }
 
     if not candidate_stations:
