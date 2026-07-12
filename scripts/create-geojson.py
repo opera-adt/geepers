@@ -101,7 +101,7 @@ def main(
 
     """
     unrg = UnrGridSource(version=version)
-    gdf = unrg.timeseries_many(bbox=bbox,start_date=start_date)
+    gdf = unrg.timeseries_many(bbox=bbox, start_date=start_date)
     export_gdf_to_geojson_sources(gdf=gdf, output_dir=output_dir)
 
 

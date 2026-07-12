@@ -8,6 +8,7 @@ import tyro
 
 from geepers.gps_sources import UnrGridSource
 
+
 def export_gdf_to_geoparquet(gdf, output_file="unr_grid.parquet"):
     """Export a GeoDataFrame to multiple GeoJSON files organized by date.
 
@@ -35,10 +36,8 @@ def export_gdf_to_geoparquet(gdf, output_file="unr_grid.parquet"):
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     gdf.to_parquet(
-        output_file,
-        compression='snappy',
-        row_group_size=None,
-        geometry_encoding="WKB")
+        output_file, compression="snappy", row_group_size=None, geometry_encoding="WKB"
+    )
 
     # Print file size statistics
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
@@ -51,7 +50,7 @@ def main(
     start_date: datetime.datetime = datetime.datetime(2016, 1, 1),
     output_dir=Path("geojson_sources"),
     version: Literal["0.1", "0.2"] = "0.2",
-    ):
+):
     """Export a GeoDataFrame to multiple GeoJSON files organized by date.
 
     Parameters
@@ -66,7 +65,7 @@ def main(
 
     """
     unrg = UnrGridSource(version=version)
-    gdf = unrg.timeseries_many(bbox=bbox,start_date=start_date)
+    gdf = unrg.timeseries_many(bbox=bbox, start_date=start_date)
     export_gdf_to_geoparquet(gdf=gdf, output_dir=output_dir)
 
 
