@@ -149,4 +149,9 @@ def detect_steps_enu(
         found = detect_steps(indexed[comp], **kwargs)
         found["component"] = comp
         results.append(found)
-    return pd.concat(results, ignore_index=True)
+    # Drop components with no detections before concat: concatenating empty /
+    # all-NA frames is deprecated in pandas and changes result dtypes.
+    non_empty = [r for r in results if not r.empty]
+    if not non_empty:
+        return pd.DataFrame(columns=["date", "step_size", "delta_aic", "component"])
+    return pd.concat(non_empty, ignore_index=True)

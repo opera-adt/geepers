@@ -3312,8 +3312,8 @@ packages:
   timestamp: 1752608821935
 - pypi: ./
   name: geepers
-  version: 0.3.0.post1.dev13+g3a069abe6
-  sha256: 565880e67cc5a8b0cd2b113af4d2539a31878b17010fbced2687c0a88e7c0ff1
+  version: 0.3.0.post1.dev14+g3237584d8.d20260713
+  sha256: 3019111e1bc45f361f84eda323a1dee349c56582c6b0b65daa4334ab2b757f39
   requires_dist:
   - pandas
   - lxml
