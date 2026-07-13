@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from functools import lru_cache
-from io import StringIO
 from typing import TYPE_CHECKING, Final, Literal
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import requests
 
 from geepers.schemas import StationObservationSchema
-from geepers.utils import decimal_year_to_datetime, get_cache_dir
+from geepers.utils import decimal_years_to_datetimes, get_cache_dir
 
 from .base import BaseGpsSource
 
@@ -62,7 +59,7 @@ class SideshowSource(BaseGpsSource):
         frame: Literal["ENU", "XYZ"] = "ENU",
         start_date: str | None = None,
         end_date: str | None = None,
-        zero_by: Literal["mean", "start"] = "mean",
+        zero_by: Literal["mean", "start", "none"] = "mean",
         download_if_missing: bool = True,  # noqa: ARG002
     ) -> pd.DataFrame:
         """Load GPS station time series data.
@@ -92,9 +89,10 @@ class SideshowSource(BaseGpsSource):
             msg = "XYZ frame not supported for Sideshow data"
             raise ValueError(msg)
 
-        df = self._read_series(station_id)
+        # Copy so we never mutate the lru_cached DataFrame
+        df = self._read_series(station_id).copy()
         # Replace decimal year with datetime
-        df["date"] = df["decimal_year"].apply(decimal_year_to_datetime)
+        df["date"] = decimal_years_to_datetimes(df["decimal_year"])
         df = df.drop(columns=["decimal_year"])
         # Move date to first column:
         df = df[["date", *df.columns[:-1].to_list()]]
@@ -103,7 +101,7 @@ class SideshowSource(BaseGpsSource):
         return StationObservationSchema.validate(df, lazy=True)
 
     @staticmethod
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=128)
     def _read_series(station_id: str) -> pd.DataFrame:
         _raw_names = ["decimal_year"] + SideshowSource._names[1:]
         # https://sideshow.jpl.nasa.gov/post/tables/GNSS_Time_Series.pdf
@@ -128,10 +126,10 @@ class SideshowSource(BaseGpsSource):
     @lru_cache(maxsize=1)
     def _fetch_station_data() -> gpd.GeoDataFrame:
         """Download and cache the JPL Sideshow site list."""
-        resp = requests.get(SITE_LIST_URL)
-        resp.raise_for_status()
+        import warnings
+
         with warnings.catch_warnings(category=UserWarning, action="ignore"):
-            return np.loadtxt(StringIO(resp.text), comments="<", skiprows=9, dtype=str)
+            return np.loadtxt(SITE_LIST_URL, comments="<", skiprows=9, dtype=str)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         lines = self._fetch_station_data()

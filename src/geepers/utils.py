@@ -7,6 +7,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 
 from ._types import DateOrDatetime
 
@@ -78,7 +79,7 @@ def get_cache_dir(force_posix=False, app_name="geepers") -> Path:
         return Path("~/Library/Application Support").expanduser() / app_name
     else:
         base_path = Path(
-            os.environ.get("XDG_CONFIG_HOME", Path("~/.cache").expanduser())
+            os.environ.get("XDG_CACHE_HOME", Path("~/.cache").expanduser())
         )
         return base_path / app_name
 
@@ -201,3 +202,23 @@ def decimal_year_to_datetime(decimal_year: float) -> datetime.datetime:
     return datetime.datetime(1990, 1, 1) + datetime.timedelta(
         seconds=(decimal_year - start_year) * seconds_per_year
     )
+
+
+def decimal_years_to_datetimes(decimal_years) -> pd.DatetimeIndex:
+    """Vectorized version of `decimal_year_to_datetime`.
+
+    Parameters
+    ----------
+    decimal_years : array-like of float
+        Years expressed as decimals (e.g., [2014.5, 2014.5027]).
+
+    Returns
+    -------
+    pd.DatetimeIndex
+        Corresponding calendar datetimes, using the same 365.25-day-year
+        convention as `decimal_year_to_datetime`.
+
+    """
+    dy = np.asarray(decimal_years, dtype=float)
+    seconds = (dy - 1990.0) * 365.25 * 24 * 3600
+    return pd.Timestamp("1990-01-01") + pd.to_timedelta(seconds, unit="s")
