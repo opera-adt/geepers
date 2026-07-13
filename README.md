@@ -61,15 +61,55 @@ print(df_many.head())
 ```
 
 ## Example: Comparing GPS and InSAR Data
-The basic InSAR/GNSS comparison workflow is offered by the `geepers` command line tool.
+
+The InSAR/GNSS comparison workflow is offered by the `geepers` command line tool:
 
 ```bash
-geepers --los F33039_los_enu.tif --timeseries-files displacement_20160711_*tif --temporal-coherence-files temporal_coherence_*.tif --similarity-files phase_similarity*.tif
+geepers \
+    --los F33039_los_enu.tif \
+    --timeseries-files displacement_20160711_*tif \
+    --temporal-coherence-files temporal_coherence_*.tif \
+    --similarity-files phase_similarity*.tif \
+    --insar-buffer-meters 100 \
+    --requirement-mm 3 0.5 \
+    --wavelength 0.2384    # NISAR L-band; omit for Sentinel-1
 ```
 
-The results are saved in the current directory in the `GPS` folder by default.
+Results are saved in the `GPS` folder by default: per-station time-series
+and rate comparisons, plus the structure function (pairwise relative RMSE
+vs station separation, checked against the requirement curve) and the
+per-epoch network misfit. See
+[How-To Guides](https://geepers.readthedocs.io/en/latest/how-to-guides/)
+and the runnable
+[validation notebook](docs/notebooks/gnss_insar_validation.ipynb).
 
-(TODO: Example data prep for this)
+## Analysis toolbox
+
+Beyond data access and the comparison workflow, geepers ships analysis
+modules for GNSS velocity fields (see
+[Analysis modules](docs/analysis-modules.md) for usage and the
+[tour notebook](docs/notebooks/geepers_tour.ipynb) for a runnable demo):
+
+| Module | Purpose |
+|---|---|
+| `geepers.midas` | Robust MIDAS velocities (Blewitt et al., 2016) |
+| `geepers.trend` | Velocities with realistic uncertainties under power-law + white noise (validated against HectorP); fast Whittle method and parallel `estimate_trend_many` for networks |
+| `geepers.variability` | Temporal & spatial velocity-stability metrics, spatial structure function |
+| `geepers.quality` | Gap percentage, station quality, reference selection |
+| `geepers.steps` | Detection of uncatalogued jumps (AIC sliding window) |
+| `geepers.cme` | Common-mode error estimation/removal (PCA/ICA) |
+| `geepers.gps_imaging` | Robust weighted-median interpolation (Hammond et al., 2016 GPS Imaging port) |
+| `geepers.collocation` | Least-squares collocation, ordinary kriging, plate-boundary separation |
+| `geepers.euler` | Euler pole estimation and plate-motion prediction |
+| `geepers.strain` | Strain-rate/rotation fields from gridded velocities |
+| `geepers.validation` | GNSS-vs-InSAR validation: velocity scatter (MAD/RMSE/R²), structure function, semivariogram, per-epoch misfit |
+| `geepers.synthetic` | Schema-valid synthetic networks and series for testing |
+
+An interactive MapLibre viewer for UNR gridded time series is hosted at
+**[opera-adt.github.io/geepers](https://opera-adt.github.io/geepers/)**
+(globe view, velocity/vector overlays, plate boundaries, per-point time
+series). See the [viewer docs](scripts/README.md) to run it locally or
+build your own dataset.
 
 ### Working with Multiple Sources
 
