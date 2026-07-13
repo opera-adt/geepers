@@ -48,7 +48,20 @@ PY
 # 2. Static assets.
 cp "$DATA_SRC" "$WORK/$DATA_DEST"
 [ -f "$BOUNDARIES" ] && cp "$BOUNDARIES" "$WORK/PB2002_boundaries.json"
+# .nojekyll (at root) disables Jekyll for the whole site, so the mkdocs
+# assets under docs/ (e.g. _mkdocstrings.css) are served too.
 : > "$WORK/.nojekyll"
+
+# 2b. mkdocs docs at /docs/ (viewer stays at the site root). Built only when
+# mkdocs is available (run from an env with the docs deps + geepers importable);
+# skipped with a warning otherwise so a viewer-only deploy still works.
+REPO_ROOT="$(cd "$SCRIPTS_DIR/.." && pwd)"
+if command -v mkdocs >/dev/null 2>&1 && [ -f "$REPO_ROOT/mkdocs.yml" ]; then
+    echo "Building docs → docs/ …"
+    ( cd "$REPO_ROOT" && PYTHONPATH=src mkdocs build --quiet --site-dir "$WORK/docs" )
+else
+    echo "warning: mkdocs not found; deploying viewer only (no docs/)." >&2
+fi
 cat > "$WORK/README.md" <<EOF
 # OPERA UNR Grid Viewer (GitHub Pages)
 
@@ -59,6 +72,7 @@ https://opera-adt.github.io/geepers/ . Rebuilt by \`scripts/deploy-pages.sh\`.
 - \`$DATA_DEST\` — RAW PARQUET (not a zip; the extension disables the Pages
   CDN gzip that would corrupt range reads — rename to .parquet after download)
 - \`PB2002_boundaries.json\` — tectonic plate boundaries (Bird 2003)
+- \`docs/\` — mkdocs project documentation (served at \`.../geepers/docs/\`)
 
 Other datasets can be viewed with \`?data=<url>\` (host must allow CORS + ranges).
 EOF
@@ -67,7 +81,7 @@ EOF
 cd "$WORK"
 git init -q -b gh-pages
 git add -A
-git commit -q -m "Deploy OPERA UNR grid viewer ($(basename "$DATA_SRC"), ${size_mb} MB)"
+git commit -q -m "Deploy OPERA UNR grid viewer ($(basename "$DATA_SRC"), ${size_mb} MB) + docs"
 git remote add origin "$REMOTE"
 git push -f origin gh-pages
 
