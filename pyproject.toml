@@ -34,6 +34,7 @@ dependencies = [
   "pyproj",
   "rasterio",
   "rioxarray",
+  "scipy",
   "shapely>=2",
   "requests",
   "tqdm",
@@ -79,6 +80,7 @@ dask = ">=2025.5.1"
 pyproj = "*"
 rasterio = "*"
 rioxarray = ">=0.19.0"
+scipy = "*"
 shapely = "*"
 requests = ">=2.32.4"
 tqdm = ">=4.67.1"
@@ -139,6 +141,10 @@ version_scheme = "no-guess-dev" # Will not guess the next version
 [tool.ruff]
 src = ["src"]
 unsafe-fixes = true
+# Rendered documentation notebooks use pedagogical inline style (compact
+# plotting, mid-notebook imports); force-exclude so pre-commit skips them too.
+extend-exclude = ["docs/notebooks"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = [
@@ -188,6 +194,8 @@ ignore = [
 "scripts/*" = ["F401"]
 "src/geepers/uncertainty.py" = ["RUF002"]                   # let us use sigma here
 "src/geepers/schemas.py" = ["D106"]
+"src/geepers/collocation.py" = ["N803"]                     # covariance matrices C, Css, ...
+"src/geepers/trend.py" = ["N803"]                           # design matrix A, covariance C
 
 [tool.black]
 target-version = ["py311", "py312", "py313"]

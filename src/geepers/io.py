@@ -4,13 +4,13 @@ import logging
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from affine import cached_property
 from numpy.typing import ArrayLike
 from pyproj import Transformer
 from rasterio.crs import CRS
@@ -26,6 +26,15 @@ logger = logging.getLogger("geepers")
 
 if TYPE_CHECKING:
     from ._types import Index
+
+
+def _round_half_up(value: float) -> int:
+    """Round to nearest integer, ties away from zero-half (0.5 -> 1, 1.5 -> 2).
+
+    Unlike built-in `round`, which rounds ties to the nearest even integer
+    and so picks pixels inconsistently at exact half-pixel boundaries.
+    """
+    return int(np.floor(value + 0.5))
 
 
 @dataclass
@@ -310,13 +319,31 @@ class XarrayReader:
     def _transformer_from_lonlat(self):
         return Transformer.from_crs("EPSG:4326", self.crs, always_xy=True)
 
+    @property
+    def resolution(self) -> tuple[float, float]:
+        """Absolute (x, y) pixel size in CRS units."""
+        rx, ry = self.da.rio.resolution()
+        return abs(float(rx)), abs(float(ry))
+
+    def _buffer_meters_to_native(
+        self, buffer_meters: float, lat: float
+    ) -> tuple[float, float]:
+        """Convert a metric radius to per-axis distances in CRS units."""
+        if self.crs.is_geographic:
+            # meters -> degrees; longitude scaled by cos(latitude)
+            deg_lat = buffer_meters / 111_320.0
+            deg_lon = deg_lat / max(np.cos(np.radians(lat)), 1e-6)
+            return deg_lon, deg_lat
+        return buffer_meters, buffer_meters
+
     def read_window(
         self,
         lons: float | ArrayLike,
         lats: float | ArrayLike,
         buffer_pixels: int = 0,
         boundary: Literal["nan", "warn", "raise"] = "nan",
-        op=round,
+        op=_round_half_up,
+        buffer_meters: float | None = None,
     ) -> list[xr.DataArray]:
         """Read values in a window around the given longitude and latitude.
 
@@ -328,12 +355,19 @@ class XarrayReader:
             Latitudes to read.
         buffer_pixels : int, optional
             Number of pixels to read around the given longitude and latitude.
-            Default is 0.
+            Default is 0. Ignored when `buffer_meters` is given.
         op : callable, optional
             Function to apply to the longitude and latitude to get the row and column.
             Default is `round`.
         boundary : Literal["nan", "warn", "raise"], optional
             How to handle out-of-bounds coordinates. Default is "nan".
+        buffer_meters : float, optional
+            Metric radius around each point. The window covers the
+            enclosing pixel box and cells whose centers fall outside the
+            circle are set to NaN, so a reducer like ``median(skipna)``
+            sees a circular footprint. Takes precedence over
+            `buffer_pixels`. For geographic rasters the radius is
+            converted to degrees with a cos(latitude) correction.
 
         Returns
         -------
@@ -348,17 +382,30 @@ class XarrayReader:
             x, y = np.asarray(lons), np.asarray(lats)
 
         xa, ya = np.atleast_1d(x), np.atleast_1d(y)
+        la = np.atleast_1d(np.asarray(lats, dtype=float))
         if xa.size != ya.size:
             msg = "x and y must have the same length"
             raise ValueError(msg)
 
+        res_x, res_y = self.resolution
+
         windows: list[xr.DataArray] = []
-        for xx, yy in zip(xa, ya, strict=True):
+        for xx, yy, lat_deg in zip(xa, ya, la, strict=True):
+            if buffer_meters is not None:
+                bx, by = self._buffer_meters_to_native(buffer_meters, lat_deg)
+                buf_px_x = int(np.ceil(bx / res_x))
+                buf_px_y = int(np.ceil(by / res_y))
+            else:
+                bx = by = None
+                buf_px_x = buf_px_y = buffer_pixels
+
             # Use the inverse transform to get row, col
             col_float, row_float = ~(self.da.rio.transform()) * (xx, yy)
             col, row = op(col_float), op(row_float)
-            x_slice = slice(col - buffer_pixels, col + buffer_pixels + 1)
-            y_slice = slice(row - buffer_pixels, row + buffer_pixels + 1)
+            # Clamp at 0 so a window near the edge shrinks instead of
+            # wrapping around via negative indexing
+            x_slice = slice(max(0, col - buf_px_x), col + buf_px_x + 1)
+            y_slice = slice(max(0, row - buf_px_y), row + buf_px_y + 1)
             # Check the sizes of the slices
             # Slice; if it would be empty we'll fabricate a NaN-filled block
             if (
@@ -376,16 +423,23 @@ class XarrayReader:
                 if boundary == "warn":
                     warnings.warn(msg, stacklevel=2)
 
-                win_shape = 2 * buffer_pixels + 1
+                win_shape = (2 * buf_px_x + 1, 2 * buf_px_y + 1)
                 template = self.da.isel(
-                    x=slice(0, win_shape), y=slice(0, win_shape)
+                    x=slice(0, win_shape[0]), y=slice(0, win_shape[1])
                 ).copy(deep=True)
                 template.data = np.full(template.shape, np.nan)
                 windows.append(template)
                 continue
 
-            # Normal in-bounds case
-            windows.append(self.da.isel(x=x_slice, y=y_slice))
+            window = self.da.isel(x=x_slice, y=y_slice)
+            if buffer_meters is not None:
+                # Keep only cells whose centers fall inside the ellipse
+                # (circle in metric units) around the requested point
+                inside = ((window.x - xx) / bx) ** 2 + (
+                    (window.y - yy) / by
+                ) ** 2 <= 1.0
+                window = window.where(inside)
+            windows.append(window)
 
         return windows
 

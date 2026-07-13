@@ -106,13 +106,15 @@ def calculate_rates(
 
     # Calculate rates for each station id
     rates = df_wide.groupby("id").apply(calc_station_metrics, include_groups=False)  # type: ignore[call-overload]
-    # Get the longitude and latitude of each station
+    # Get the longitude and latitude of each station, aligned by station id
     unr_source = UnrSource()
-    gdf_stations = unr_source.stations()
-    rates = gpd.GeoDataFrame(
-        rates,
-        geometry=gdf_stations[gdf_stations.id.isin(rates.index)].geometry.tolist(),
-    )
+    gdf_stations = unr_source.stations().set_index("id")
+    geometry = gdf_stations.geometry.reindex(rates.index)
+    if geometry.isna().any():
+        missing = rates.index[geometry.isna()].tolist()
+        msg = f"No station coordinates found for: {missing}"
+        raise ValueError(msg)
+    rates = gpd.GeoDataFrame(rates, geometry=geometry.values, crs="EPSG:4326")
 
     rates = RatesSchema.validate(rates, lazy=True)
 
