@@ -208,3 +208,64 @@ def plot_stations_on_map(
     for name, geom in zip(gdf.name, gdf.geometry, strict=True):
         ax.text(geom.x, geom.y, name, fontsize=8)
     return fig, ax
+
+
+def plot_rmse_vs_distance(
+    rmse_df: pd.DataFrame,
+    binned_df: pd.DataFrame | None = None,
+    requirement=None,
+    units: str = "m",
+    ax=None,
+    loglog: bool = True,
+):
+    """Structure function: pairwise differential RMSE vs separation.
+
+    Parameters
+    ----------
+    rmse_df : pd.DataFrame
+        Output of `geepers.analysis.pairwise_differential_rmse`.
+    binned_df : pd.DataFrame, optional
+        Output of `geepers.analysis.binned_rmse_profile`; adds the
+        median-per-bin curve.
+    requirement : callable, optional
+        Requirement curve ``req(distance_km) -> threshold`` (same units
+        as ``rmse``), drawn as a dashed line.
+    units : str
+        Unit label for the y axis. Default "m".
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw into; a new figure is created if omitted.
+    loglog : bool
+        Use logarithmic x and y axes (the structure-function
+        convention). Default True.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 5))
+
+    ax.scatter(
+        rmse_df["distance_km"], rmse_df["rmse"],
+        s=25, c="0.2", alpha=0.6, zorder=3, label="station pairs",
+    )
+    if binned_df is not None and len(binned_df):
+        ax.plot(
+            binned_df["distance_km"], binned_df["rmse_median"],
+            "r-o", ms=4, lw=1.5, zorder=4, label="median per bin",
+        )
+    if requirement is not None:
+        dmin = max(rmse_df["distance_km"].min() * 0.9, 1e-3)
+        d = np.linspace(dmin, rmse_df["distance_km"].max() * 1.02, 200)
+        ax.plot(d, requirement(d), "k--", lw=1.5, label="requirement")
+
+    if loglog:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+    ax.set_xlabel("Station separation (km)")
+    ax.set_ylabel(f"Differential RMSE ({units})")
+    ax.set_title("InSAR - GPS structure function")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    return ax

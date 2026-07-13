@@ -1,0 +1,18 @@
+# Keep .git: setuptools_scm derives the version from git metadata
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.pixi/
+pixi.lock
+docs/
+tests/cassettes/
+tests/data/
+scripts/
+*.zip
+*.parquet
+.vscode/
+.idea/

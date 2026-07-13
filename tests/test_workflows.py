@@ -43,8 +43,12 @@ def test_main(tmp_path, monkeypatch):
         "measurement": "los_gps",
         "value": 0.0010796103397325,
     }
+    # check_names=False: the row's positional index in the CSV depends on
+    # station ordering, which is not part of the contract
     pd.testing.assert_series_equal(
-        df[df.id == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
+        df[df.id == "HLNA"].iloc[0],
+        pd.Series(expected_entry),
+        check_names=False,
     )
 
 

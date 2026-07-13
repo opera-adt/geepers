@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from geepers.schemas import StationObservationSchema
-from geepers.utils import decimal_year_to_datetime, get_cache_dir
+from geepers.utils import decimal_years_to_datetimes, get_cache_dir
 
 from .base import BaseGpsSource
 
@@ -89,9 +89,10 @@ class SideshowSource(BaseGpsSource):
             msg = "XYZ frame not supported for Sideshow data"
             raise ValueError(msg)
 
-        df = self._read_series(station_id)
+        # Copy so we never mutate the lru_cached DataFrame
+        df = self._read_series(station_id).copy()
         # Replace decimal year with datetime
-        df["date"] = df["decimal_year"].apply(decimal_year_to_datetime)
+        df["date"] = decimal_years_to_datetimes(df["decimal_year"])
         df = df.drop(columns=["decimal_year"])
         # Move date to first column:
         df = df[["date", *df.columns[:-1].to_list()]]
@@ -100,7 +101,7 @@ class SideshowSource(BaseGpsSource):
         return StationObservationSchema.validate(df, lazy=True)
 
     @staticmethod
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=128)
     def _read_series(station_id: str) -> pd.DataFrame:
         _raw_names = ["decimal_year"] + SideshowSource._names[1:]
         # https://sideshow.jpl.nasa.gov/post/tables/GNSS_Time_Series.pdf

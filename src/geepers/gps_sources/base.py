@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import difflib
+import logging
+import re
+import urllib.error
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
@@ -11,7 +14,7 @@ from typing import Literal
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import box
+import requests
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import thread_map
 
@@ -19,7 +22,39 @@ from geepers import utils
 from geepers._types import PathOrStr
 from geepers.schemas import PointSchema
 
-__all__ = ["BaseGpsSource"]
+__all__ = ["BaseGpsSource", "validate_station_id"]
+
+logger = logging.getLogger("geepers")
+
+_STATION_ID_PATTERN = re.compile(r"[A-Za-z0-9_]{1,9}")
+
+
+def validate_station_id(station_id: str) -> str:
+    """Check that `station_id` is safe to embed in URLs and cache paths.
+
+    Guards against path traversal (e.g. ``"../../etc"``), since station ids
+    are interpolated into both download URLs and local cache filenames.
+
+    Parameters
+    ----------
+    station_id : str
+        The station identifier to check.
+
+    Returns
+    -------
+    str
+        The validated station id, unchanged.
+
+    Raises
+    ------
+    ValueError
+        If the id contains anything but 1-9 alphanumeric/underscore chars.
+
+    """
+    if not _STATION_ID_PATTERN.fullmatch(station_id):
+        msg = f"Invalid station id: {station_id!r}"
+        raise ValueError(msg)
+    return station_id
 
 
 class BaseGpsSource(ABC):
@@ -34,39 +69,43 @@ class BaseGpsSource(ABC):
         frame: Literal["ENU", "XYZ"] = "ENU",
         start_date: str | None = None,
         end_date: str | None = None,
-        zero_by: Literal["mean", "start"] = "mean",
+        zero_by: Literal["mean", "start", "none"] = "mean",
         download_if_missing: bool = True,
         *,
         max_workers: int = 8,
+        skip_errors: bool = True,
     ):
         if bbox is None and mask is None and ids is None:
             msg = "Must provide ids, bbox or mask"
             raise ValueError(msg)
-        gdf_stations = self.stations()
-        if bbox is not None:
-            gdf_stations = self.stations(bbox=bbox)
+        gdf_stations = self.stations(bbox=bbox, mask=mask)
+        if bbox is not None or mask is not None or ids is None:
             ids = gdf_stations["id"]
-        elif mask is not None:
-            gdf_stations = self.stations(mask=mask)
-            ids = gdf_stations["id"]
-
-        if ids is None:
-            ids = gdf_stations["id"]
+        # Index by id for O(1) metadata lookups in `_load_one`
+        station_rows = gdf_stations.set_index("id")
 
         # Function to load one id
-        def _load_one(sid: str) -> pd.DataFrame:
-            df = self.timeseries(
-                sid,
-                frame=frame,
-                start_date=start_date,
-                end_date=end_date,
-                zero_by=zero_by,
-                download_if_missing=download_if_missing,
-            )
+        def _load_one(sid: str) -> pd.DataFrame | None:
+            try:
+                df = self.timeseries(
+                    sid,
+                    frame=frame,
+                    start_date=start_date,
+                    end_date=end_date,
+                    zero_by=zero_by,
+                    download_if_missing=download_if_missing,
+                )
+            except (requests.HTTPError, urllib.error.HTTPError) as e:
+                # Some ids in the station lists have no data file on the
+                # server (e.g. UNR grid points with too little data)
+                if not skip_errors:
+                    raise
+                logger.warning("Skipping %s: %s", sid, e)
+                return None
             df.insert(0, "id", sid)  # keep id as a column for melt/pivot
-            row = gdf_stations[gdf_stations["id"] == sid]
+            row = station_rows.loc[sid]
             for col in ("lon", "lat", "alt", "geometry"):
-                df[col] = row.iloc[0][col]
+                df[col] = row[col]
             return df
 
         # (Optional) parallel map
@@ -77,6 +116,15 @@ class BaseGpsSource(ABC):
         else:
             dfs = [_load_one(sid) for sid in tqdm(ids)]
 
+        n_failed = sum(df is None for df in dfs)
+        if n_failed:
+            logger.warning(
+                "Skipped %d of %d ids with no data", n_failed, len(dfs)
+            )
+        dfs = [df for df in dfs if df is not None]
+        if not dfs:
+            msg = "No time series could be loaded"
+            raise ValueError(msg)
         big = pd.concat(dfs, ignore_index=True)
 
         return gpd.GeoDataFrame(big, geometry="geometry", crs="EPSG:4326")
@@ -96,9 +144,18 @@ class BaseGpsSource(ABC):
             self._base_cache_dir = utils.get_cache_dir()
         else:
             self._base_cache_dir = Path(cache_dir)
-        subdir = self.__class__.__name__.lower().replace("source", "")
-        self._cache_dir = self._base_cache_dir / subdir
-        self._cache_dir.mkdir(exist_ok=True, parents=True)
+        self._subdir = self.__class__.__name__.lower().replace("source", "")
+
+    @property
+    def _cache_dir(self) -> Path:
+        """Cache directory for this source, created on first access.
+
+        Creation is deferred so that instantiating a source (e.g. at module
+        import time) has no filesystem side effects.
+        """
+        cache_dir = self._base_cache_dir / self._subdir
+        cache_dir.mkdir(exist_ok=True, parents=True)
+        return cache_dir
 
     @abstractmethod
     def timeseries(
@@ -197,18 +254,18 @@ class BaseGpsSource(ABC):
             Filtered GeoDataFrame.
 
         """
-        # Apply bbox filter
+        # Apply bbox filter (coordinate slicing: much faster than a
+        # geometric clip for point layers)
         if bbox is not None:
             west, south, east, north = bbox
-            bounds_poly = box(west, south, east, north)
-            gdf = gdf.clip(bounds_poly)
+            gdf = gdf.cx[west:east, south:north]
 
         # Apply mask filter
         if mask is not None:
-            gdf = gdf[gdf.geometry.within(mask.unary_union)]
+            gdf = gdf[gdf.geometry.within(mask.union_all())]
 
         # Reset index for cleaner output
-        gdf.reset_index(drop=True, inplace=True)
+        gdf = gdf.reset_index(drop=True)
 
         # Validate basic point schema
         return PointSchema.validate(gdf, lazy=True)
@@ -229,12 +286,14 @@ class BaseGpsSource(ABC):
     def _zero_data(
         self,
         df: pd.DataFrame,
-        zero_by: Literal["mean", "start"] = "mean",
+        zero_by: Literal["mean", "start", "none"] | None = "mean",
         columns: list[str] | None = None,
     ) -> pd.DataFrame:
-        """Zero the data in a DataFrame."""
+        """Zero the data in a DataFrame ("none"/None leaves it as-is)."""
         if columns is None:
             columns = ["east", "north", "up"]
+        if zero_by is None or zero_by.lower() == "none":
+            return df
         if zero_by.lower() == "mean":
             mean_val = df[columns].mean()
             df.loc[:, columns] -= mean_val
@@ -242,7 +301,7 @@ class BaseGpsSource(ABC):
             start_val = df[columns].iloc[:10].mean()
             df.loc[:, columns] -= start_val
         else:
-            msg = "zero_by must be either 'mean' or 'start'"
+            msg = "zero_by must be 'mean', 'start', or 'none'"
             raise ValueError(msg)
         return df
 

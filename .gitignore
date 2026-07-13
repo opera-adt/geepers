@@ -161,3 +161,12 @@ Thumbs.db
 # pixi environments
 .pixi
 *.egg-info
+
+# Local research scratch files (keep out of the package)
+/*.zip
+/midas.py
+/hectorp_wrapper.py
+scripts/*.parquet
+
+# Generated GitHub Pages staging copy (see scripts/deploy-pages.sh)
+scripts/web/

@@ -7,6 +7,50 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 import pandas as pd
+from numpy.typing import ArrayLike
+
+
+def gap_percentage(
+    dates: ArrayLike,
+    sampling_days: float = 1.0,
+    start: str | pd.Timestamp | None = None,
+    end: str | pd.Timestamp | None = None,
+) -> float:
+    """Percentage of missing epochs in a time series.
+
+    Compares the number of observed epochs against the number expected
+    on a regular grid with the given sampling interval.
+
+    Parameters
+    ----------
+    dates : array-like of datetime64
+        Observation epochs.
+    sampling_days : float
+        Nominal sampling interval in days. Default is 1 (daily).
+    start, end : str or pd.Timestamp, optional
+        Evaluate coverage over this window instead of the observed span
+        (epochs outside are dropped; missing lead/tail time counts as
+        gaps). Useful to grade stations against a campaign period.
+
+    Returns
+    -------
+    float
+        Gap percentage in [0, 100]. NaN if no epochs remain.
+
+    """
+    dates = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates))).sort_values()
+    t0 = pd.Timestamp(start) if start is not None else dates[0]
+    t1 = pd.Timestamp(end) if end is not None else dates[-1]
+    dates = dates[(dates >= t0) & (dates <= t1)]
+    if len(dates) == 0:
+        return np.nan
+
+    step = pd.Timedelta(days=sampling_days)
+    n_expected = int(round((t1 - t0) / step)) + 1
+    # Snap observed epochs to the regular grid; count unique slots
+    slots = np.round((dates - t0) / step).astype(int)
+    n_present = len(np.unique(slots))
+    return float(100.0 * (1.0 - n_present / n_expected))
 
 
 @dataclass(slots=True)
@@ -167,14 +211,14 @@ def select_gps_reference(
 
     # Select best station based on quality metrics
     if coherence_priority:
-        # Prefer highest temporal coherence, then lowest RMS misfit
-        best_station = max(
-            candidate_stations,
-            key=lambda s: (
-                qualities[s].temporal_coherence or -np.inf,
-                -(qualities[s].rms_misfit or np.inf),
-            ),
-        )
+        # Prefer highest temporal coherence, then lowest RMS misfit.
+        # Use explicit None checks: `or` would treat a perfect 0.0 as missing.
+        def _key(s: str) -> tuple[float, float]:
+            q = qualities[s]
+            tcoh = q.temporal_coherence if q.temporal_coherence is not None else -np.inf
+            return (tcoh, -q.rms_misfit)
+
+        best_station = max(candidate_stations, key=_key)
     else:
         # Prefer lowest RMS misfit
         best_station = min(candidate_stations, key=lambda s: qualities[s].rms_misfit)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import cache
-from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
@@ -13,11 +12,10 @@ import numpy as np
 import pandas as pd
 import requests
 
-from geepers import utils
 from geepers._types import PathOrStr
 from geepers.schemas import StationObservationSchema
 
-from .base import BaseGpsSource
+from .base import BaseGpsSource, validate_station_id
 
 __all__ = ["UnrSource"]
 
@@ -30,10 +28,11 @@ GPS_BASE_URL = (
     # https://geodesy.unr.edu/gps_timeseries/IGS20/tenv3/IGS20/LAVR.tenv3
     "https://geodesy.unr.edu/gps_timeseries/{reference}/tenv3/{reference}/{station}.tenv3"
 )
-GPS_DIR = utils.get_cache_dir() / "unr"
-GPS_DIR.mkdir(exist_ok=True, parents=True)
 STATION_LLH_URL = "https://geodesy.unr.edu/NGLStationPages/llh.out"
-STATION_LLH_FILE = str(GPS_DIR / "station_llh_all_{today}.csv")
+STATION_LLH_FILENAME = "station_llh_all_{today}.csv"
+STEPS_URL = "https://geodesy.unr.edu/NGLStationPages/steps.txt"
+# Seconds before an HTTP download is abandoned (connect, read)
+REQUEST_TIMEOUT = (10, 120)
 
 logger = logging.getLogger("geepers")
 
@@ -86,7 +85,7 @@ class UnrSource(BaseGpsSource):
             msg = f"Unsupported frame: {frame}. Use 'ENU' or 'XYZ'"
             raise ValueError(msg)
 
-        station_id = station_id.upper()
+        station_id = validate_station_id(station_id.upper())
 
         plate = None
         if plate_fixed and frame == "ENU":
@@ -101,12 +100,12 @@ class UnrSource(BaseGpsSource):
                 plate = plate_name
             else:
                 plate = plates[0]
-            gps_data_file = GPS_DIR / plate / f"{station_id}.tenv3"
+            gps_data_file = self._cache_dir / plate / f"{station_id}.tenv3"
         else:
             if frame == "ENU":
-                gps_data_file = GPS_DIR / f"{station_id}.tenv3"
+                gps_data_file = self._cache_dir / f"{station_id}.tenv3"
             else:  # frame in ("XYZ")
-                gps_data_file = GPS_DIR / f"{station_id}.txyz2"
+                gps_data_file = self._cache_dir / f"{station_id}.txyz2"
 
         if not gps_data_file.exists():
             if download_if_missing:
@@ -124,15 +123,7 @@ class UnrSource(BaseGpsSource):
         )
 
         if frame == "ENU" and zero_by:
-            if zero_by.lower() == "mean":
-                mean_val = df[["east", "north", "up"]].mean()
-                df[["east", "north", "up"]] -= mean_val
-            elif zero_by.lower() == "start":
-                start_val = df[["east", "north", "up"]].iloc[:10].mean()
-                df[["east", "north", "up"]] -= start_val
-            else:
-                msg = "zero_by must be either 'mean' or 'start'"
-                raise ValueError(msg)
+            df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
 
         if frame == "ENU":
             StationObservationSchema.validate(df, lazy=True)
@@ -149,8 +140,7 @@ class UnrSource(BaseGpsSource):
 
         """
         today = datetime.date.today().strftime("%Y%m%d")
-        filename = STATION_LLH_FILE.format(today=today)
-        lla_path = Path(filename)
+        lla_path = self._cache_dir / STATION_LLH_FILENAME.format(today=today)
 
         try:
             df = pd.read_csv(lla_path, sep=r"\s+", engine="c", header=None)
@@ -194,27 +184,27 @@ class UnrSource(BaseGpsSource):
             If None, uses the first plate from the UNR results.
 
         """
-        station_id = station_id.upper()
+        station_id = validate_station_id(station_id.upper())
 
         if frame == "ENU":
             if plate_fixed:
                 if plate is None:
                     plate = self._get_station_plates(station_id)[0]
                 url = f"https://geodesy.unr.edu/gps_timeseries/tenv3/plates/{plate}/{station_id}.{plate}.tenv3"
-                filename = GPS_DIR / plate / f"{station_id}.tenv3"
+                filename = self._cache_dir / plate / f"{station_id}.tenv3"
             else:
                 url = GPS_BASE_URL.format(station=station_id, reference=reference)
                 # Hack to get around bad url structure
                 url = url.replace("gps_timeseries/IGS14", "gps_timeseries")
-                filename = GPS_DIR / f"{station_id}.tenv3"
+                filename = self._cache_dir / f"{station_id}.tenv3"
         elif frame == "XYZ":
             url = f"https://geodesy.unr.edu/gps_timeseries/txyz/{reference}/{station_id}.txyz2"
-            filename = GPS_DIR / f"{station_id}.txyz2"
+            filename = self._cache_dir / f"{station_id}.txyz2"
         else:
             msg = "frame must be 'ENU' or 'XYZ'"
             raise ValueError(msg)
 
-        response = requests.get(url)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
 
         filename.parent.mkdir(parents=True, exist_ok=True)
@@ -222,21 +212,29 @@ class UnrSource(BaseGpsSource):
         logger.info(f"Saved {url} to {filename}")
 
     def _get_station_plates(self, station_id: str) -> list[str]:
-        """Get the tectonic plate for a given GPS station."""
-        # A text file that gives the plate associated with each station is available:
-        url = "https://geodesy.unr.edu/gps_timeseries/Plates/sta_frames.txt"
-        # This directory also contains files for each frame ("plate_??.txt" where
+        """Get the tectonic plate(s) for a given GPS station."""
+        plates = self._read_station_plates_table().get(station_id)
+        if plates is None:
+            msg = f"Failed to find {station_id} in the UNR station plates table"
+            raise ValueError(msg)
+        return plates
+
+    @staticmethod
+    @cache
+    def _read_station_plates_table() -> dict[str, list[str]]:
+        """Download and parse the UNR station -> plates table (cached)."""
+        # A text file that gives the plate associated with each station.
+        # The directory also contains files for each frame ("plate_??.txt" where
         # ?? is the 2-character plate designation) that list the stations
         # associated with each plate.
-        response = requests.get(url)
+        url = "https://geodesy.unr.edu/gps_timeseries/Plates/sta_frames.txt"
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
+        table: dict[str, list[str]] = {}
         for line in response.text.splitlines():
             cur_id, *plates = line.split(" ")
-            if cur_id == station_id:
-                return plates
-
-        msg = f"Failed to find {station_id} at {url}"
-        raise ValueError(msg)
+            table[cur_id] = plates
+        return table
 
     def _clean_gps_df(
         self,
@@ -289,11 +287,74 @@ class UnrSource(BaseGpsSource):
 
     def _download_station_locations(self, filename: PathOrStr, url: str) -> None:
         """Download the station location file from the Nevada Geodetic Laboratory."""
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
         with open(filename, "w") as f:
             f.write(resp.text)
+
+    def steps(self, station_ids: list[str] | None = None) -> pd.DataFrame:
+        """Fetch the UNR database of potential step epochs.
+
+        Parses https://geodesy.unr.edu/NGLStationPages/steps.txt (format:
+        https://geodesy.unr.edu/NGLStationPages/steps_readme.txt), which
+        lists equipment changes (code 1) and earthquakes near the station
+        (code 2).
+
+        Parameters
+        ----------
+        station_ids : list of str, optional
+            Only return steps for these stations.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: ``id``, ``date`` (parsed datetime), ``code``,
+            ``description``, plus for earthquake entries
+            ``threshold_distance``, ``distance_from_eq`` and
+            ``magnitude`` (NaN for equipment steps).
+
+        """
+        rows = self._read_steps_table()
+        df = rows.copy()
+        if station_ids is not None:
+            wanted = {s.upper() for s in station_ids}
+            df = df[df["id"].isin(wanted)].reset_index(drop=True)
+        return df
+
+    @staticmethod
+    @cache
+    def _read_steps_table() -> pd.DataFrame:
+        """Download and parse the UNR steps file (cached)."""
+        response = requests.get(STEPS_URL, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+
+        equipment, earthquakes = [], []
+        for line in response.text.splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            if len(parts) > 5:  # earthquake entries carry extra columns
+                earthquakes.append(parts[:7])
+            else:
+                equipment.append(parts[:4])
+
+        df_eq = pd.DataFrame(
+            earthquakes,
+            columns=[
+                "id", "date", "code", "threshold_distance",
+                "distance_from_eq", "magnitude", "description",
+            ],
+        )
+        df_env = pd.DataFrame(
+            equipment, columns=["id", "date", "code", "description"]
+        )
+        df = pd.concat([df_env, df_eq], ignore_index=True)
+        df["date"] = pd.to_datetime(df["date"], format="%y%b%d")
+        df["code"] = df["code"].astype(int)
+        for col in ("threshold_distance", "distance_from_eq", "magnitude"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df.sort_values(["id", "date"], ignore_index=True)
 
     def get_global_station_list(self) -> list[str]:
         """Get the list of "processed" stations from UNR.

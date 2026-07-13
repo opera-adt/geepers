@@ -22,7 +22,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
-license = { file = "LICENSE.txt" }
+license = { file = "LICENSE" }
 
 dependencies = [
   "pandas",
@@ -50,10 +50,23 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/isce-framework/geepers"
-"Bug Tracker" = "https://github.com/isce-framework/geepers/issues"
-Discussions = "https://github.com/isce-framework/geepers/discussions"
-Changelog = "https://github.com/isce-framework/geepers/releases"
+Homepage = "https://github.com/opera-adt/geepers"
+"Bug Tracker" = "https://github.com/opera-adt/geepers/issues"
+Discussions = "https://github.com/opera-adt/geepers/discussions"
+Changelog = "https://github.com/opera-adt/geepers/releases"
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8", "contextily"]
+test = [
+  "pre-commit",
+  "pytest",
+  "pytest-cov",
+  "pytest-randomly",
+  "pytest-recording>=0.13.2",
+  "pytest-xdist",
+  "ruff",
+  "matplotlib>=3.8",
+]
 
 # Entry points for the command line interface
 [project.scripts]
@@ -188,6 +201,7 @@ ignore = [
 "scripts/*" = ["F401"]
 "src/geepers/uncertainty.py" = ["RUF002"]                   # let us use sigma here
 "src/geepers/schemas.py" = ["D106"]
+"src/geepers/trend.py" = ["N803", "N806"]                   # A, C: linear-algebra notation
 
 [tool.black]
 target-version = ["py311", "py312", "py313"]

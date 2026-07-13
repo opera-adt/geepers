@@ -21,8 +21,16 @@ logger = logging.getLogger("geepers")
 PHASE_TO_METERS = float(SENTINEL_1_WAVELENGTH) / (4.0 * np.pi)
 
 
+def phase_to_meters(wavelength: float) -> float:
+    """Return the radians -> meters conversion factor for `wavelength` (m)."""
+    return float(wavelength) / (4.0 * np.pi)
+
+
 def sample_insar(
-    reader: XarrayReader, stations_df: pd.DataFrame, buffer_pixels: int
+    reader: XarrayReader,
+    stations_df: pd.DataFrame,
+    buffer_pixels: int,
+    buffer_meters: float | None = None,
 ) -> xr.DataArray:
     """Sample InSAR data at station locations with optional spatial buffering.
 
@@ -35,6 +43,10 @@ def sample_insar(
     buffer_pixels : int
         Number of pixels to buffer around each station.
         If >0, samples a window and computes median.
+    buffer_meters : float, optional
+        Metric radius around each station instead of a pixel count; the
+        median is taken over a circular footprint. Takes precedence
+        over `buffer_pixels`.
 
     Returns
     -------
@@ -45,10 +57,15 @@ def sample_insar(
     lons = stations_df.lon.to_numpy()
     lats = stations_df.lat.to_numpy()
 
-    with TqdmCallback(
-        desc=f"Sampling {reader.da.name} (buffered by {buffer_pixels} pixels)"
-    ):
-        windows_list = reader.read_window(lons, lats, buffer_pixels)
+    desc = (
+        f"Sampling {reader.da.name} (buffer {buffer_meters} m)"
+        if buffer_meters is not None
+        else f"Sampling {reader.da.name} (buffered by {buffer_pixels} pixels)"
+    )
+    with TqdmCallback(desc=desc):
+        windows_list = reader.read_window(
+            lons, lats, buffer_pixels, buffer_meters=buffer_meters
+        )
         p = [w.median(dim=("x", "y"), skipna=True) for w in windows_list]
         averaged = xr.concat(p, dim="pixel")
         a = averaged.compute()
@@ -62,6 +79,8 @@ def process_insar_data(
     reader_temporal_coherence: XarrayReader | None = None,
     reader_similarity: XarrayReader | None = None,
     insar_buffer: int = 0,
+    insar_buffer_meters: float | None = None,
+    wavelength: float = SENTINEL_1_WAVELENGTH,
 ) -> dict[str, pd.DataFrame]:
     """Sample InSAR rasters at all station locations in one pass.
 
@@ -79,6 +98,16 @@ def process_insar_data(
         Number of pixels to buffer around each GPS station when sampling InSAR
         data. Uses median averaging, ignoring NaN values, to reduce noise through
         spatial averaging. Default is 0 (single pixel).
+    insar_buffer_meters : float, optional
+        Metric radius (meters) around each station instead of a pixel
+        count; sampling uses a circular median footprint. Applied
+        identically to every station (reference and secondary alike).
+        Takes precedence over `insar_buffer`.
+    wavelength : float
+        Radar wavelength in meters, used to convert phase (radians) to meters
+        when the stack units are not already meters.
+        Default is the Sentinel-1 C-band wavelength (~0.0555 m); pass the
+        appropriate value for other sensors (e.g. ~0.2384 m for NISAR L-band).
 
     Returns
     -------
@@ -89,23 +118,34 @@ def process_insar_data(
 
     """
     # Sample InSAR data with optional buffering
-    los_insar = sample_insar(reader, df_gps_stations, insar_buffer)
+    los_insar = sample_insar(
+        reader, df_gps_stations, insar_buffer, insar_buffer_meters
+    )
 
     if reader_temporal_coherence is not None:
         temp_coh = sample_insar(
-            reader_temporal_coherence, df_gps_stations, insar_buffer
+            reader_temporal_coherence, df_gps_stations, insar_buffer,
+            insar_buffer_meters,
         )
     else:
         temp_coh = None
 
     if reader_similarity is not None:
-        similarity = sample_insar(reader_similarity, df_gps_stations, insar_buffer)
+        similarity = sample_insar(
+            reader_similarity, df_gps_stations, insar_buffer,
+            insar_buffer_meters,
+        )
     else:
         similarity = None
 
     if reader.units not in ("meters", "m"):
-        logger.warning("Converting InSAR displacement to meters.")
-        los_insar *= PHASE_TO_METERS
+        logger.warning(
+            "Stack units are %r; converting phase to meters using "
+            "wavelength=%.4f m.",
+            reader.units,
+            wavelength,
+        )
+        los_insar *= phase_to_meters(wavelength)
 
     station_to_insar: dict[str, pd.DataFrame] = {}
     for i, station in tqdm(
