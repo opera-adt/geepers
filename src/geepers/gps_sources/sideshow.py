@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from functools import lru_cache
+from io import StringIO
 from typing import TYPE_CHECKING, Final, Literal
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import requests
 
 from geepers.schemas import StationObservationSchema
 from geepers.utils import decimal_years_to_datetimes, get_cache_dir
@@ -126,10 +129,10 @@ class SideshowSource(BaseGpsSource):
     @lru_cache(maxsize=1)
     def _fetch_station_data() -> gpd.GeoDataFrame:
         """Download and cache the JPL Sideshow site list."""
-        import warnings
-
+        resp = requests.get(SITE_LIST_URL)
+        resp.raise_for_status()
         with warnings.catch_warnings(category=UserWarning, action="ignore"):
-            return np.loadtxt(SITE_LIST_URL, comments="<", skiprows=9, dtype=str)
+            return np.loadtxt(StringIO(resp.text), comments="<", skiprows=9, dtype=str)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         lines = self._fetch_station_data()
