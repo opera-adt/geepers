@@ -34,7 +34,9 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# 1. Viewer: point the default DATA_URL at the hosted (renamed) dataset.
+# 1. Viewer: point the default DATA_URL at the hosted (renamed) dataset, and
+#    inject a "Docs" link (deploy-only, so running the HTML locally has no
+#    dead docs/ link).
 python3 - "$SCRIPTS_DIR/browse_unr_grid.html" "$WORK/index.html" "$DATA_DEST" <<'PY'
 import sys
 src, dst, data = sys.argv[1:4]
@@ -42,7 +44,16 @@ html = open(src).read()
 old = "const DATA_URL = params.get('data') || 'unr_grid.parquet';"
 new = f"const DATA_URL = params.get('data') || '{data}';"
 assert html.count(old) == 1, "could not find DATA_URL default in viewer"
-open(dst, "w").write(html.replace(old, new))
+html = html.replace(old, new)
+# Deploy-only Docs link (present only when docs/ is published alongside).
+credit = "funded by the JPL-led OPERA project. Viewer: JPL."
+if credit in html:
+    html = html.replace(
+        credit,
+        credit + '\n            &middot; '
+        '<a href="docs/" style="color:var(--accent)">Docs</a>',
+    )
+open(dst, "w").write(html)
 PY
 
 # 2. Static assets.
