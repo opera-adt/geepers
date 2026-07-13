@@ -43,8 +43,12 @@ def test_main(tmp_path, monkeypatch):
         "measurement": "los_gps",
         "value": 0.0010796103397325,
     }
+    # Compare row content independent of its absolute position in the CSV
+    # (station block order depends on the spatial-filter method).
     pd.testing.assert_series_equal(
-        df[df.id == "HLNA"].iloc[0], pd.Series(expected_entry, name=0)
+        df[df.id == "HLNA"].iloc[0],
+        pd.Series(expected_entry, name=0),
+        check_names=False,
     )
 
 
