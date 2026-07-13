@@ -10,8 +10,59 @@ mamba install -c conda-forge geepers
 
 ## Usage
 
-Example usage:
+### Compare an InSAR time series to GPS (main workflow)
 
+The `geepers` command samples an InSAR displacement stack at every GPS
+station inside its bounds, projects the GPS East/North/Up series onto the
+radar line of sight, and writes per-station comparison tables:
+
+```bash
+geepers \
+    --los path/to/los_enu.tif \
+    --timeseries-files displacement_*.tif \
+    --gps-source unr \
+    --wavelength 0.2384 \
+    -o ./GPS
+```
+
+- `--los` is a 3-band raster of the line-of-sight unit vector (ENU).
+- `--wavelength` (meters) is used only when the stack units are radians;
+  the default is Sentinel-1 C-band (~0.0555 m) — pass `0.2384` for
+  NISAR L-band.
+- Outputs: `combined_data.csv` (tidy GPS+InSAR series),
+  `relative_comparison.csv` (relative to a reference station,
+  auto-selected if not given via `--ref`), and `station_summary.csv`
+  (per-station rates and quality metrics).
+
+Run `geepers --help` for all options.
+
+### Download GPS data programmatically
+
+```python
+from geepers.gps_sources import UnrSource, UnrGridSource
+
+src = UnrSource()
+stations = src.stations(bbox=(-120, 35, -115, 40))     # (W, S, E, N)
+df = src.timeseries("P123", start_date="2015-01-01")   # one station
+gdf = src.timeseries_many(bbox=(-118, 36, -117, 37))   # all stations in box
+steps = src.steps(station_ids=["P123"])                # known offsets
+```
+
+`UnrGridSource` provides the UNR interpolated grid products the same way,
+and `SideshowSource` the JPL series.
+
+### Estimate velocities
+
+```python
+from geepers.trend import estimate_trend
+
+res = estimate_trend(df["date"], df["up"] * 1000, step_dates=steps["date"])
+print(f"{res.velocity:.2f} ± {res.velocity_uncertainty:.2f} mm/yr")
+```
+
+See [Analysis modules](analysis-modules.md) for the full velocity /
+interpolation / quality-metric toolbox, and the
+[tour notebook](notebooks/geepers_tour.ipynb) for a runnable demo.
 
 ## Setup for Developers
 
@@ -62,7 +113,7 @@ python -m pytest
 ### Creating Documentation
 
 We use [MKDocs](https://www.mkdocs.org/) to generate the documentation.
-The reference documentation is generated from the code docstrings using [mkdocstrings](mkdocstrings.github.io/).
+The reference documentation is generated from the code docstrings using [mkdocstrings](https://mkdocstrings.github.io/).
 
 When adding new documentation, you can build and serve the documentation locally using:
 
