@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import urllib.error
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
@@ -17,7 +18,14 @@ from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import thread_map
 
 import geepers.rates
-from geepers.analysis import compare_relative_gps_insar, create_tidy_df
+from geepers.analysis import (
+    binned_rmse_profile,
+    compare_relative_gps_insar,
+    create_tidy_df,
+    epoch_rmse,
+    pairwise_differential_rmse,
+)
+from geepers.constants import SENTINEL_1_WAVELENGTH
 from geepers.gps_sources import SideshowSource, UnrSource
 from geepers.io import XarrayReader
 from geepers.processing import get_quality_reader, process_insar_data
@@ -40,7 +48,11 @@ def main(
     temporal_coherence_files: Sequence[str | Path] | None = None,
     similarity_files: Sequence[str | Path] | None = None,
     insar_buffer: int = 0,
+    insar_buffer_meters: float | None = None,
     gps_time_window: int = 10,
+    wavelength: float = SENTINEL_1_WAVELENGTH,
+    structure_function: bool = True,
+    requirement_mm: tuple[float, float] | None = None,
 ) -> None:
     """Compare InSAR time series to GPS observations along the line-of-sight.
 
@@ -81,21 +93,43 @@ def main(
         Number of pixels to buffer around each GPS station when sampling InSAR
         data. Uses median averaging, ignoring NaN values, to reduce noise through
         spatial averaging. Default is 0 (single pixel).
+    insar_buffer_meters
+        Metric radius (meters) for a circular median footprint around
+        every GPS station (reference and secondary alike) when sampling
+        InSAR, e.g. 100. Takes precedence over `insar_buffer`.
     gps_time_window
         Number of days for GPS rolling average window to reduce temporal noise.
-        Default is 30 days.
+        Default is 10 days. Set to 0 to disable smoothing.
+    wavelength
+        Radar wavelength in meters, used to convert phase (radians) to meters
+        when the InSAR stack units are not already meters.
+        Default is the Sentinel-1 C-band wavelength (~0.0555 m); pass
+        ~0.2384 for NISAR L-band.
+    structure_function
+        Also write the pairwise differential-RMSE structure function
+        (`pairwise_rmse.csv`, `structure_function.png`) and the
+        per-epoch network misfit (`epoch_rmse.csv`). Default True.
+    requirement_mm
+        Optional (a, b) of a requirement curve ``a + b * sqrt(d_km)``
+        in millimeters, drawn on the structure-function plot and used
+        for the per-bin `fraction_passing` compliance column.
 
     Notes
     -----
-    The script writes three CSV files into `output_dir`:
+    The script writes into `output_dir`:
 
     combined_data.csv
         Tidy table stacking raw GPS and InSAR series for each station.
     relative_comparison.csv
-        Relative GPS/InSAR displacements if `reference_station` was specified,
-        if `reference_station` is not `None`.
+        Relative GPS/InSAR displacements with respect to
+        `reference_station` (auto-selected if not given).
     station_summary.csv
         Per-station linear rates (mm/yr) computed from the combined table.
+    pairwise_rmse.csv, rmse_profile.csv, epoch_rmse.csv, structure_function.png
+        Structure-function validation outputs (unless
+        ``structure_function=False``): relative RMSE per station pair vs
+        separation, its binned profile (with requirement compliance if
+        `requirement_mm` is given), and the per-epoch network misfit.
 
     """
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -148,7 +182,8 @@ def main(
             return source.timeseries(
                 name, frame="ENU", start_date=start_date, end_date=end_date
             )
-        except requests.HTTPError:
+        except (requests.HTTPError, urllib.error.HTTPError):
+            # urllib.error.HTTPError: sources that fetch via pd.read_csv(url)
             return None
 
     df_gps_list = thread_map(
@@ -205,6 +240,8 @@ def main(
         reader_temporal_coherence=reader_temporal_coherence,
         reader_similarity=reader_similarity,
         insar_buffer=insar_buffer,
+        insar_buffer_meters=insar_buffer_meters,
+        wavelength=wavelength,
     )
 
     # Merge GPS and InSAR tables per station
@@ -227,15 +264,8 @@ def main(
 
     if not reference_station:
         # Automatic reference selection (if the user didn't supply --ref)
-        if reference_station is None:
-            reference_station = select_gps_reference(station_to_merged)
-            logger.info("Auto-selected %s as reference station", reference_station)
-
-        # Compute relative comparison
-        logger.info("Comparing GPS and InSAR relative to %s", reference_station)
-        rel_df = compare_relative_gps_insar(
-            station_to_merged, reference_station=reference_station
-        )
+        reference_station = select_gps_reference(station_to_merged)
+        logger.info("Auto-selected %s as reference station", reference_station)
 
     logger.info("Comparing GPS and InSAR relative to %s", reference_station)
     rel_df = compare_relative_gps_insar(
@@ -245,5 +275,39 @@ def main(
 
     df_rates = geepers.rates.calculate_rates(df=combined_df, to_mm=True)
     df_rates.to_csv(output_dir / "station_summary.csv")
+
+    if structure_function:
+        logger.info("Computing structure function (pairwise differential RMSE)")
+        coords = {sid: (row.lon, row.lat) for sid, row in df_gps_stations.iterrows()}
+        req = None
+        if requirement_mm is not None:
+            a_mm, b_mm = requirement_mm
+
+            def req(d_km, _a=a_mm, _b=b_mm):
+                return (_a + _b * np.sqrt(d_km)) / 1000.0  # mm -> m
+
+        rmse_df = pairwise_differential_rmse(station_to_merged, coords)
+        rmse_df.to_csv(output_dir / "pairwise_rmse.csv", index=False)
+        binned = binned_rmse_profile(rmse_df, requirement=req)
+        binned.to_csv(output_dir / "rmse_profile.csv", index=False)
+        epoch_df = epoch_rmse(station_to_merged)
+        epoch_df.to_csv(output_dir / "epoch_rmse.csv")
+
+        if len(rmse_df):
+            # Object-oriented Matplotlib API: no pyplot, so we never
+            # touch the global backend (which would break notebooks)
+            from matplotlib.figure import Figure
+
+            from geepers.plotting import plot_rmse_vs_distance
+
+            fig = Figure(figsize=(8, 5))
+            plot_rmse_vs_distance(
+                rmse_df, binned, requirement=req, ax=fig.add_subplot()
+            )
+            fig.savefig(
+                output_dir / "structure_function.png",
+                dpi=150,
+                bbox_inches="tight",
+            )
 
     logger.info("Finished - results written to %s", output_dir)
