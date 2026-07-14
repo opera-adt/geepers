@@ -98,6 +98,8 @@ def main(
     start_date : datetime
         First date to download from UNR.
         Default is 2016-01-01
+    version : Literal["0.1", "0.2"]
+        UNR grid product version to download. Default "0.2".
 
     """
     unrg = UnrGridSource(version=version)

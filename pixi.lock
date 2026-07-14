@@ -3312,8 +3312,8 @@ packages:
   timestamp: 1752608821935
 - pypi: ./
   name: geepers
-  version: 0.3.0.post1.dev14+g3237584d8.d20260713
-  sha256: 3019111e1bc45f361f84eda323a1dee349c56582c6b0b65daa4334ab2b757f39
+  version: 0.3.0.post1.dev15+g1bbe50eeb.d20260714
+  sha256: 24eba2e155a8abd646d08abbf654e1909c71c25cee5e57fa93b37d056ab41a74
   requires_dist:
   - pandas
   - lxml
@@ -3331,6 +3331,16 @@ packages:
   - zarr
   - tyro>=0.9.24
   - pandera
+  - matplotlib>=3.8 ; extra == 'plot'
+  - contextily ; extra == 'plot'
+  - pre-commit ; extra == 'test'
+  - pytest ; extra == 'test'
+  - pytest-cov ; extra == 'test'
+  - pytest-randomly ; extra == 'test'
+  - pytest-recording>=0.13.2 ; extra == 'test'
+  - pytest-xdist ; extra == 'test'
+  - ruff ; extra == 'test'
+  - matplotlib>=3.8 ; extra == 'test'
   requires_python: '>=3.11'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/geographiclib-2.0-pyhd8ed1ab_1.conda

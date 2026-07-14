@@ -12,6 +12,8 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
         args: [--allow-multiple-documents]
+        # conda recipe uses Jinja2 templating, which is not valid YAML
+        exclude: ^recipe/meta\.yaml$
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending

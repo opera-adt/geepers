@@ -1,0 +1,68 @@
+# conda-forge recipe for geepers.
+# To publish: fork https://github.com/conda-forge/staged-recipes, copy this
+# file to recipes/geepers/meta.yaml, fill in the sha256 for the release
+# tarball (curl -sL <pypi sdist url> | sha256sum), and open a PR.
+# After acceptance, the geepers-feedstock repo handles future releases.
+{% set name = "geepers" %}
+{% set version = "0.3.0" %}
+{% set python_min = "3.11" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/geepers-{{ version }}.tar.gz
+  sha256: FILL_IN_FROM_PYPI_SDIST
+
+build:
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+  entry_points:
+    - geepers = geepers.cli:cli
+
+requirements:
+  host:
+    - python {{ python_min }}
+    - pip
+    - setuptools >=64.0
+    - setuptools_scm >=6.2
+  run:
+    - python >={{ python_min }}
+    - pandas
+    - lxml
+    - geopandas-base
+    - pyogrio
+    - xarray
+    - dask >=2025
+    - pyproj
+    - rasterio
+    - rioxarray
+    - shapely >=2
+    - requests
+    - tqdm
+    - zarr
+    - tyro >=0.9.24
+    - pandera
+
+test:
+  imports:
+    - geepers
+  commands:
+    - pip check
+    - geepers --help
+  requires:
+    - python {{ python_min }}
+    - pip
+
+about:
+  home: https://github.com/opera-adt/geepers
+  summary: Download GPS data and compare to InSAR
+  license: Apache-2.0
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - scottstanie
+    - mgovorcin
