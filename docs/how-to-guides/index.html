@@ -1,0 +1,2047 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../tutorials/">
+      
+      
+        <link rel="next" href="../analysis-modules/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>How-To Guides - Documentation for geepers</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="cyan" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-to-guides" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Documentation for geepers" class="md-header__button md-logo" aria-label="Documentation for geepers" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Documentation for geepers
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How-To Guides
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Documentation for geepers" class="md-nav__button md-logo" aria-label="Documentation for geepers" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Documentation for geepers
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    geepers Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-validate-an-opera-disp-product-against-gps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to validate an OPERA DISP product against GPS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-screen-a-gps-network-before-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to screen a GPS network before analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-estimate-a-velocity-with-a-realistic-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to estimate a velocity with a realistic uncertainty
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-interpolate-a-velocity-field-onto-a-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to interpolate a velocity field onto a grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-interpolate-across-plate-boundaries-plate-separation-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to interpolate across plate boundaries (plate-separation constraint)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-browse-unr-grid-time-series-interactively" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to browse UNR grid time series interactively
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-point-the-download-cache-somewhere-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to point the download cache somewhere else
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/geepers_tour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A tour of the geepers analysis modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/gnss_insar_validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validating an InSAR displacement product against GNSS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    geepers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    geepers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/cme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/collocation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    collocation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/constants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    constants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/euler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    euler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_imaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps_imaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1_10" id="__nav_7_1_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps_sources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_1_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    gps_sources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_sources/base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_sources/sideshow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sideshow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_sources/unr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    unr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/gps_sources/unr_grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    unr_grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/midas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    midas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/plotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/rates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    rates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/schemas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    schemas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/strain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/synthetic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    synthetic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/variability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    variability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/geepers/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../background-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background theory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-validate-an-opera-disp-product-against-gps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to validate an OPERA DISP product against GPS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-screen-a-gps-network-before-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to screen a GPS network before analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-estimate-a-velocity-with-a-realistic-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to estimate a velocity with a realistic uncertainty
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-interpolate-a-velocity-field-onto-a-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to interpolate a velocity field onto a grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-interpolate-across-plate-boundaries-plate-separation-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to interpolate across plate boundaries (plate-separation constraint)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-browse-unr-grid-time-series-interactively" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to browse UNR grid time series interactively
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-point-the-download-cache-somewhere-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to point the download cache somewhere else
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="how-to-guides">How-To Guides</h1>
+<p>Task-oriented recipes. Each assumes <code>geepers</code> is installed
+(<a href="../getting-started/">Getting started</a>) and, where GPS data is
+downloaded, network access to <code>geodesy.unr.edu</code> or
+<code>sideshow.jpl.nasa.gov</code>. Downloads are cached under
+<code>~/.cache/geepers/</code> (override with <code>cache_dir=</code> on any source).</p>
+<h2 id="how-to-validate-an-opera-disp-product-against-gps">How to validate an OPERA DISP product against GPS</h2>
+<p>One command runs the full comparison — time series, velocities, and the
+structure-function requirement verification:</p>
+<pre><code class="language-bash">geepers \
+    --los los_enu.tif \
+    --timeseries-stack disp_product.zarr \
+    --stack-data-var displacement \
+    --wavelength 0.2384 \
+    --insar-buffer-meters 100 \
+    --requirement-mm 3 0.5 \
+    -o ./GPS_validation
+</code></pre>
+<p>Key choices:</p>
+<ul>
+<li><code>--insar-buffer-meters R</code> samples a <strong>circular</strong> footprint of radius
+  R meters around <em>every</em> GPS station (reference and secondary alike)
+  and takes the NaN-ignoring median — e.g. 100 m to suppress
+  single-pixel noise without mixing in different ground motion.
+  (<code>--insar-buffer N</code> is the older pixel-count rectangular variant.)</li>
+<li><code>--requirement-mm A B</code> draws and checks the requirement curve
+  <code>A + B·√(distance_km)</code> mm on the structure function (e.g. <code>3 0.5</code>).</li>
+<li><code>--gps-time-window D</code> applies a D-day rolling median to the GPS LOS
+  series (default 10; 0 disables).</li>
+<li>If the product stores displacement in meters, <code>--wavelength</code> is
+  ignored; it only matters for stacks in radians (pass <code>0.2384</code> for
+  NISAR L-band).</li>
+<li><code>--ref STATION</code> fixes the reference station; otherwise the station
+  with the best temporal coherence / data coverage is auto-selected.</li>
+</ul>
+<p>Outputs in <code>GPS_validation/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>file</th>
+<th>contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>combined_data.csv</code></td>
+<td>tidy per-station GPS + InSAR LOS series</td>
+</tr>
+<tr>
+<td><code>relative_comparison.csv</code></td>
+<td>both series relative to the reference station</td>
+</tr>
+<tr>
+<td><code>station_summary.csv</code></td>
+<td>per-station GPS (MIDAS) and InSAR rates + quality metrics</td>
+</tr>
+<tr>
+<td><code>pairwise_rmse.csv</code></td>
+<td>structure function: relative RMSE + bias for every station pair vs separation</td>
+</tr>
+<tr>
+<td><code>rmse_profile.csv</code></td>
+<td>binned median/mean/p90 RMSE per distance bin, <code>fraction_passing</code> if a requirement was given</td>
+</tr>
+<tr>
+<td><code>epoch_rmse.csv</code></td>
+<td>network misfit per acquisition date — spikes flag bad epochs (ionosphere, unwrapping, snow)</td>
+</tr>
+<tr>
+<td><code>structure_function.png</code></td>
+<td>pairs + binned curve + requirement line</td>
+</tr>
+</tbody>
+</table>
+<p>The pairwise structure function differences the two stations' series
+<em>before</em> comparing, so any common reference or datum wobble cancels —
+it measures the product's relative accuracy the way the OPERA
+requirements are written. For programmatic access to the same metrics
+see <a href="../analysis-modules/#product-validation-geepersvalidation">Analysis modules</a>.</p>
+<h2 id="how-to-screen-a-gps-network-before-analysis">How to screen a GPS network before analysis</h2>
+<pre><code class="language-python">import numpy as np
+from geepers.gps_sources import UnrSource
+from geepers.quality import gap_percentage
+from geepers.variability import temporal_velocity_variability
+
+src = UnrSource()
+stations = src.stations(bbox=(112, -39, 158, -10))  # W, S, E, N
+
+good = []
+for sid in stations[&quot;id&quot;]:
+    df = src.timeseries(sid, start_date=&quot;2010-01-01&quot;)
+    # 1. Enough data, few gaps
+    span_yr = (df[&quot;date&quot;].iloc[-1] - df[&quot;date&quot;].iloc[0]).days / 365.25
+    if span_yr &lt; 3 or gap_percentage(df[&quot;date&quot;]) &gt; 35:
+        continue
+    # 2. Velocity stable in time
+    tv = temporal_velocity_variability(df[&quot;date&quot;], df[[&quot;east&quot;, &quot;north&quot;, &quot;up&quot;]])
+    if tv.variability[&quot;up&quot;] * 1000 &gt; 2.0:  # mm/yr
+        continue
+    good.append(sid)
+</code></pre>
+<p>Add per-station spatial checks with
+<code>geepers.variability.spatial_variability</code> (neighbor RMS/MAD) and
+<code>ssf_per_station</code> once you have velocities for the whole network.</p>
+<p>Two more cleaning steps that pay off before velocity fitting:</p>
+<pre><code class="language-python">from geepers.steps import detect_steps_enu
+from geepers.cme import estimate_cme, remove_cme
+
+# 1. Find uncatalogued jumps; feed them to the trend/MIDAS estimators
+found = detect_steps_enu(df)                # complements UnrSource.steps()
+
+# 2. Estimate and remove the network common mode from detrended residuals
+cme = estimate_cme(residuals_by_station)    # epochs x stations DataFrame
+cleaned = cme.cleaned                       # or remove_cme(residuals_by_station)
+</code></pre>
+<h2 id="how-to-estimate-a-velocity-with-a-realistic-uncertainty">How to estimate a velocity with a realistic uncertainty</h2>
+<pre><code class="language-python">from geepers.gps_sources import UnrSource
+from geepers.trend import estimate_trend
+
+src = UnrSource()
+df = src.timeseries(&quot;P123&quot;, start_date=&quot;2015-01-01&quot;)
+steps = src.steps(station_ids=[&quot;P123&quot;])
+
+res = estimate_trend(
+    df[&quot;date&quot;],
+    df[&quot;up&quot;] * 1000,                      # meters -&gt; mm
+    step_dates=steps[&quot;date&quot;].tolist(),    # estimate offsets, don't span them
+    noise_model=&quot;PLWN&quot;,                   # power-law + white
+)
+print(f&quot;v = {res.velocity:.2f} ± {res.velocity_uncertainty:.2f} mm/yr &quot;
+      f&quot;(kappa = {res.kappa:.2f})&quot;)
+</code></pre>
+<p>Use <code>noise_model="WN"</code> for a fast first pass (OLS-equivalent sigma,
+typically 5-10× too small), or <code>geepers.midas.midas</code> when robustness to
+unknown steps matters more than the noise model.</p>
+<h2 id="how-to-interpolate-a-velocity-field-onto-a-grid">How to interpolate a velocity field onto a grid</h2>
+<p>Robust, edge-preserving (GPS Imaging — cite Hammond et al., 2016):</p>
+<pre><code class="language-python">import numpy as np
+from geepers.gps_imaging import make_ssf, msf_interpolate
+
+ssf = make_ssf(lon, lat, v_up, sigma_up)
+gx, gy = np.meshgrid(np.arange(-120, -114, 0.1), np.arange(36, 41, 0.1))
+grid = msf_interpolate(lon, lat, v_up, sigma_up, gx.ravel(), gy.ravel(), ssf)
+v_grid = grid[&quot;value&quot;].to_numpy().reshape(gx.shape)
+</code></pre>
+<p>Geostatistical, with covariance-propagated uncertainties (collocation):</p>
+<pre><code class="language-python">from geepers.collocation import empirical_covariance, interpolate_velocities
+
+emp = empirical_covariance(lon, lat, ve, vn, se, sn)
+at_stations, at_grid = interpolate_velocities(
+    lon, lat, ve, vn, se, sn, gx.ravel(), gy.ravel(),
+    covariance_parameters=emp.parameters,
+)
+</code></pre>
+<p>Rules of thumb: GPS Imaging for vertical land motion, outlier-prone
+networks, and sharp boundaries; collocation for smooth horizontal
+fields where you need rigorous sigmas. See
+<a href="../analysis-modules/#choosing-between-gps-imaging-and-collocation">Analysis modules</a>.</p>
+<h2 id="how-to-interpolate-across-plate-boundaries-plate-separation-constraint">How to interpolate across plate boundaries (plate-separation constraint)</h2>
+<p>A covariance model only knows <em>distance</em>: stations 50 km apart on
+opposite sides of a plate boundary look "close", and interpolation
+smears the velocity discontinuity across the boundary.
+<code>separate_plates</code> fixes this by building a working coordinate space in
+which each plate's points are pushed far apart (≥ 1500 km by default),
+so any distance-decaying covariance treats cross-plate pairs as
+uncorrelated — while within-plate geometry is preserved.</p>
+<p>The recipe: <strong>assign &amp; separate → interpolate in moved coordinates →
+attach results back to the true coordinates.</strong></p>
+<p>Self-contained synthetic example (two plates with discontinuous motion):</p>
+<pre><code class="language-python">import geopandas as gpd
+import numpy as np
+from shapely.geometry import box
+
+from geepers.collocation import (
+    ordinary_kriging, separate_plates,
+)
+
+rng = np.random.default_rng(1)
+
+# Two plates meeting at lon = 5°, moving differently
+plates = gpd.GeoDataFrame(
+    {&quot;code&quot;: [&quot;A&quot;, &quot;B&quot;]},
+    geometry=[box(0, 0, 5, 10), box(5, 0, 10, 10)],
+    crs=&quot;EPSG:4326&quot;,
+)
+n = 80
+lon = np.r_[rng.uniform(0.5, 4.5, n // 2), rng.uniform(5.5, 9.5, n // 2)]
+lat = rng.uniform(1, 9, n)
+v = np.where(lon &lt; 5, -2.0, 3.0) + rng.normal(0, 0.3, n)   # 5 mm/yr jump
+sv = np.full(n, 0.3)
+
+# Evaluation grid spanning the boundary
+gx, gy = np.meshgrid(np.linspace(0.5, 9.5, 60), np.linspace(1, 9, 40))
+
+# --- 1. Separate stations AND grid points together (one call, so both
+#        get consistent working coordinates)
+all_lon = np.r_[lon, gx.ravel()]
+all_lat = np.r_[lat, gy.ravel()]
+lon_m, lat_m, plate_idx = separate_plates(
+    all_lon, all_lat, plates, min_separation_km=1500
+)
+slon_m, slat_m = lon_m[:n], lat_m[:n]          # stations, moved
+glon_m, glat_m = lon_m[n:], lat_m[n:]          # grid, moved
+
+# --- 2. Interpolate in the moved space
+params = np.array([1.0, 200.0])                 # (C0, d0) — or fit with
+                                                # empirical_covariance on
+                                                # the *moved* coordinates
+unconstrained = ordinary_kriging(lon, lat, v, sv, gx.ravel(), gy.ravel(), params)
+constrained   = ordinary_kriging(slon_m, slat_m, v, sv, glon_m, glat_m, params)
+
+# --- 3. Results map back trivially: constrained.signal[i] belongs to
+#        the true coordinate (gx.ravel()[i], gy.ravel()[i])
+v_unc = unconstrained.signal.reshape(gx.shape)  # boundary smeared
+v_con = constrained.signal.reshape(gx.shape)    # sharp step at lon=5°
+</code></pre>
+<p>Plotting <code>v_unc</code> vs <code>v_con</code> shows the difference: without the
+constraint the −2 → +3 mm/yr step is blurred over ~2 x d0; with it,
+each grid node is informed only by stations on its own plate.</p>
+<p>The same moved coordinates work for <code>interpolate_velocities</code> (LSC) and
+<code>geepers.gps_imaging.msf_interpolate</code> — pass <code>slon_m/slat_m</code> and
+<code>glon_m/glat_m</code> wherever station/evaluation coordinates go, and always
+fit <code>empirical_covariance</code> / <code>make_ssf</code> on the <strong>moved</strong> coordinates so
+cross-plate pairs don't contaminate the covariogram.</p>
+<p>Real-data notes:</p>
+<ul>
+<li>Plate polygons: use e.g. the Bird (2003) plate-boundary model, or
+  your project's plate shapefile —
+  <code>plates = gpd.read_file("plates.shp")</code>. Points falling outside every
+  polygon are assigned to the nearest plate (the original workflow
+  silently dropped them).</li>
+<li><strong>Horizontal velocities</strong>: remove each plate's rigid rotation
+  <em>before</em> interpolating and restore it afterward — otherwise the plate
+  motion itself dominates the field. Use <code>geepers.euler</code>:</li>
+</ul>
+<p>```python
+  from geepers.euler import estimate_euler_pole, predict_plate_motion</p>
+<p>for k in np.unique(plate_idx[:n]):        # per plate
+      sel = plate_idx[:n] == k
+      pole = estimate_euler_pole(lon[sel], lat[sel], ve[sel], vn[sel],
+                                 se[sel], sn[sel])
+      vp_e, vp_n = predict_plate_motion(pole, lon[sel], lat[sel])
+      ve[sel] -= vp_e; vn[sel] -= vp_n      # remove (restore after)
+  ```</p>
+<p>(or build the <code>EulerPole</code> from published ITRF2014-PMM values).
+  Vertical velocities need no such correction, which makes them the
+  simplest case.
+- Choose <code>min_separation_km</code> several times larger than the fitted
+  correlation length <code>d0</code> (the 1500 km default suits d0 ≲ 300 km).</p>
+<h2 id="how-to-browse-unr-grid-time-series-interactively">How to browse UNR grid time series interactively</h2>
+<pre><code class="language-bash">cd scripts/
+python create-geoparquet.py --bbox -110 28 -101 36 --start-date 2016-01-01
+python -m http.server 8123
+# open http://localhost:8123/browse_unr_grid.html
+</code></pre>
+<p>The viewer loads the Parquet directly in the browser (no server-side
+processing) with a date slider, per-point time-series charts, and WebM
+animation export. See <code>scripts/README.md</code> for details.</p>
+<h2 id="how-to-point-the-download-cache-somewhere-else">How to point the download cache somewhere else</h2>
+<p>Every data source accepts <code>cache_dir</code>:</p>
+<pre><code class="language-python">src = UnrSource(cache_dir=&quot;/big/disk/gps_cache&quot;)
+</code></pre>
+<p>or set <code>XDG_CACHE_HOME</code> to relocate all caches.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
