@@ -277,3 +277,38 @@ class TestEstimateTrendMany:
         assert list(df.index) == ["good", "bad"]
         assert np.isfinite(df.loc["good", "velocity"])
         assert np.isnan(df.loc["bad", "velocity"])
+
+
+class TestEstimateTrendRegression:
+    """Golden-value regression: on a noise-free line + annual signal the
+    design-matrix solve must recover the inputs to machine precision. This
+    pins the model parameterization (trend + sin_1yr/cos_1yr) and the
+    least-squares path, independent of the noise estimator.
+    """
+
+    def _signal(self):
+        dates = pd.to_datetime("2016-01-01") + pd.to_timedelta(
+            np.arange(0, 4 * 365, 1), unit="D"
+        )
+        t = (dates - dates[0]).days.to_numpy() / 365.25
+        # intercept 1.0, velocity 5.0, annual = 2.0*sin + 0.5*cos
+        y = 1.0 + 5.0 * t + 2.0 * np.sin(2 * np.pi * t) + 0.5 * np.cos(2 * np.pi * t)
+        return dates, y
+
+    def test_recovers_exact_parameters(self):
+        dates, y = self._signal()
+        res = estimate_trend(dates, y, noise_model="WN", periods_years=(1.0,))
+        assert res.velocity == pytest.approx(5.0, abs=1e-6)
+        assert res.parameters["intercept"][0] == pytest.approx(1.0, abs=1e-6)
+        assert res.parameters["sin_1yr"][0] == pytest.approx(2.0, abs=1e-6)
+        assert res.parameters["cos_1yr"][0] == pytest.approx(0.5, abs=1e-6)
+        # noise-free -> the formal trend uncertainty collapses to ~0
+        assert res.velocity_uncertainty < 1e-6
+        # fitted model reproduces the data
+        np.testing.assert_allclose(res.model, y, atol=1e-6)
+
+    def test_annual_amplitude(self):
+        dates, y = self._signal()
+        res = estimate_trend(dates, y, noise_model="WN", periods_years=(1.0,))
+        amp = np.hypot(res.parameters["sin_1yr"][0], res.parameters["cos_1yr"][0])
+        assert amp == pytest.approx(np.hypot(2.0, 0.5), abs=1e-6)

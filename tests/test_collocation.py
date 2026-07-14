@@ -307,3 +307,57 @@ class TestSeparatePlates:
         # rigid-ish translation: pairwise distances change by < 5%
         scale = d_after[d_before > 10] / d_before[d_before > 10]
         assert 0.95 < np.median(scale) < 1.05
+
+
+class TestInterpolateVelocitiesRegression:
+    """Golden-value regression for the collocation interpolation entry point.
+
+    With covariance parameters supplied explicitly the whole path is
+    deterministic linear algebra (no empirical estimation / optimization), so
+    the interpolated signal and its uncertainty are pinned exactly. Guards
+    against silent changes to the covariance assembly or the collocation solve.
+    """
+
+    # Fixed 8-station network (deg) with a smooth horizontal velocity field.
+    LON = np.array([-118.0, -117.6, -117.2, -118.0, -117.2, -117.6, -117.8, -117.4])
+    LAT = np.array([34.0, 34.0, 34.0, 34.6, 34.6, 34.6, 34.3, 34.3])
+    EAST = np.array([2.0, 2.4, 2.8, 2.3, 3.1, 2.7, 2.45, 2.65])
+    NORTH = np.array([-1.0, -0.88, -0.76, -1.12, -0.88, -1.0, -1.0, -0.94])
+    PARAMS = np.array([[4.0, 40.0]])  # (C0 mm^2, d0 km)
+
+    def _run(self):
+        se = np.full(self.LON.size, 0.2)
+        sn = np.full(self.LON.size, 0.2)
+        lon_n = np.array([-117.6, -117.8])
+        lat_n = np.array([34.3, 34.15])
+        return interpolate_velocities(
+            self.LON,
+            self.LAT,
+            self.EAST,
+            self.NORTH,
+            se,
+            sn,
+            lon_n,
+            lat_n,
+            covariance_parameters=self.PARAMS,
+        )
+
+    def test_interpolated_signal_and_sigma(self):
+        _, at_new = self._run()
+        np.testing.assert_allclose(
+            np.asarray(at_new.signal),
+            [[2.55293065, -0.96402871], [2.26822667, -0.94776713]],
+            rtol=1e-5,
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(
+            np.asarray(at_new.signal_sigma),
+            [[1.28685762, 1.28685906], [1.29859423, 1.29859321]],
+            rtol=1e-5,
+            atol=1e-6,
+        )
+
+    def test_deterministic(self):
+        _, a = self._run()
+        _, b = self._run()
+        np.testing.assert_array_equal(np.asarray(a.signal), np.asarray(b.signal))
