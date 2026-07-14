@@ -107,6 +107,16 @@
             align-items: center;
         }
 
+        #controls #btn-collapse {
+            background: none; border: none; color: var(--muted); cursor: pointer;
+            font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 8px;
+            flex: none;
+        }
+        #controls #btn-collapse:hover { color: var(--text); }
+        #controls.collapsed { width: auto; padding: 10px 14px; }
+        #controls.collapsed > *:not(h1) { display: none; }
+        #controls.collapsed h1 { margin: 0; }
+
         #controls details { border-top: 1px solid var(--hairline); padding: 8px 0 4px; }
         #controls details:first-of-type { border-top: none; }
         #controls details summary {
@@ -317,7 +327,7 @@
     </div>
 
     <div id="controls" class="panel">
-        <h1>OPERA UNR Grid Viewer <span id="prop-badge" style="color:var(--accent)"></span></h1>
+        <h1><span>OPERA UNR Grid Viewer <span id="prop-badge" style="color:var(--accent)"></span></span><button id="btn-collapse" title="Collapse panel" aria-label="Collapse panel">–</button></h1>
         <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px;line-height:1.4">
             Gridded GPS time series by the Nevada Geodetic Laboratory (UNR),
             funded by the JPL-led OPERA project. Viewer: JPL.
@@ -1682,6 +1692,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 const [lo, hi] = e.target.value.split(',').map(Number);
                 S.pctl = [lo / 100, hi / 100];
                 autoRange(); restyle();
+            };
+            $('btn-collapse').onclick = () => {
+                const c = $('controls').classList.toggle('collapsed');
+                $('btn-collapse').textContent = c ? '+' : '–';
+                $('btn-collapse').title = c ? 'Expand panel' : 'Collapse panel';
             };
             $('inp-vmin').onchange = e => { S.vmin = Number(e.target.value); restyle(); };
             $('inp-vmax').onchange = e => { S.vmax = Number(e.target.value); restyle(); };
