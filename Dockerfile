@@ -16,7 +16,11 @@ LABEL org.opencontainers.image.source="https://github.com/opera-adt/geepers" \
       org.opencontainers.image.description="Download GPS data and compare to InSAR" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# rasterio/pyogrio/shapely ship manylinux wheels, so no system GDAL is needed
+# rasterio/pyogrio/shapely ship manylinux wheels that bundle GDAL, but still
+# link libexpat from the system; python:*-slim doesn't include it.
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /wheels /wheels
 RUN python -m pip install --no-cache-dir /wheels/*.whl matplotlib \
     && rm -rf /wheels
