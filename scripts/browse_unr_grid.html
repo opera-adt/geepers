@@ -107,6 +107,16 @@
             align-items: center;
         }
 
+        #controls #btn-collapse {
+            background: none; border: none; color: var(--muted); cursor: pointer;
+            font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 8px;
+            flex: none;
+        }
+        #controls #btn-collapse:hover { color: var(--text); }
+        #controls.collapsed { width: auto; padding: 10px 14px; }
+        #controls.collapsed > *:not(h1) { display: none; }
+        #controls.collapsed h1 { margin: 0; }
+
         #controls details { border-top: 1px solid var(--hairline); padding: 8px 0 4px; }
         #controls details:first-of-type { border-top: none; }
         #controls details summary {
@@ -317,7 +327,7 @@
     </div>
 
     <div id="controls" class="panel">
-        <h1>OPERA UNR Grid Viewer <span id="prop-badge" style="color:var(--accent)"></span></h1>
+        <h1><span>OPERA UNR Grid Viewer <span id="prop-badge" style="color:var(--accent)"></span></span><button id="btn-collapse" title="Collapse panel" aria-label="Collapse panel">–</button></h1>
         <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px;line-height:1.4">
             Gridded GPS time series by the Nevada Geodetic Laboratory (UNR),
             funded by the JPL-led OPERA project. Viewer: JPL.
@@ -351,7 +361,14 @@
             </div>
             <div class="row">
                 <label></label>
-                <button id="btn-auto">Auto (p2–p98)</button>
+                <button id="btn-auto">Auto</button>
+                <select id="sel-pctl" style="min-width:0" title="Percentile stretch used by Auto (and live) range">
+                    <option value="2,98">p2–p98</option>
+                    <option value="5,95">p5–p95</option>
+                    <option value="10,90">p10–p90</option>
+                    <option value="1,99">p1–p99</option>
+                    <option value="0,100">min–max</option>
+                </select>
                 <label style="min-width:0"><input type="checkbox" id="chk-sym" checked> sym</label>
                 <label style="min-width:0" title="Re-run auto range on every date change">
                     <input type="checkbox" id="chk-autolive"> live
@@ -687,6 +704,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             cmap: 'RdBu',
             invert: false,
             vmin: -10, vmax: 10,
+            pctl: [0.02, 0.98],  // low/high fractions for Auto range stretch
             refMode: 'none',    // 'none' | 'mean' | 'first' | 'current'
             refIdx: -1,         // date index for 'first'/'current', else -1
             refRow: null,       // Float32Array [nPoints] for current prop, mm
@@ -879,12 +897,15 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('prop-badge').textContent = S.prop;
         }
 
-        // Robust p2–p98 range from a sample of values (ref-adjusted)
+        // Percentile-stretch range from a sample of values (ref-adjusted).
+        // Percentiles come from S.pctl (set by the preset dropdown).
         function applyPercentileRange(sample) {
             if (!sample.length) return;
             sample.sort((a, b) => a - b);
-            let lo = sample[Math.floor(sample.length * 0.02)];
-            let hi = sample[Math.floor(sample.length * 0.98)];
+            const at = f => sample[Math.min(sample.length - 1,
+                                            Math.max(0, Math.round((sample.length - 1) * f)))];
+            let lo = at(S.pctl[0]);
+            let hi = at(S.pctl[1]);
             if ($('chk-sym').checked) {
                 const m = Math.max(Math.abs(lo), Math.abs(hi));
                 lo = -m; hi = m;
@@ -1667,6 +1688,16 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('chk-invert').onchange = e => { S.invert = e.target.checked; restyle(); };
             $('chk-sym').onchange = () => { autoRange(); restyle(); };
             $('btn-auto').onclick = () => { autoRange(); restyle(); };
+            $('sel-pctl').onchange = e => {
+                const [lo, hi] = e.target.value.split(',').map(Number);
+                S.pctl = [lo / 100, hi / 100];
+                autoRange(); restyle();
+            };
+            $('btn-collapse').onclick = () => {
+                const c = $('controls').classList.toggle('collapsed');
+                $('btn-collapse').textContent = c ? '+' : '–';
+                $('btn-collapse').title = c ? 'Expand panel' : 'Collapse panel';
+            };
             $('inp-vmin').onchange = e => { S.vmin = Number(e.target.value); restyle(); };
             $('inp-vmax').onchange = e => { S.vmax = Number(e.target.value); restyle(); };
             $('inp-size').oninput = e => {
