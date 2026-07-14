@@ -19,7 +19,7 @@
 [pypi-platforms]:           https://img.shields.io/pypi/pyversions/geepers
 [pypi-version]:             https://img.shields.io/pypi/v/geepers
 [rtd-badge]:                https://readthedocs.org/projects/geepers/badge/?version=latest
-[rtd-link]:                 https://geepers.readthedocs.io/en/latest/?badge=latest
+[rtd-link]:                 https://opera-adt.github.io/geepers/docs/
 
 <!-- prettier-ignore-end -->
 
