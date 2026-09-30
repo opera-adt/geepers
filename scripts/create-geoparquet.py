@@ -32,6 +32,7 @@ import tyro
 from geepers.gps_sources import BaseGpsSource, UnrGridSource, UnrSource
 
 META_KEY = "unr_grid_meta"
+MIDAS_URL = "https://geodesy.unr.edu/gps_timeseries/IGS20/midas/midas.IGS.txt"
 
 
 def export_gdf_to_parquet(gdf, output_file="unr_grid.parquet") -> Path:
@@ -74,7 +75,8 @@ def export_gdf_to_parquet(gdf, output_file="unr_grid.parquet") -> Path:
         .reset_index(drop=True)
     )
 
-    value_cols = ["east", "north", "up", "sigma_east", "sigma_north", "sigma_up"]
+    all_value_cols = ["east", "north", "up", "sigma_east", "sigma_north", "sigma_up"]
+    value_cols = [c for c in all_value_cols if c in df.columns]
     out = pd.DataFrame(
         {
             "id": df["id"].astype("string"),
@@ -121,9 +123,76 @@ def export_gdf_to_parquet(gdf, output_file="unr_grid.parquet") -> Path:
     return output_path
 
 
+def midas_timeseries(
+    bbox: tuple[float, float, float, float], start_date: datetime.datetime
+) -> pd.DataFrame:
+    """Build monthly straight-line series from UNR MIDAS station velocities.
+
+    A lightweight stand-in for real station positions, for when downloading
+    every station's series is impractical (e.g. a global demo of the viewer):
+    each station's east/north/up is its MIDAS velocity times the time from
+    the middle of its record, on the 1st of each month it was observing.
+    Seasonal signals, offsets, noise and uncertainties are all absent.
+
+    Parameters
+    ----------
+    bbox : tuple[float, float, float, float]
+        Bounding box (west, south, east, north) in degrees.
+    start_date : datetime
+        First month to keep.
+
+    Returns
+    -------
+    pd.DataFrame
+        Long format (id, date, lon, lat, east, north, up), in meters.
+
+    References
+    ----------
+    Blewitt, G., et al. (2016), MIDAS robust trend estimator for accurate GPS
+    station velocities without step detection, JGR Solid Earth,
+    https://doi.org/10.1002/2015JB012552
+
+    """
+    cols = {
+        0: "id",
+        2: "t_first",
+        3: "t_last",
+        8: "ve",
+        9: "vn",
+        10: "vu",
+        24: "lat",
+        25: "lon",
+    }
+    midas = pd.read_csv(MIDAS_URL, sep=r"\s+", header=None, usecols=list(cols))
+    midas = midas.rename(columns=cols)
+    # MIDAS longitudes run over [-360, 0]
+    midas["lon"] = (midas["lon"] + 180) % 360 - 180
+    west, south, east, north = bbox
+    midas = midas[midas["lon"].between(west, east) & midas["lat"].between(south, north)]
+
+    months = pd.date_range(start_date.replace(day=1), datetime.date.today(), freq="MS")
+    years = (months.year + (months.dayofyear - 1) / 365.25).to_numpy()
+    t_first, t_last = midas["t_first"].to_numpy(), midas["t_last"].to_numpy()
+    observing = (years[:, None] >= t_first) & (years[:, None] <= t_last)
+    d_idx, p_idx = np.nonzero(observing)
+    dt = years[d_idx] - (t_first + t_last)[p_idx] / 2
+    return pd.DataFrame(
+        {
+            "id": midas["id"].to_numpy()[p_idx],
+            "date": months[d_idx],
+            "lon": midas["lon"].to_numpy()[p_idx],
+            "lat": midas["lat"].to_numpy()[p_idx],
+            **{
+                c: midas[v].to_numpy()[p_idx] * dt
+                for c, v in [("east", "ve"), ("north", "vn"), ("up", "vu")]
+            },
+        }
+    )
+
+
 def main(
     bbox: tuple[float, float, float, float],
-    source: Literal["grid", "stations"] = "grid",
+    source: Literal["grid", "stations", "midas"] = "grid",
     start_date: datetime.datetime = datetime.datetime(2016, 1, 1),
     output_file: Path = Path("unr_grid.parquet"),
     version: Literal["0.1", "0.3"] = "0.3",
@@ -139,9 +208,11 @@ def main(
     ----------
     bbox : tuple[float, float, float, float]
         Bounding box (west, south, east, north) in degrees.
-    source : {"grid", "stations"}
+    source : {"grid", "stations", "midas"}
         "grid" downloads the UNR gridded (interpolated) product;
-        "stations" downloads real UNR GPS station positions (.tenv3).
+        "stations" downloads real UNR GPS station positions (.tenv3);
+        "midas" builds monthly straight lines from UNR MIDAS station
+        velocities (a light demo stand-in; see `midas_timeseries`).
         Default is "grid".
     start_date : datetime
         First date to keep. Default is 2016-01-01.
@@ -165,6 +236,12 @@ def main(
         Default is "mean".
 
     """
+    if source == "midas":
+        export_gdf_to_parquet(
+            gdf=midas_timeseries(bbox, start_date), output_file=output_file
+        )
+        return
+
     src: BaseGpsSource
     if source == "grid":
         src = UnrGridSource(
