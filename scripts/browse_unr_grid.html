@@ -92,7 +92,7 @@
             top: 12px;
             right: 12px;
             width: 276px;
-            max-height: calc(100vh - 110px);
+            max-height: calc(100vh - 255px);   /* stops above the map controls in the corner below */
             overflow-y: auto;
             padding: 14px 16px;
         }
@@ -154,7 +154,7 @@
         }
 
         .row label { flex: 0 0 auto; color: var(--muted); min-width: 62px; font-size: 12px; }
-        .row select, .row input[type="number"], .row input[type="text"] {
+        .row select, .row input[type="number"], .row input[type="text"], .row input[type="date"] {
             flex: 1;
             min-width: 0;
             padding: 5px 7px;
@@ -168,12 +168,15 @@
         }
         .row select:focus-visible,
         .row input[type="number"]:focus-visible,
-        .row input[type="text"]:focus-visible {
+        .row input[type="text"]:focus-visible,
+        .row input[type="date"]:focus-visible {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
         }
         .row input[type="range"] { flex: 1; accent-color: var(--accent); }
+        .row .swatch { flex: 0 0 auto; width: 18px; height: 18px; padding: 0; border-radius: 5px; }
+        .row input[type="color"] { position: absolute; width: 0; height: 0; padding: 0; border: 0; opacity: 0; }
         .row input[type="checkbox"] { margin: 0; accent-color: var(--accent); width: 14px; height: 14px; }
 
         button {
@@ -231,6 +234,11 @@
             color: var(--text);
         }
 
+        /* ---- Deployment note (bottom left, above the legend) ---- */
+        #note { left: 12px; bottom: 118px; width: 240px; box-sizing: border-box; padding: 9px 26px 9px 12px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+        #note[hidden] { display: none; }
+        #note-close { position: absolute; top: 4px; right: 4px; border: none; background: none; padding: 0 4px; font-size: 14px; color: var(--muted); }
+
         /* ---- Legend (bottom left) ---- */
         #legend { left: 12px; bottom: 14px; padding: 11px 14px; width: 212px; }
         #legend-canvas { width: 100%; height: 12px; border-radius: 4px; display: block; }
@@ -238,13 +246,106 @@
         #legend-title { font-size: 12px; font-weight: 650; margin-bottom: 6px; letter-spacing: -0.01em; }
         #hover-info { font-size: 11px; color: var(--muted); margin-top: 7px; min-height: 14px; }
 
-        /* ---- Chart panel (top left) ---- */
+        /* ---- Search (top left) ---- */
+        #search { position: absolute; top: 12px; left: 12px; z-index: 11; width: 268px; }
+        #search input, #search-results {
+            box-sizing: border-box;
+            width: 100%;
+            background: var(--panel-bg);
+            -webkit-backdrop-filter: blur(18px) saturate(1.4);
+            backdrop-filter: blur(18px) saturate(1.4);
+            border: 1px solid var(--panel-border);
+            border-radius: 11px;
+            box-shadow: var(--shadow);
+            color: var(--text);
+            font: inherit;
+            font-size: 12px;
+        }
+        #search input { padding: 8px 11px; }
+        #search input:focus-visible { outline: none; border-color: var(--accent); }
+        #search-results { margin-top: 6px; max-height: 260px; overflow-y: auto; }
+        #search-results button {
+            display: block;
+            width: 100%;
+            padding: 6px 11px;
+            border: none;
+            border-bottom: 1px solid var(--hairline);
+            border-radius: 0;
+            background: none;
+            text-align: left;
+            line-height: 1.35;
+        }
+        #search-results button:hover { background: var(--btn-hover); }
+        #search-results button small { display: block; color: var(--muted); font-size: 10.5px; }
+        #search-results .msg { padding: 6px 11px; color: var(--muted); font-size: 11px; }
+
+        /* ---- Grid / GPS sites switch (top left, beside the search box) ---- */
+        #dataset-toggle { top: 12px; left: 288px; z-index: 11; display: flex; gap: 2px; padding: 3px; border-radius: 11px; font-size: 12px; }
+        #dataset-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+        #dataset-toggle span { display: block; padding: 5px 10px; border-radius: 8px; color: var(--muted); cursor: pointer; }
+        #dataset-toggle span:hover { background: var(--btn-hover); }
+        #dataset-toggle :checked + span { background: var(--accent); color: var(--accent-contrast); }
+        #dataset-toggle :focus-visible + span { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+
+        /* ---- Map tools (bottom right, styled to match the MapLibre controls) ---- */
+        .maplibregl-ctrl-top-left { top: 46px; left: 2px; }   /* zoom and compass, under the search box */
+        body > #map-tools { display: none; }   /* parked here while no map holds it */
+        #map-tools { color: #333; color-scheme: light; }
+        #map-tools .tool { position: relative; }
+        #map-tools .tool + .tool { border-top: 1px solid #ddd; }
+        #map-tools .face {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 29px;
+            height: 29px;
+            cursor: pointer;
+            list-style: none;
+        }
+        #map-tools .face::-webkit-details-marker { display: none; }
+        #map-tools .face:hover { background: rgb(0 0 0 / 5%); }
+        #map-tools .face svg {
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        #map-tools .face input { position: absolute; opacity: 0; pointer-events: none; }
+        #map-tools .face:has(:checked), #map-tools details[open] > .face {
+            color: #4f46e5;
+            background: rgb(79 70 229 / 12%);
+        }
+        #map-tools .face.labels { color: #fff; background: #4f46e5; }   /* plates with names */
+        #map-tools .face:focus-visible, #map-tools .face:has(:focus-visible) {
+            outline: none;
+            box-shadow: 0 0 2px 2px #0096ff;
+        }
+        #map-tools .flyout {
+            position: absolute;
+            right: 37px;
+            top: 0;   /* opens downward, clear of the sidebar above */
+            padding: 5px 9px;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+            white-space: nowrap;
+        }
+        #map-tools .flyout label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        #basemap-menu { z-index: 1; }   /* over the terrain slider beside it */
+        #map-tools .flyout input { margin: 0; accent-color: #4f46e5; }
+        #map-tools .flyout input[type="range"] { display: block; width: 110px; height: 19px; }
+        #map-tools label.face:not(:has(:checked)) + .flyout { display: none; }
+
+        /* ---- Chart panel (top left, under the search box, beside the zoom buttons) ---- */
         #chart-panel {
-            top: 12px;
-            left: 12px;
+            top: 56px;
+            left: 52px;
             padding: 12px 14px;
             display: none;
-            max-height: calc(100vh - 40px);
+            max-height: calc(100vh - 84px);
             overflow-y: auto;
         }
         .chart-wrap {
@@ -255,7 +356,7 @@
             min-width: 220px;
             min-height: 120px;
             max-width: calc(100vw - 340px);
-            max-height: calc(100vh - 140px);
+            max-height: calc(100vh - 184px);
         }
         #chart-title, #chart-title2 {
             font-size: 12px;
@@ -269,6 +370,22 @@
             user-select: none;
             touch-action: none;
         }
+        #fit-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 4px; font-size: 11px; color: var(--muted); }
+        #fit-controls[hidden] { display: none; }
+        #fit-controls label { display: flex; align-items: center; gap: 4px; }
+        #fit-controls select, #fit-controls input[type="text"] {
+            padding: 2px 5px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text);
+            font: inherit;
+        }
+        #inp-fit-steps { width: 150px; }
+        /* width:0 + min-width:100% → wrap to the chart's width instead of widening the panel */
+        .fit-result { width: 0; min-width: 100%; margin-top: 2px; font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+        .fit-result:empty { display: none; }
+        .fit-result b { display: inline-block; min-width: 14px; }
         #chart-block2 { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 6px; }
         #chart-close, #chart-close2 { border: none; background: none; font-size: 15px; cursor: pointer; color: var(--muted); padding: 0 2px; }
         /* width:0 + min-width:100% → wrap to the chart's width instead of widening the panel */
@@ -319,6 +436,62 @@
 <body>
     <div id="map"></div>
     <canvas id="quiver"></canvas>
+
+    <div id="search">
+        <input id="search-q" type="search" autocomplete="off" spellcheck="false"
+            placeholder="Place, lat lon or grid # / station">
+        <div id="search-results" hidden></div>
+    </div>
+
+    <div id="dataset-toggle" class="panel">
+        <label title="UNR gridded (interpolated) product">
+            <input type="radio" name="dataset" value="grid" checked><span>Grid</span>
+        </label>
+        <label title="Individual UNR GPS stations">
+            <input type="radio" name="dataset" value="stations"><span>GPS sites</span>
+        </label>
+        <label title="Both together: grid nodes as squares, GPS stations as circles">
+            <input type="radio" name="dataset" value="both"><span>Both</span>
+        </label>
+    </div>
+
+    <!-- initMap moves this into the map's bottom-right control stack -->
+    <div id="map-tools" class="maplibregl-ctrl maplibregl-ctrl-group">
+        <details class="tool" id="tool-basemap">
+            <summary class="face" title="Basemap">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>
+            </summary>
+            <div class="flyout" id="basemap-menu">
+                <label><input type="radio" name="basemap" value="ofm-light" checked> OpenFreeMap Light</label>
+                <label><input type="radio" name="basemap" value="ofm-dark"> OpenFreeMap Dark</label>
+                <label><input type="radio" name="basemap" value="osm"> OpenStreetMap</label>
+                <label><input type="radio" name="basemap" value="esri-sat"> Esri Satellite</label>
+                <label><input type="radio" name="basemap" value="google-hybrid"> Google Satellite Hybrid</label>
+            </div>
+        </details>
+        <div class="tool">
+            <label class="face" title="Globe projection (off: Mercator)">
+                <input type="checkbox" id="chk-globe" checked>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.500 2.700 3.800 5.700 3.800 9s-1.300 6.300-3.800 9c-2.500-2.700-3.800-5.700-3.800-9s1.300-6.300 3.800-9Z"/></svg>
+            </label>
+        </div>
+        <div class="tool">
+            <label class="face" title="3D terrain — hold right-drag (or Ctrl+drag) to tilt/rotate">
+                <input type="checkbox" id="chk-terrain">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 19 6-11 4 7 2-3 6 7Z"/></svg>
+            </label>
+            <div class="flyout">
+                <input type="range" id="inp-exag" min="0.5" max="6" step="0.1" value="1.5"
+                    title="Vertical exaggeration">
+            </div>
+        </div>
+        <div class="tool">
+            <label class="face" title="Tectonic plates: click for boundaries, again for plate names, again to hide. Bird (2003), via fraxen/tectonicplates">
+                <input type="checkbox" id="chk-plates" checked>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 9 9l5 3-5 4 3 5"/><path d="M3 9h3M18 15h3"/></svg>
+            </label>
+        </div>
+    </div>
 
     <div id="loading" class="">
         <div class="spinner"></div>
@@ -374,9 +547,17 @@
                     <input type="checkbox" id="chk-autolive"> live
                 </label>
             </div>
-            <div class="row">
-                <label>Size</label>
+            <div class="row" id="row-size-grid">
+                <label>Grid size</label>
                 <input type="range" id="inp-size" min="0.3" max="4" step="0.1" value="1">
+                <button class="swatch" id="swatch-grid" title="Click: single color on/off. Double-click: choose the color."></button>
+                <input type="color" id="col-grid" value="#111111">
+            </div>
+            <div class="row" id="row-size-sites">
+                <label>Site size</label>
+                <input type="range" id="inp-size-sites" min="0.3" max="4" step="0.1" value="1">
+                <button class="swatch" id="swatch-sites" title="Click: single color on/off. Double-click: choose the color."></button>
+                <input type="color" id="col-sites" value="#111111">
             </div>
             <div class="row">
                 <label>Opacity</label>
@@ -391,11 +572,11 @@
                     <option value="both">Both</option>
                 </select>
             </div>
-            <div class="row">
+            <div class="row" id="row-qscale" style="display:none">
                 <label>Arrow scale</label>
                 <input type="range" id="inp-qscale" min="0.2" max="5" step="0.1" value="1">
             </div>
-            <div class="row">
+            <div class="row" id="row-qref" style="display:none">
                 <label>Ref H / V</label>
                 <input type="number" id="inp-qref-h" step="any" min="0"
                     title="Horizontal reference magnitude (mm or mm/yr) for the standard arrow length">
@@ -426,47 +607,21 @@
         </details>
 
         <details>
-            <summary>Map</summary>
+            <summary>Record</summary>
             <div class="row">
-                <label>Basemap</label>
-                <select id="sel-basemap">
-                    <option value="carto-light" selected>Carto Light</option>
-                    <option value="carto-dark">Carto Dark</option>
-                    <option value="osm">OpenStreetMap</option>
-                    <option value="esri-sat">Esri Satellite</option>
-                </select>
+                <label>Start</label>
+                <input type="date" id="inp-start" title="First date of the time slider and playback">
             </div>
             <div class="row">
-                <label>Projection</label>
-                <select id="sel-proj">
-                    <option value="globe" selected>Globe</option>
-                    <option value="mercator">Mercator</option>
-                </select>
-            </div>
-            <div class="row">
-                <label>Terrain</label>
-                <label style="min-width:0" title="3D topography — hold right-drag (or Ctrl+drag) to tilt/rotate">
-                    <input type="checkbox" id="chk-terrain"> 3D
-                </label>
-                <input type="range" id="inp-exag" min="0.5" max="6" step="0.1" value="1.5"
-                    title="Vertical exaggeration">
-            </div>
-            <div class="row">
-                <label>Overlays</label>
-                <label style="min-width:0" title="Tectonic plate boundaries — Bird (2003), via fraxen/tectonicplates">
-                    <input type="checkbox" id="chk-plates" checked> Plate boundaries
-                </label>
+                <label>End</label>
+                <input type="date" id="inp-end" title="Last date of the time slider and playback">
+                <button id="btn-span-reset" title="Back to the full record in the data">Full</button>
             </div>
         </details>
 
-        <details open>
+        <details id="data-section">
             <summary>Data</summary>
             <div id="stats">–</div>
-            <div class="row">
-                <label>Find ID</label>
-                <input type="text" id="inp-find" placeholder="grid # / station" spellcheck="false">
-                <button id="btn-find">Go</button>
-            </div>
             <div class="row">
                 <label>Date stride</label>
                 <select id="sel-stride" title="Load only every Nth date (reloads the page) — reduces memory for large files">
@@ -521,6 +676,11 @@
         </select>
     </div>
 
+    <div id="note" class="panel" hidden>
+        <button id="note-close" title="Hide this note">×</button>
+        <div id="note-text"></div>
+    </div>
+
     <div id="legend" class="panel">
         <div id="quiver-legend" style="display:none;border-bottom:1px solid var(--border);margin-bottom:6px;padding-bottom:4px">
             <canvas id="quiver-legend-canvas" width="200" height="22"></canvas>
@@ -538,11 +698,27 @@
                 <label style="font-weight:400;color:var(--muted)" title="Show ±1σ uncertainty">
                     <input type="checkbox" id="chk-sigma" checked> ±σ
                 </label>
+                <label style="font-weight:400;color:var(--muted)" title="Fit a trajectory model: polynomial, seasonal terms and steps">
+                    <input type="checkbox" id="chk-fit"> fit
+                </label>
                 <button id="chart-csv" title="Download this point's time series as CSV">csv</button>
                 <button id="chart-close" title="Close">✕</button>
             </span>
         </div>
+        <div id="fit-controls" hidden>
+            <label title="Polynomial order in time: 0 = offset, 1 = + velocity, 2 = + acceleration">
+                poly <select id="sel-fit-order">
+                    <option>0</option><option selected>1</option><option>2</option><option>3</option>
+                </select>
+            </label>
+            <label title="Annual sine and cosine"><input type="checkbox" id="chk-fit-annual" checked> annual</label>
+            <label title="Semi-annual sine and cosine"><input type="checkbox" id="chk-fit-semi"> semi-annual</label>
+            <label title="Heaviside steps (offsets) at these dates, comma separated">
+                steps <input type="text" id="inp-fit-steps" placeholder="2019-07-06, …" spellcheck="false">
+            </label>
+        </div>
         <div id="chart-wrap" class="chart-wrap"><div id="chart"></div></div>
+        <div class="fit-result" id="fit-result"></div>
         <div id="chart-block2" style="display:none">
             <div id="chart-title2">
                 <span id="chart-point2" style="color:#7c3aed">–</span>
@@ -552,10 +728,11 @@
                 </span>
             </div>
             <div id="chart-wrap2" class="chart-wrap"><div id="chart2"></div></div>
+            <div class="fit-result" id="fit-result2"></div>
         </div>
         <div id="chart-hint">
             Drag = box zoom · wheel = zoom time · double-click = reset · click = jump to date ·
-            drag bottom-right corner to resize. Dashed line = current date.
+            drag bottom-right corner to resize. Dashed line = current date; dashed curves = fit.
             <b>Shift+click</b> another map point to compare it in a second chart.
         </div>
     </div>
@@ -657,8 +834,15 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // ================= configuration =================
         const params = new URLSearchParams(location.search);
         const DATA_URL = params.get('data') || 'unr_grid.parquet';
+        const DATASET_URLS = { grid: DATA_URL, stations: params.get('stations') || 'unr_stations.parquet' };
+        // Optional note for this deployment: deploy-pages.sh --note fills the
+        // default; ?note=<text> overrides it and an empty ?note= hides it.
+        const DEFAULT_NOTE = '';
+        const NOTE = params.get('note') ?? DEFAULT_NOTE;
+        const STRIDE = Math.max(1, Math.floor(Number(params.get('stride')) || 1));
         const META_KEY = 'unr_grid_meta';
         const COMPONENTS = ['east', 'north', 'up'];
+        const DATA_LAYERS = ['grid-squares', 'grid-circles'];   // bottom first
         const SIGMA_OF = { east: 'sigma_east', north: 'sigma_north', up: 'sigma_up' };
         const SERIES_COLORS = ['#2563eb', '#16a34a', '#dc2626'];
 
@@ -671,17 +855,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         };
 
         const BASEMAPS = {
-            'carto-light': {
-                tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-                        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-                        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png'],
-                attribution: '© OpenStreetMap contributors © CARTO',
-            },
-            'carto-dark': {
-                tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-                        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
-                attribution: '© OpenStreetMap contributors © CARTO',
-            },
+            // OpenFreeMap serves the Positron / Dark Matter designs (the ones
+            // behind Carto light/dark) as vector styles with no key or account.
+            'ofm-light': { style: 'https://tiles.openfreemap.org/styles/positron' },
+            'ofm-dark': { style: 'https://tiles.openfreemap.org/styles/dark' },
             'osm': {
                 tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
                 attribution: '© OpenStreetMap contributors',
@@ -689,6 +866,13 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             'esri-sat': {
                 tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
                 attribution: 'Esri, Maxar, Earthstar Geographics',
+            },
+            'google-hybrid': {
+                tiles: ['https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+                        'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+                        'https://mt2.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+                        'https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
+                attribution: '© Google',
             },
         };
 
@@ -699,6 +883,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             points: null,       // {id: [], lon: [], lat: []}
             nDates: 0,
             nPoints: 0,
+            nGrid: 0,           // leading points that are grid nodes; the rest are GPS sites
+            nRows: 0,           // rows read from the file(s)
             mats: {},           // component -> Float32Array [nDates * nPoints], mm
             prop: 'up',
             cmap: 'RdBu',
@@ -713,10 +899,14 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             qscale: 1,          // arrow length multiplier
             qauto: true,        // auto (p90, live) vs fixed reference magnitudes
             dateIdx: 0,
+            span: [0, 0],       // first and last date index the slider and playback cover
             playing: false,
             sel: [-1, -1],      // selected points: [primary, comparison]
             charts: [null, null],
-            sizeMult: 1,
+            sizeMult: 1,        // marker size of grid nodes
+            siteSizeMult: 1,    // marker size of GPS sites
+            flatOn: { grid: false, sites: false },           // draw in one color, not the colormap
+            flatColor: { grid: '#111111', sites: '#111111' },
             opacity: 1,
             hasSigma: false,    // sigma_* columns present in the file
             showRate: false,    // color map by linear trend instead of displacement
@@ -725,9 +915,17 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         };
 
         const $ = id => document.getElementById(id);
+
+        if (NOTE) {
+            $('note-text').textContent = NOTE;
+            $('note').hidden = false;
+        }
+        $('note-close').onclick = () => { $('note').hidden = true; };
         const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2);
 
         // ================= data loading =================
+        const pointLabel = p => (p < S.nGrid ? 'Grid #' : 'Station ') + S.points.id[p];
+
         function setLoading(text, detail = '') {
             $('loading-text').textContent = text;
             $('loading-detail').textContent = detail;
@@ -746,8 +944,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return arr;
         }
 
+        // Read one file into a dataset: the fields of S that describe the data
         async function loadParquet(file) {
-            const t0 = performance.now();
             setLoading('Reading Parquet metadata…');
             const metadata = await parquetMetadataAsync(file);
             const nRows = Number(metadata.num_rows);
@@ -758,13 +956,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
             const fileCols = new Set(metadata.schema.map(e => e.name));
             const sigmaCols = Object.values(SIGMA_OF).filter(c => fileCols.has(c));
-            S.hasSigma = sigmaCols.length === COMPONENTS.length;
-
-            const stride = Math.max(1, Math.floor(Number(params.get('stride')) || 1));
+            const hasSigma = sigmaCols.length === COMPONENTS.length;
 
             // Warn before allocating matrices that may not fit in browser memory
             if (meta) {
-                const nD = Math.ceil(meta.dates.length / stride);
+                const nD = Math.ceil(meta.dates.length / STRIDE);
                 const nP = meta.points.id.length;
                 const estMB = (COMPONENTS.length + sigmaCols.length) * nD * nP * 4 / 2 ** 20;
                 if (estMB > 1500 && !confirm(
@@ -820,37 +1016,84 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             }
 
             // Keep only every Nth date (?stride=N) to bound memory on large files
-            if (stride > 1) {
-                meta = { ...meta, dates: meta.dates.filter((_, i) => i % stride === 0) };
+            if (STRIDE > 1) {
+                meta = { ...meta, dates: meta.dates.filter((_, i) => i % STRIDE === 0) };
             }
 
-            S.dates = meta.dates;
-            S.dateSec = meta.dates.map(d => Date.parse(d + 'T12:00:00Z') / 1000);
-            S.points = meta.points;
-            S.nDates = meta.dates.length;
-            S.nPoints = meta.points.id.length;
+            const nDates = meta.dates.length, nPoints = meta.points.id.length;
 
-            setLoading('Building matrices…', `${S.nPoints} points × ${S.nDates} dates`);
+            setLoading('Building matrices…', `${nPoints} points × ${nDates} dates`);
             await new Promise(r => setTimeout(r));  // let the UI paint
-            const matCols = [...COMPONENTS, ...(S.hasSigma ? Object.values(SIGMA_OF) : [])];
+            const matCols = [...COMPONENTS, ...(hasSigma ? Object.values(SIGMA_OF) : [])];
+            const mats = {};
             for (const comp of matCols) {
                 const col = assembleColumn(chunks[comp], Float32Array, nRows);
-                const mat = new Float32Array(S.nDates * S.nPoints).fill(NaN);
+                const mat = new Float32Array(nDates * nPoints).fill(NaN);
                 for (let r = 0; r < nRows; r++) {
                     const d = dIdx[r];
-                    if (d % stride) continue;
-                    mat[(d / stride) * S.nPoints + pIdx[r]] = col[r] * 1000; // m -> mm
+                    if (d % STRIDE) continue;
+                    mat[(d / STRIDE) * nPoints + pIdx[r]] = col[r] * 1000; // m -> mm
                 }
-                S.mats[comp] = mat;
+                mats[comp] = mat;
             }
+            return {
+                dates: meta.dates,
+                dateSec: meta.dates.map(d => Date.parse(d + 'T12:00:00Z') / 1000),
+                points: meta.points,
+                nDates, nPoints, nGrid: nPoints, nRows, mats, hasSigma,
+            };
+        }
 
-            const mb = (matCols.length * S.nDates * S.nPoints * 4 / 2 ** 20).toFixed(0);
-            const secs = ((performance.now() - t0) / 1000).toFixed(1);
+        // Grid nodes and GPS sites as one dataset over both records. On each date
+        // a set shows its own nearest date, if that lies within half its date
+        // spacing; grid nodes come first (see S.nGrid).
+        function mergeDatasets(grid, sites) {
+            const nPoints = grid.nPoints + sites.nPoints;
+            const dates = [...new Set([...grid.dates, ...sites.dates])].sort();
+            const dateSec = dates.map(d => Date.parse(d + 'T12:00:00Z') / 1000);
+            const rowsOf = ds => {
+                const gaps = ds.dateSec.slice(1).map((t, i) => t - ds.dateSec[i]).sort((a, b) => a - b);
+                const tolerance = (gaps[gaps.length >> 1] ?? 86_400) / 2;
+                let j = 0;
+                return dateSec.map(t => {
+                    while (j + 1 < ds.nDates && Math.abs(ds.dateSec[j + 1] - t) <= Math.abs(ds.dateSec[j] - t)) j++;
+                    return ds.nDates && Math.abs(ds.dateSec[j] - t) <= tolerance ? j : -1;
+                });
+            };
+            const gridRow = rowsOf(grid), siteRow = rowsOf(sites);
+            const mats = {};
+            for (const comp of Object.keys(grid.mats).filter(c => sites.mats[c])) {
+                const mat = new Float32Array(dates.length * nPoints).fill(NaN);
+                dates.forEach((_, t) => {
+                    const g = gridRow[t], u = siteRow[t];
+                    if (g >= 0) mat.set(grid.mats[comp].subarray(g * grid.nPoints, (g + 1) * grid.nPoints), t * nPoints);
+                    if (u >= 0) {
+                        mat.set(sites.mats[comp].subarray(u * sites.nPoints, (u + 1) * sites.nPoints),
+                            t * nPoints + grid.nPoints);
+                    }
+                });
+                mats[comp] = mat;
+            }
+            return {
+                dates, dateSec,
+                points: Object.fromEntries(['id', 'lon', 'lat'].map(k => [k, [...grid.points[k], ...sites.points[k]]])),
+                nDates: dates.length, nPoints, nGrid: grid.nPoints, nRows: grid.nRows + sites.nRows, mats,
+                hasSigma: grid.hasSigma && sites.hasSigma,
+            };
+        }
+
+        function showStats(secs) {
+            const nSites = S.nPoints - S.nGrid;
+            const counts = [
+                S.nGrid && `${S.nGrid.toLocaleString()} grid points`,
+                nSites && `${nSites.toLocaleString()} GPS sites`,
+            ].filter(Boolean).join(' + ');
+            const mb = (Object.keys(S.mats).length * S.nDates * S.nPoints * 4 / 2 ** 20).toFixed(0);
             $('stats').innerHTML =
-                `${S.nPoints.toLocaleString()} grid points · ${S.nDates.toLocaleString()} dates<br>` +
-                `${nRows.toLocaleString()} rows · ${mb} MB in memory · loaded in ${secs}s<br>` +
+                `${counts} · ${S.nDates.toLocaleString()} dates<br>` +
+                `${S.nRows.toLocaleString()} rows · ${mb} MB in memory · loaded in ${secs.toFixed(1)}s<br>` +
                 `${S.dates[0]} → ${S.dates[S.nDates - 1]}` +
-                (stride > 1 ? ` · every ${stride}. date` : '');
+                (STRIDE > 1 ? ` · every ${STRIDE}. date` : '');
         }
 
         // ================= color helpers =================
@@ -860,21 +1103,50 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return colors;
         }
 
-        function colorExpression() {
+        // `kind` is 'grid' or 'sites'; points without a value stay grey either way
+        function colorExpression(kind) {
             const colors = activeStops();
             const span = (S.vmax - S.vmin) || 1;
             const interp = ['interpolate', ['linear'],
                 ['/', ['-', ['to-number', ['feature-state', 'v']], S.vmin], span]];
             colors.forEach((c, i) => interp.push(i / (colors.length - 1), c));
             return ['case',
-                ['==', ['typeof', ['feature-state', 'v']], 'number'], interp,
+                ['==', ['typeof', ['feature-state', 'v']], 'number'], S.flatOn[kind] ? S.flatColor[kind] : interp,
                 'rgba(128,128,128,0.35)'];
         }
 
-        function radiusExpression() {
-            const m = S.sizeMult;
+        // Squares are the grid in the Both view. Outside the grid's record they
+        // fade out instead of turning grey: fully when colored by value, partly
+        // (keeping their color) when drawn in a single color.
+        const squareColor = () => S.flatOn.grid ? S.flatColor.grid : colorExpression('grid');
+        const squareOpacity = () => ['case',
+            ['==', ['typeof', ['feature-state', 'v']], 'number'], S.opacity,
+            S.flatOn.grid ? 0.25 * S.opacity : 0];
+
+        // Marker half-width in px by zoom, times `m`
+        function sizeExpression(m) {
             return ['interpolate', ['exponential', 1.6], ['zoom'],
                 3, 2 * m, 6, 4 * m, 9, 9 * m, 12, 22 * m];
+        }
+        // Circles are the GPS sites, or the grid nodes when only the grid is shown
+        const circleKind = () => S.nGrid < S.nPoints ? 'sites' : 'grid';
+        const circleSize = () => sizeExpression(circleKind() === 'sites' ? S.siteSizeMult : S.sizeMult);
+        // squareSdf() is 20 px across, so icon-size 0.1 is a half-width of 1 px
+        const squareSize = () => sizeExpression(S.sizeMult / 10);
+
+        // Square marker as a signed distance field, so it stays sharp at any size
+        // and takes a color and an outline like the circles do.
+        function squareSdf() {
+            const n = 32, half = 10;
+            const data = new Uint8ClampedArray(n * n * 4);
+            for (let y = 0; y < n; y++) {
+                for (let x = 0; x < n; x++) {
+                    const dx = Math.abs(x + 0.5 - n / 2) - half, dy = Math.abs(y + 0.5 - n / 2) - half;
+                    const dist = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);
+                    data[(y * n + x) * 4 + 3] = 255 * (0.75 - dist / 8);   // MapLibre's encoding: 0.75 is the edge
+                }
+            }
+            return { width: n, height: n, data };
         }
 
         function drawLegend() {
@@ -979,42 +1251,115 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // ================= map =================
         let map;
 
-        function setBasemap(key) {
+        const projection = () => $('chk-globe').checked ? 'globe' : 'mercator';
+
+        // The tool buttons sit in the map's control stack. map.remove() deletes
+        // that stack, so they are parked in <body> (hidden there) between maps.
+        const mapTools = $('map-tools');
+        const mapToolsControl = { onAdd: () => mapTools, onRemove: () => document.body.append(mapTools) };
+        document.addEventListener('pointerdown', e => {
+            if (!$('tool-basemap').contains(e.target)) $('tool-basemap').open = false;
+            if (!$('search').contains(e.target)) $('search-results').hidden = true;
+        });
+
+        // Ids the current basemap added, so a switch removes exactly those.
+        let basemapLayers = [], basemapSources = [];
+        let basemapSeq = 0;
+
+        // A vector basemap is a whole MapLibre style. Its sources and layers are
+        // merged in under the data layers instead of going through
+        // map.setStyle(), which would drop the grid, terrain and overlays.
+        async function setBasemap(key) {
             const bm = BASEMAPS[key];
-            if (map.getLayer('basemap')) map.removeLayer('basemap');
-            if (map.getSource('basemap')) map.removeSource('basemap');
-            map.addSource('basemap', { type: 'raster', tiles: bm.tiles, tileSize: 256, attribution: bm.attribution });
+            const seq = ++basemapSeq;
+            const target = map;
+            const style = bm.style
+                ? await (await fetch(bm.style)).json()
+                : {
+                    sources: { raster: { type: 'raster', tiles: bm.tiles, tileSize: 256, attribution: bm.attribution } },
+                    layers: [{ id: 'raster', type: 'raster', source: 'raster' }],
+                };
+            // The style arrived after a newer selection, or after the map was
+            // rebuilt for another dataset; adding it now would stack two basemaps.
+            if (seq !== basemapSeq || target !== map) return;
+
+            for (const id of basemapLayers) map.removeLayer(id);
+            for (const id of basemapSources) map.removeSource(id);
+
+            if (style.glyphs) map.setGlyphs(style.glyphs);
+            if (style.sprite) map.setSprite(style.sprite);
+            basemapSources = Object.keys(style.sources).map(id => 'basemap:' + id);
+            for (const [id, src] of Object.entries(style.sources)) map.addSource('basemap:' + id, src);
+
             const before = map.getLayer('hillshade') ? 'hillshade'
                 : map.getLayer('plates') ? 'plates'
-                : map.getLayer('grid-circles') ? 'grid-circles' : undefined;
-            map.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' }, before);
+                : map.getLayer(DATA_LAYERS[0]) ? DATA_LAYERS[0] : undefined;
+            basemapLayers = style.layers.map(l => 'basemap:' + l.id);
+            for (const l of style.layers) {
+                const layer = { ...l, id: 'basemap:' + l.id };
+                if (l.source) layer.source = 'basemap:' + l.source;
+                map.addLayer(layer, before);
+            }
         }
 
-        // Tectonic plate boundaries — Bird (2003) via fraxen/tectonicplates.
-        // Tries a local/same-origin copy first, then the GitHub raw fallback.
+        // Tectonic plates — Bird (2003) via fraxen/tectonicplates. Each file is
+        // tried as a local/same-origin copy first, then from GitHub raw.
+        async function fetchPlateFile(name) {
+            for (const u of [name, 'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/' + name]) {
+                try {
+                    const r = await fetch(u);
+                    if (r.ok) return await r.json();
+                } catch { /* try next */ }
+            }
+            return null;
+        }
+
+        // One label point per plate: the mean direction of its boundary, which
+        // needs no unwrapping at the antimeridian (where the file cuts plates).
+        function plateLabelPoints(plates) {
+            const RAD = Math.PI / 180, sums = {};
+            for (const f of plates.features) {
+                const sum = sums[f.properties.PlateName] ??= [0, 0, 0];
+                const polygons = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+                for (const [ring] of polygons) {
+                    for (let i = 1; i < ring.length; i++) {
+                        const [x0, y0] = ring[i - 1], [x1, y1] = ring[i];
+                        // Edges along the antimeridian or at a pole are cuts, not plate boundary
+                        if (Math.min(Math.abs(x0), Math.abs(x1)) > 179.999 || Math.min(Math.abs(y0), Math.abs(y1)) > 89.999) continue;
+                        const lon = (x0 + x1) / 2 * RAD, lat = (y0 + y1) / 2 * RAD;
+                        const length = Math.hypot((x1 - x0) * Math.cos(lat), y1 - y0);
+                        sum[0] += length * Math.cos(lat) * Math.cos(lon);
+                        sum[1] += length * Math.cos(lat) * Math.sin(lon);
+                        sum[2] += length * Math.sin(lat);
+                    }
+                }
+            }
+            return {
+                type: 'FeatureCollection',
+                features: Object.entries(sums).map(([name, [x, y, z]]) => ({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [Math.atan2(y, x) / RAD, Math.atan2(z, Math.hypot(x, y)) / RAD] },
+                    properties: { name },
+                })),
+            };
+        }
+
         let platesData = null;
+        let plateNames = null;        // label points, once loaded
+        let plateMode = 1;            // 0 off, 1 boundaries, 2 boundaries with plate names
+
         async function togglePlates() {
             if (!$('chk-plates').checked) {
-                if (map.getLayer('plates')) map.removeLayer('plates');
-                if (map.getSource('plates')) map.removeSource('plates');
+                for (const id of ['plate-names', 'plates']) {
+                    if (map.getLayer(id)) map.removeLayer(id);
+                    if (map.getSource(id)) map.removeSource(id);
+                }
+                $('chk-plates').parentElement.classList.remove('labels');
                 return;
             }
-            if (!platesData) {
-                const urls = [
-                    'PB2002_boundaries.json',
-                    'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json',
-                ];
-                for (const u of urls) {
-                    try {
-                        const r = await fetch(u);
-                        if (r.ok) { platesData = await r.json(); break; }
-                    } catch { /* try next */ }
-                }
-                if (!platesData) {
-                    $('chk-plates').checked = false;
-                    return;
-                }
-            }
+            platesData ??= await fetchPlateFile('PB2002_boundaries.json');
+            if (!platesData) { plateMode = 0; $('chk-plates').checked = false; }
+            if (!$('chk-plates').checked) return;   // also: switched off while the file was loading
             if (!map.getSource('plates')) {
                 map.addSource('plates', {
                     type: 'geojson', data: platesData,
@@ -1025,15 +1370,152 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 map.addLayer({
                     id: 'plates', type: 'line', source: 'plates',
                     paint: { 'line-color': '#e05c2f', 'line-width': 1.4, 'line-opacity': 0.85 },
-                }, map.getLayer('grid-circles') ? 'grid-circles' : undefined);
+                }, map.getLayer(DATA_LAYERS[0]) ? DATA_LAYERS[0] : undefined);
+            }
+
+            if (plateMode === 2) {
+                plateNames ??= await fetchPlateFile('PB2002_plates.json').then(d => d && plateLabelPoints(d));
+                if (!plateNames) plateMode = 1;
+            }
+            $('chk-plates').parentElement.classList.toggle('labels', plateMode === 2);
+            if (plateMode !== 2) {
+                if (map.getLayer('plate-names')) map.removeLayer('plate-names');
+                return;
+            }
+            if (!map.getSource('plate-names')) map.addSource('plate-names', { type: 'geojson', data: plateNames });
+            if (!map.getLayer('plate-names')) {
+                map.addLayer({
+                    id: 'plate-names', type: 'symbol', source: 'plate-names',
+                    layout: {
+                        'text-field': ['get', 'name'],
+                        'text-font': ['Noto Sans Bold'],
+                        'text-size': ['interpolate', ['linear'], ['zoom'], 1, 10, 6, 15],
+                        'text-transform': 'uppercase',
+                        'text-letter-spacing': 0.12,
+                        'text-max-width': 7,
+                    },
+                    paint: { 'text-color': '#a63c17', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.4 },
+                });
             }
         }
 
         // Dark "space" backdrop behind the globe; plain background for mercator
         function applyMapBackground() {
-            $('map').style.background = $('sel-proj').value === 'globe'
+            $('map').style.background = projection() === 'globe'
                 ? 'radial-gradient(circle at 50% 42%, #17233f 0%, #0a0f1c 55%, #04060c 100%)'
                 : '';
+        }
+
+        // ================= search =================
+        // "lat lon" when that fits, else "lon lat"; comma or space separated.
+        function parseCoords(q) {
+            const m = /^(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/.exec(q);
+            if (!m) return null;
+            const a = Number(m[1]), b = Number(m[2]);
+            if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return [b, a];
+            if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return [a, b];
+            return null;
+        }
+
+        // Up to 8 point indices whose id equals or starts with `q`; grid ids are
+        // zero-padded, so "123" also finds "000123".
+        function matchPoints(q) {
+            if (!S.points) return [];
+            const bare = t => t.replace(/^0+(?=.)/, '');
+            const exact = [], prefix = [];
+            S.points.id.forEach((raw, p) => {
+                const id = String(raw).toLowerCase();
+                if (id === q || bare(id) === bare(q)) exact.push(p);
+                else if (prefix.length < 8 && (id.startsWith(q) || bare(id).startsWith(q))) prefix.push(p);
+            });
+            return [...exact, ...prefix].slice(0, 8);
+        }
+
+        const placeCache = new Map();
+        let nextPlaceFetch = 0;
+
+        async function searchPlaces(q) {
+            const key = q.toLowerCase();
+            if (!placeCache.has(key)) {
+                // Nominatim's usage policy allows at most one request per second
+                const wait = Math.max(nextPlaceFetch - Date.now(), 0);
+                nextPlaceFetch = Date.now() + wait + 1100;
+                await new Promise(r => setTimeout(r, wait));
+                const r = await fetch(
+                    'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=' + encodeURIComponent(q),
+                    { headers: { Accept: 'application/json' } });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                placeCache.set(key, await r.json());
+            }
+            return placeCache.get(key);
+        }
+
+        function goToPlace(place) {
+            const [s, n, w, e] = place.boundingbox.map(Number);
+            // fitBounds cannot frame a box that wraps the antimeridian, spans a
+            // continent on the globe, or has no extent; fly to the point instead.
+            const zoom = w > e ? 5
+                : (e - w > 120 || n - s > 90) ? 4
+                : (e - w < 0.002 || n - s < 0.002) ? 11 : 0;
+            if (zoom) map.flyTo({ center: [Number(place.lon), Number(place.lat)], zoom, duration: 1200 });
+            else map.fitBounds([[w, s], [e, n]], { padding: 80, maxZoom: 11, duration: 1200 });
+        }
+
+        // `rows` is a status message, or [{title, sub, pick}]
+        function showResults(rows) {
+            const box = $('search-results');
+            box.replaceChildren();
+            if (typeof rows === 'string') {
+                const msg = document.createElement('div');
+                msg.className = 'msg';
+                msg.textContent = rows;
+                box.append(msg);
+            } else {
+                for (const row of rows) {
+                    const btn = document.createElement('button');
+                    const sub = document.createElement('small');
+                    sub.textContent = row.sub;
+                    btn.append(row.title, sub);
+                    btn.onclick = () => {
+                        box.hidden = true;
+                        $('search-q').value = row.title;
+                        row.pick();
+                    };
+                    box.append(btn);
+                }
+            }
+            box.hidden = false;
+        }
+
+        const pointRows = q => matchPoints(q).map(p => ({
+            title: pointLabel(p),
+            sub: `${S.points.lat[p].toFixed(3)}°, ${S.points.lon[p].toFixed(3)}°`,
+            pick: () => {
+                selectPoint(p);
+                map.flyTo({ center: [S.points.lon[p], S.points.lat[p]], zoom: Math.max(map.getZoom(), 8) });
+            },
+        }));
+
+        // Coordinates, then point ids (local), then place names (network)
+        async function runSearch(q) {
+            const lonLat = parseCoords(q);
+            if (lonLat) {
+                $('search-results').hidden = true;
+                map.flyTo({ center: lonLat, zoom: 9 });
+                return;
+            }
+            const rows = pointRows(q.toLowerCase());
+            // Grid ids are all digits; no place is, so skip the lookup
+            if (rows.length && /^\d+$/.test(q)) return showResults(rows);
+            showResults('Searching…');
+            try {
+                for (const place of await searchPlaces(q)) {
+                    rows.push({ title: place.name || place.display_name, sub: place.display_name, pick: () => goToPlace(place) });
+                }
+            } catch (err) {
+                return showResults(`Place lookup failed (${err.message}). Coordinates and point ids still work offline.`);
+            }
+            showResults(rows.length ? rows : 'Nothing found.');
         }
 
         // 3D terrain from the AWS Open Data terrain tiles (Mapzen terrarium encoding)
@@ -1058,7 +1540,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     map.addLayer({
                         id: 'hillshade', type: 'hillshade', source: 'dem',
                         paint: { 'hillshade-exaggeration': 0.35 },
-                    }, 'grid-circles');
+                    }, DATA_LAYERS[0]);
                 }
                 if (map.getPitch() === 0) map.easeTo({ pitch: 60, duration: 800 });
             } else {
@@ -1085,15 +1567,19 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 container: 'map',
                 style: {
                     version: 8, sources: {}, layers: [],
+                    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',   // for the plate names
                     // Atmosphere halo when zoomed out on the globe
                     sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
                 },
                 ...view,
                 maxPitch: 85,
-                attributionControl: { compact: true },
+                attributionControl: { compact: true, customAttribution: 'Place search © OpenStreetMap' },
             });
-            map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'bottom-right');
+            basemapLayers = [];
+            basemapSources = [];
+            map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-left');
             map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+            map.addControl(mapToolsControl, 'bottom-right');
 
             // Keep the vector overlay in sync with the camera
             resizeQuiver();
@@ -1102,36 +1588,59 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             applyMapBackground();
 
             return new Promise(resolve => map.on('load', () => {
-                setBasemap($('sel-basemap').value);
+                setBasemap($('basemap-menu').querySelector(':checked').value);
 
                 if (S.points) {
+                    // Showing grid and GPS sites together: grid nodes become squares
+                    const both = S.nGrid > 0 && S.nGrid < S.nPoints;
                     const features = new Array(S.nPoints);
                     for (let p = 0; p < S.nPoints; p++) {
                         features[p] = {
                             type: 'Feature', id: p,
                             geometry: { type: 'Point', coordinates: [S.points.lon[p], S.points.lat[p]] },
-                            properties: { sid: S.points.id[p] },
+                            properties: { sid: S.points.id[p], square: both && p < S.nGrid },
                         };
                     }
                     map.addSource('grid', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+                    const strokeColor = ['case',
+                        ['boolean', ['feature-state', 'sel2'], false], '#7c3aed',
+                        '#111'];
+                    const strokeWidth = ['case',
+                        ['boolean', ['feature-state', 'sel'], false], 2.5,
+                        ['boolean', ['feature-state', 'sel2'], false], 2.5,
+                        0.4];
+                    // Not 'square': basemap sprites own the short names and would replace it
+                    map.addImage('unr-grid-square', squareSdf(), { sdf: true });
+                    map.addLayer({
+                        id: 'grid-squares', type: 'symbol', source: 'grid',
+                        filter: ['get', 'square'],
+                        layout: {
+                            'icon-image': 'unr-grid-square',
+                            'icon-size': squareSize(),
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true,
+                        },
+                        paint: {
+                            'icon-color': squareColor(),
+                            'icon-opacity': squareOpacity(),
+                            'icon-halo-color': strokeColor,
+                            'icon-halo-width': strokeWidth,
+                        },
+                    });
                     map.addLayer({
                         id: 'grid-circles', type: 'circle', source: 'grid',
+                        filter: ['!', ['get', 'square']],
                         paint: {
-                            'circle-radius': radiusExpression(),
-                            'circle-color': colorExpression(),
+                            'circle-radius': circleSize(),
+                            'circle-color': colorExpression(circleKind()),
                             'circle-opacity': S.opacity,
-                            'circle-stroke-color': ['case',
-                                ['boolean', ['feature-state', 'sel2'], false], '#7c3aed',
-                                '#111'],
-                            'circle-stroke-width': ['case',
-                                ['boolean', ['feature-state', 'sel'], false], 2.5,
-                                ['boolean', ['feature-state', 'sel2'], false], 2.5,
-                                0.4],
+                            'circle-stroke-color': strokeColor,
+                            'circle-stroke-width': strokeWidth,
                             'circle-stroke-opacity': 0.9 * S.opacity,
                         },
                     });
 
-                    map.on('mousemove', 'grid-circles', e => {
+                    map.on('mousemove', DATA_LAYERS, e => {
                         map.getCanvas().style.cursor = 'pointer';
                         const f = e.features[0];
                         const v = S.showRate ? computeRates(S.prop)[f.id] : valueAt(S.dateIdx, f.id);
@@ -1140,17 +1649,17 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                             `${f.geometry.coordinates[0].toFixed(3)}°  →  ` +
                             (Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data');
                     });
-                    map.on('mouseleave', 'grid-circles', () => {
+                    map.on('mouseleave', DATA_LAYERS, () => {
                         map.getCanvas().style.cursor = '';
                         $('hover-info').textContent = '';
                     });
                     // Plain click = main chart; Shift+click = comparison chart
-                    map.on('click', 'grid-circles', e =>
+                    map.on('click', DATA_LAYERS, e =>
                         selectPoint(e.features[0].id, e.originalEvent.shiftKey ? 1 : 0));
                 }
 
                 // Restore map settings after a dataset (re)load
-                map.setProjection({ type: $('sel-proj').value });
+                map.setProjection({ type: projection() });
                 if ($('chk-terrain').checked) applyTerrain();
                 if ($('chk-plates').checked) togglePlates();
 
@@ -1160,7 +1669,14 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
         function restyle() {
             if (map?.getLayer('grid-circles')) {
-                map.setPaintProperty('grid-circles', 'circle-color', colorExpression());
+                map.setPaintProperty('grid-circles', 'circle-color', colorExpression(circleKind()));
+                map.setPaintProperty('grid-squares', 'icon-color', squareColor());
+                map.setPaintProperty('grid-squares', 'icon-opacity', squareOpacity());
+            }
+            for (const kind of ['grid', 'sites']) {
+                $(`swatch-${kind}`).style.background = S.flatOn[kind]
+                    ? S.flatColor[kind]
+                    : `linear-gradient(90deg, ${activeStops().join(',')})`;
             }
             drawLegend();
         }
@@ -1202,10 +1718,25 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             S.refRow = rows[S.prop] ?? null;
         }
 
+        // Limit the slider and playback to the dates from `start` to `end` (ISO
+        // strings, snapped to dates in the data). Called bare, or with a span
+        // that holds no dates, it covers the whole record.
+        function setSpan(start = '', end = '') {
+            let t0 = S.dates.findIndex(d => d >= start);
+            let t1 = end ? S.dates.findLastIndex(d => d <= end) : S.nDates - 1;
+            if (t0 < 0 || t1 < t0) [t0, t1] = [0, S.nDates - 1];
+            S.span = [t0, t1];
+            $('inp-date').min = t0;
+            $('inp-date').max = t1;
+            $('inp-start').value = S.dates[t0];
+            $('inp-end').value = S.dates[t1];
+            setDate(S.dateIdx);
+        }
+
         let pendingDate = -1, rafScheduled = false;
         function setDate(t, fromSlider = false) {
             if (!S.nDates || !map) return;
-            t = Math.max(0, Math.min(S.nDates - 1, t));
+            t = Math.max(S.span[0], Math.min(S.span[1], t));
             S.dateIdx = t;
             if (!fromSlider) $('inp-date').value = t;
             $('date-label').textContent = S.dates[t];
@@ -1257,7 +1788,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const fps = Number($('sel-fps').value);
             if (ts - lastTick >= 1000 / fps) {
                 lastTick = ts;
-                setDate(S.dateIdx >= S.nDates - 1 ? 0 : S.dateIdx + 1);
+                setDate(S.dateIdx >= S.span[1] ? S.span[0] : S.dateIdx + 1);
             }
             requestAnimationFrame(playLoop);
         }
@@ -1438,7 +1969,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('chart-panel').style.display = 'block';
             if (cs.block) $(cs.block).style.display = 'block';
             $(cs.title).textContent =
-                `Grid #${S.points.id[p]} — ${S.points.lat[p].toFixed(3)}°, ${S.points.lon[p].toFixed(3)}°`;
+                `${pointLabel(p)} — ${S.points.lat[p].toFixed(3)}°, ${S.points.lon[p].toFixed(3)}°`;
             renderChart(slot);
         }
 
@@ -1470,9 +2001,29 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const p = S.sel[slot];
             if (p < 0) return;
             const data = chartData(p);
+            const isGrid = p < S.nGrid;
+            // Velocity from the chart's fit model when one with a velocity term is
+            // on, else from a plain straight line
+            const useFit = $('chk-fit').checked && Number($('sel-fit-order').value) >= 1;
+            const cfg = useFit ? fitConfig() : { order: 1, annual: false, semi: false, steps: [] };
+            const fits = COMPONENTS.map((_, i) => fitSeries(data[0], data[i + 1], cfg));
+            const lines = [
+                `# point_type: ${isGrid ? 'grid' : 'GPS site'}`,
+                `# id: ${S.points.id[p]}`,
+                `# lat: ${S.points.lat[p].toFixed(6)}`,
+                `# lon: ${S.points.lon[p].toFixed(6)}`,
+                `# reference: ${S.refMode === 'none' ? 'values as in file' : S.refMode === 'mean' ? 'per-point temporal mean' : 'date ' + S.dates[S.refIdx]}`,
+                `# velocity_model: ${describeFit(cfg)} (least squares; sigma assumes white noise)`,
+            ];
+            COMPONENTS.forEach((comp, i) => {
+                const v = fits[i]?.velocity;
+                lines.push(`# velocity_${comp}_mm_yr: ${v ? v.value.toFixed(4) : ''}`,
+                    `# velocity_${comp}_sigma_mm_yr: ${v ? v.sigma.toFixed(4) : ''}`);
+            });
+            if (useFit) COMPONENTS.forEach((comp, i) => lines.push(`# fit_${comp}: ${fits[i]?.terms.join(' · ') ?? ''}`));
             const header = ['date', ...COMPONENTS.map(c => `${c}_mm`)];
             if (S.hasSigma) header.push(...COMPONENTS.map(c => `sigma_${c}_mm`));
-            const lines = [header.join(',')];
+            lines.push(header.join(','));
             for (let t = 0; t < S.nDates; t++) {
                 const row = [S.dates[t]];
                 for (let i = 0; i < COMPONENTS.length; i++) {
@@ -1490,7 +2041,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `unr_point_${S.points.id[p]}.csv`;
+            a.download = `unr_${isGrid ? 'grid' : 'site'}_${S.points.id[p]}.csv`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 5000);
         }
@@ -1518,6 +2069,164 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 return out;
             });
             return [S.dateSec, ...series];
+        }
+
+        // Time span the point actually has data for. GPS sites start and stop at
+        // different times, so the chart opens on this rather than the whole axis.
+        function recordSpan(data) {
+            const x = data[0];
+            const hasData = t => data.slice(1).some(series => series[t] != null);
+            let first = 0, last = x.length - 1;
+            while (first < last && !hasData(first)) first++;
+            while (last > first && !hasData(last)) last--;
+            return last > first ? [x[first], x[last]] : [x[0], x[x.length - 1]];
+        }
+
+        // ================= trajectory fit =================
+        const YEAR_SEC = 31_557_600;
+
+        // Inverse of a small symmetric matrix by Gauss-Jordan, or null if singular
+        function invert(a) {
+            const n = a.length;
+            const eps = 1e-12 * Math.max(...a.map((row, i) => Math.abs(row[i])));
+            const m = a.map((row, i) => [...row, ...row.map((_, j) => +(i === j))]);
+            for (let c = 0; c < n; c++) {
+                let p = c;
+                for (let r = c + 1; r < n; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
+                if (!(Math.abs(m[p][c]) > eps)) return null;
+                [m[c], m[p]] = [m[p], m[c]];
+                const d = m[c][c];
+                for (let j = 0; j < 2 * n; j++) m[c][j] /= d;
+                for (let r = 0; r < n; r++) {
+                    const f = m[r][c];
+                    if (r !== c && f) for (let j = 0; j < 2 * n; j++) m[r][j] -= f * m[c][j];
+                }
+            }
+            return m.map(row => row.slice(n));
+        }
+
+        // Step dates typed in the fit controls; flags the box when one is not a date
+        function fitSteps() {
+            const words = $('inp-fit-steps').value.split(/[,\s]+/).filter(Boolean);
+            const steps = words.map(d => ({ date: d, t: Date.parse(d + 'T00:00:00Z') / 1000 }));
+            $('inp-fit-steps').style.borderColor = steps.every(st => Number.isFinite(st.t)) ? '' : '#dc2626';
+            return steps.filter(st => Number.isFinite(st.t)).sort((a, b) => a.t - b.t);
+        }
+
+        // Least-squares fit of one series y(x) (x in unix seconds, null = no data) to
+        // offset + polynomial + annual/semi-annual sinusoids + Heaviside steps.
+        // Uncertainties assume white noise, so they are optimistic for GPS.
+        function fitSeries(x, y, cfg) {
+            const idx = [];
+            for (let i = 0; i < y.length; i++) if (y[i] != null) idx.push(i);
+            if (idx.length < 3) return null;
+            const tFirst = x[idx[0]], tLast = x[idx[idx.length - 1]];
+            const mid = (tFirst + tLast) / 2, half = Math.max((tLast - tFirst) / 2, 1);
+            const halfYears = half / YEAR_SEC;
+            const cols = [{ f: () => 1 }];
+            // Polynomial in time scaled to [-1, 1] so high orders stay well conditioned
+            for (let k = 1; k <= cfg.order; k++) cols.push({ poly: k, f: t => ((t - mid) / half) ** k });
+            for (const [on, w, name] of [[cfg.annual, 2, 'ann'], [cfg.semi, 4, 'semi']]) {
+                if (!on) continue;
+                cols.push({ season: name, f: t => Math.sin(w * Math.PI * (t - mid) / YEAR_SEC) });
+                cols.push({ season: name, f: t => Math.cos(w * Math.PI * (t - mid) / YEAR_SEC) });
+            }
+            // A step needs data on both sides of it to be estimable
+            for (const st of cfg.steps) {
+                if (st.t > tFirst && st.t <= tLast) cols.push({ step: st.date, f: t => (t >= st.t ? 1 : 0) });
+            }
+            const m = cols.length;
+            if (idx.length <= m) return null;
+
+            const N = cols.map(() => new Array(m).fill(0)), b = new Array(m).fill(0);
+            for (const i of idx) {
+                const row = cols.map(c => c.f(x[i]));
+                for (let r = 0; r < m; r++) {
+                    b[r] += row[r] * y[i];
+                    for (let c = 0; c < m; c++) N[r][c] += row[r] * row[c];
+                }
+            }
+            const inv = invert(N);
+            if (!inv) return null;
+            const coef = inv.map(row => row.reduce((acc, v, c) => acc + v * b[c], 0));
+            const model = t => cols.reduce((acc, c, k) => acc + coef[k] * c.f(t), 0);
+            let rss = 0;
+            for (const i of idx) rss += (y[i] - model(x[i])) ** 2;
+            const sd = k => Math.sqrt(inv[k][k] * rss / (idx.length - m));
+
+            const terms = [];
+            let velocity = null;   // {value, sigma} in mm/yr
+            cols.forEach((c, k) => {
+                if (c.poly === 1) {
+                    velocity = { value: coef[k] / halfYears, sigma: sd(k) / halfYears };
+                    terms.push(`v ${fmtFit(velocity.value, velocity.sigma)} mm/yr`);
+                }
+                if (c.poly === 2) terms.push(`acc ${fmtFit(2 * coef[k] / halfYears ** 2, 2 * sd(k) / halfYears ** 2)} mm/yr²`);
+                if (c.season && cols[k + 1]?.season === c.season) {
+                    terms.push(`${c.season} ${Math.hypot(coef[k], coef[k + 1]).toFixed(1)} mm`);
+                }
+                if (c.step) terms.push(`step ${c.step} ${fmtFit(coef[k], sd(k))} mm`);
+            });
+            const fitted = x.map((t, i) => (i >= idx[0] && i <= idx[idx.length - 1] ? model(t) : null));
+            return { fitted, terms, velocity };
+        }
+
+        const fmtFit = (v, sd) => `${v.toFixed(2)} ± ${sd.toFixed(2)}`;
+
+        let fitVersion = 0;   // bumped when a fit control changes
+
+        const fitConfig = () => ({
+            order: Number($('sel-fit-order').value),
+            annual: $('chk-fit-annual').checked,
+            semi: $('chk-fit-semi').checked,
+            steps: fitSteps(),
+        });
+
+        function describeFit(cfg) {
+            const parts = ['offset', 'velocity', 'acceleration', 'cubic'].slice(0, cfg.order + 1);
+            if (cfg.annual) parts.push('annual');
+            if (cfg.semi) parts.push('semi-annual');
+            if (cfg.steps.length) parts.push('steps at ' + cfg.steps.map(st => st.date).join(' '));
+            return parts.join(' + ');
+        }
+
+        // Fitted curves (dashed) plus a line of estimates per component under the chart
+        function drawFit(u, slot) {
+            const out = $(slot ? 'fit-result2' : 'fit-result');
+            if (!$('chk-fit').checked) { out.replaceChildren(); return; }
+            if (u._fit?.data !== u.data || u._fit.version !== fitVersion) {
+                const cfg = fitConfig();
+                u._fit = { data: u.data, version: fitVersion, fits: COMPONENTS.map((_, i) => fitSeries(u.data[0], u.data[i + 1], cfg)) };
+                out.replaceChildren(...u._fit.fits.map((fit, i) => {
+                    const line = document.createElement('div');
+                    const name = document.createElement('b');
+                    name.style.color = SERIES_COLORS[i];
+                    name.textContent = COMPONENTS[i][0].toUpperCase();
+                    line.append(name, fit ? fit.terms.join(' · ') || 'offset only' : 'too few points to fit');
+                    return line;
+                }));
+            }
+            const ctx = u.ctx;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height);
+            ctx.clip();
+            ctx.setLineDash([6, 3]);
+            ctx.lineWidth = 1.6;
+            u._fit.fits.forEach((fit, i) => {
+                if (!fit || !u.series[i + 1].show) return;
+                ctx.strokeStyle = SERIES_COLORS[i];
+                ctx.beginPath();
+                let started = false;
+                fit.fitted.forEach((v, t) => {
+                    if (v == null) return;
+                    const px = u.valToPos(u.data[0][t], 'x', true), py = u.valToPos(v, 'y', true);
+                    if (started) ctx.lineTo(px, py);
+                    else { ctx.moveTo(px, py); started = true; }
+                });
+                ctx.stroke();
+            });
+            ctx.restore();
         }
 
         // Dashed vertical marker at the current date
@@ -1631,12 +2340,22 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     { ...axisCfg() },
                     { ...axisCfg(), label: 'mm', size: 52 },
                 ],
-                scales: { x: { time: true } },
+                scales: {
+                    x: {
+                        time: true,
+                        // uPlot asks for the full date axis on load and on double-click
+                        // reset; answer with the point's own record. Zooms pass through.
+                        range: (u, min, max) => {
+                            const x = u.data[0];
+                            return min === x[0] && max === x[x.length - 1] ? recordSpan(u.data) : [min, max];
+                        },
+                    },
+                },
                 cursor: { drag: { x: true, y: true, uni: 40 } },  // drag box = zoom, dblclick = reset
                 hooks: {
                     // Band under the series (drawAxes runs before series), marker on top
                     drawAxes: [u => drawSigmaBand(u, S.sel[slot])],
-                    draw: [drawCursorLine],
+                    draw: [u => drawFit(u, slot), drawCursorLine],
                     ready: [u => {
                         // Click (without drag) jumps the map to that date
                         let downX = 0, downY = 0;
@@ -1700,26 +2419,40 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
             $('inp-vmin').onchange = e => { S.vmin = Number(e.target.value); restyle(); };
             $('inp-vmax').onchange = e => { S.vmax = Number(e.target.value); restyle(); };
-            $('inp-size').oninput = e => {
-                S.sizeMult = Number(e.target.value);
+            for (const kind of ['grid', 'sites']) {
+                $(`swatch-${kind}`).onclick = () => { S.flatOn[kind] = !S.flatOn[kind]; restyle(); };
+                // The two clicks of a double-click cancel out, so switch it on here
+                $(`swatch-${kind}`).ondblclick = () => { S.flatOn[kind] = true; restyle(); $(`col-${kind}`).click(); };
+                $(`col-${kind}`).oninput = e => { S.flatColor[kind] = e.target.value; restyle(); };
+            }
+            const resize = () => {
                 if (map.getLayer('grid-circles')) {
-                    map.setPaintProperty('grid-circles', 'circle-radius', radiusExpression());
+                    map.setPaintProperty('grid-circles', 'circle-radius', circleSize());
+                    map.setLayoutProperty('grid-squares', 'icon-size', squareSize());
                 }
             };
+            $('inp-size').oninput = e => { S.sizeMult = Number(e.target.value); resize(); };
+            $('inp-size-sites').oninput = e => { S.siteSizeMult = Number(e.target.value); resize(); };
             $('inp-opacity').oninput = e => {
                 S.opacity = Number(e.target.value);
                 if (map.getLayer('grid-circles')) {
                     map.setPaintProperty('grid-circles', 'circle-opacity', S.opacity);
+                    map.setPaintProperty('grid-squares', 'icon-opacity', squareOpacity());
                     map.setPaintProperty('grid-circles', 'circle-stroke-opacity', 0.9 * S.opacity);
                 }
             };
-            $('sel-basemap').onchange = e => setBasemap(e.target.value);
-            $('sel-proj').onchange = e => {
-                map.setProjection({ type: e.target.value });
+            $('dataset-toggle').onchange = e => switchDataset(e.target.value);
+            $('basemap-menu').onchange = e => setBasemap(e.target.value);
+            $('chk-globe').onchange = () => {
+                map.setProjection({ type: projection() });
                 applyMapBackground();
                 drawQuiver();
             };
-            $('sel-quiver').onchange = e => { S.quiver = e.target.value; drawQuiver(); };
+            $('sel-quiver').onchange = e => {
+                S.quiver = e.target.value;
+                for (const id of ['row-qscale', 'row-qref']) $(id).style.display = S.quiver === 'none' ? 'none' : '';
+                drawQuiver();
+            };
             $('inp-qscale').oninput = e => { S.qscale = Number(e.target.value); drawQuiver(); };
             $('chk-qauto').onchange = e => { S.qauto = e.target.checked; drawQuiver(); };
             const useFixedRef = () => {   // typing a value switches to fixed scaling
@@ -1730,10 +2463,18 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('inp-qref-h').onchange = useFixedRef;
             $('inp-qref-v').onchange = useFixedRef;
             $('chk-terrain').onchange = applyTerrain;
-            $('chk-plates').onchange = togglePlates;
+            // One button, three states: boundaries, boundaries with names, off
+            $('chk-plates').onchange = () => {
+                plateMode = (plateMode + 1) % 3;
+                $('chk-plates').checked = plateMode > 0;
+                togglePlates();
+            };
             $('inp-exag').oninput = () => { if ($('chk-terrain').checked) applyTerrain(); };
             $('chk-autolive').onchange = e => { if (e.target.checked) applyDate(S.dateIdx); };
             $('chk-sigma').onchange = redrawCharts;
+            const refit = () => { fitVersion++; redrawCharts(); };
+            $('chk-fit').onchange = e => { $('fit-controls').hidden = !e.target.checked; refit(); };
+            for (const id of ['sel-fit-order', 'chk-fit-annual', 'chk-fit-semi', 'inp-fit-steps']) $(id).onchange = refit;
 
             const strideSel = $('sel-stride');
             const curStride = String(Math.max(1, Math.floor(Number(params.get('stride')) || 1)));
@@ -1748,26 +2489,27 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 location.href = u;   // reload with the new subsampling
             };
 
-            const doFind = () => {
-                const q = $('inp-find').value.trim().toLowerCase();
-                if (!q || !S.points) return;
-                let p = S.points.id.findIndex(id => String(id).toLowerCase() === q);
-                if (p < 0) p = S.points.id.findIndex(id => String(id).toLowerCase().includes(q));
-                $('inp-find').style.borderColor = p < 0 ? '#dc2626' : '';
-                if (p < 0) return;
-                selectPoint(p);
-                map.flyTo({
-                    center: [S.points.lon[p], S.points.lat[p]],
-                    zoom: Math.max(map.getZoom(), 8),
-                });
+            // Only point ids match while typing; places are looked up on Enter
+            $('search-q').oninput = e => {
+                const q = e.target.value.trim().toLowerCase();
+                const rows = q && !parseCoords(q) ? pointRows(q) : [];
+                if (rows.length) showResults(rows);
+                else $('search-results').hidden = true;
             };
-            $('btn-find').onclick = doFind;
-            $('inp-find').onkeydown = e => { if (e.key === 'Enter') doFind(); };
+            $('search-q').onkeydown = e => {
+                const q = e.target.value.trim();
+                if (e.key === 'Enter' && q) runSearch(q);
+                if (e.key === 'Escape') {
+                    $('search-results').hidden = true;
+                    e.target.blur();
+                }
+            };
 
             $('btn-loadfile').onclick = () => $('inp-file').click();
             $('inp-file').onchange = async e => {
                 if (!e.target.files.length) return;
-                reboot(await fileToAsyncBuffer(e.target.files[0]));
+                const file = await fileToAsyncBuffer(e.target.files[0]);
+                reboot(() => loadParquet(file));
                 e.target.value = '';
             };
             $('btn-loadurl').onclick = () => {
@@ -1812,6 +2554,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
 
             $('inp-date').oninput = e => setDate(Number(e.target.value), true);
+            $('inp-start').onchange = $('inp-end').onchange = () => setSpan($('inp-start').value, $('inp-end').value);
+            $('btn-span-reset').onclick = () => setSpan();
             $('btn-play').onclick = () => setPlaying(!S.playing);
             $('btn-first').onclick = () => setDate(0);
             $('btn-back').onclick = () => setDate(S.dateIdx - 1);
@@ -1865,23 +2609,28 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             'Load a dataset with "Open .parquet…" or a URL below ' +
             '(generate one with create-geoparquet.py).';
 
-        // Boot with a parquet buffer, or with null to open an empty map;
-        // a parse failure also falls back to the empty map.
-        async function boot(file) {
-            if (file) {
+        // Boot with a function returning a dataset, or with null to open an
+        // empty map; a failed load also falls back to the empty map.
+        async function boot(load) {
+            if (load) {
                 try {
-                    await loadParquet(file);
+                    const t0 = performance.now();
+                    Object.assign(S, await load());
+                    showStats((performance.now() - t0) / 1000);
                 } catch (err) {
                     console.error(err);
                     S.mats = {}; S.points = null; S.dates = [];
-                    S.nDates = 0; S.nPoints = 0; S.hasSigma = false;
+                    S.nDates = 0; S.nPoints = 0; S.nGrid = 0; S.hasSigma = false;
                     $('stats').innerHTML = `Failed to read data: ${err.message}<br>${NO_DATA_HINT}`;
+                    $('data-section').open = true;
                 }
             }
             await initMap();
             wireUI();
             if (S.nDates) {
-                $('inp-date').max = S.nDates - 1;
+                $('row-size-grid').style.display = S.nGrid ? '' : 'none';
+                $('row-size-sites').style.display = S.nGrid < S.nPoints ? '' : 'none';
+                setSpan();
                 autoRange();
                 restyle();
                 setDate(S.nDates - 1);
@@ -1891,7 +2640,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         }
 
         // Tear down the current dataset and boot another one (sidebar "Open .parquet…")
-        async function reboot(file) {
+        async function reboot(load) {
             setPlaying(false);
             closeChart(0);                 // takes the comparison chart with it
             map?.remove();
@@ -1908,7 +2657,53 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('sel-ref').value = 'none';
             $('ref-row').style.display = 'none';
             $('loading').style.display = 'flex';
-            await boot(file);
+            await boot(load);
+        }
+
+        const loaded = {};        // 'grid' | 'stations' -> dataset, so switching back needs no re-read
+        let shownKind = 'grid';
+
+        async function loadKind(kind) {
+            if (kind === 'both') return mergeDatasets(await loadKind('grid'), await loadKind('stations'));
+            if (!loaded[kind]) {
+                const url = DATASET_URLS[kind];
+                setLoading('Fetching data…', url);
+                let file;
+                try {
+                    file = await asyncBufferFromUrl(await versionedSource(url));
+                } catch (err) {
+                    throw new Error(`could not fetch "${url}"`, { cause: err });
+                }
+                const ds = await loadParquet(file);
+                if (kind === 'stations') ds.nGrid = 0;
+                loaded[kind] = ds;
+            }
+            return loaded[kind];
+        }
+
+        // Swap between grid, GPS sites and both, keeping the camera and the date
+        async function switchDataset(kind) {
+            const camera = { center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
+            const date = S.dates[S.dateIdx];
+            $('loading').style.display = 'flex';
+            let ds;
+            try {
+                ds = await loadKind(kind);
+            } catch (err) {
+                console.warn(err);
+                document.querySelector(`input[name="dataset"][value="${shownKind}"]`).checked = true;
+                $('loading').style.display = 'none';
+                $('stats').innerHTML += `<br>Not switched: ${err.message}.`;
+                $('data-section').open = true;
+                return;
+            }
+            shownKind = kind;
+            await reboot(() => ds);
+            map.jumpTo(camera);
+            if (date && S.nDates) {
+                const i = S.dates.findIndex(d => d >= date);
+                setDate(i < 0 ? S.nDates - 1 : i);
+            }
         }
 
         // The parquet is read via HTTP range requests. If the file is regenerated
@@ -1947,10 +2742,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         setLoading('Fetching data…', DATA_URL);
         versionedSource(DATA_URL)
             .then(src => asyncBufferFromUrl(src))
-            .then(boot, err => {
+            .then(file => boot(async () => loaded.grid = await loadParquet(file)), err => {
                 // No dataset yet — open the empty map; data can be added later
                 console.warn(`Could not fetch "${DATA_URL}":`, err);
                 $('stats').innerHTML = `No dataset loaded (could not fetch "${DATA_URL}").<br>${NO_DATA_HINT}`;
+                $('data-section').open = true;
                 boot(null);
             });
     </script>

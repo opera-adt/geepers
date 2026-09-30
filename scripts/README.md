@@ -20,7 +20,20 @@ Hosted on GitHub Pages: **https://opera-adt.github.io/geepers/**
 
 The default dataset is the **global UNR grid, all 28,358 points at monthly
 sampling** (2014→2026, ~95 MB), served same-origin from the `gh-pages`
-branch. See `deploy-pages.sh` for how the site is (re)built and pushed.
+branch. The "GPS sites" switch loads a global `--source midas` file (all
+~21,800 UNR stations, 1994→now, ~80 MB), with a note on the page saying it
+is a velocity-based simplification. See `deploy-pages.sh` for how the site
+is (re)built and pushed:
+
+```bash
+cd scripts/
+python create-geoparquet.py --bbox -180 -90 180 90 --source midas \
+    --start-date 1994-01-01 --output-file OPERA_UNR_GNSS_stations_midas.parquet
+./deploy-pages.sh                        # grid + stations, default demo note
+./deploy-pages.sh --note "Custom text"   # your own note
+./deploy-pages.sh --no-note              # no note
+./deploy-pages.sh --no-stations          # grid only
+```
 
 ### Viewing the full daily-resolution grid
 
@@ -60,8 +73,13 @@ python -m http.server 8123
 
 Useful options:
 
-- `--source grid|stations` — UNR gridded (interpolated) product, or real
-  UNR GPS station positions (.tenv3). Default `grid`.
+- `--source grid|stations|midas` — UNR gridded (interpolated) product,
+  real UNR GPS station positions (.tenv3), or `midas`: monthly straight
+  lines from UNR's IGS20 MIDAS station velocities over each station's
+  observing span. `midas` downloads one ~5 MB table instead of every
+  station's series, so it suits a global demo (the GitHub Pages "GPS
+  sites"), but it has no seasonal signal, offsets, noise or sigmas.
+  Default `grid`.
 - `--gridded-type constant|variable` — time-constant vs time-variable UNR
   product (version 0.3 only; grid source only; default `variable`).
 - `--output-file my_area.parquet` then open
@@ -71,6 +89,10 @@ Useful options:
 - `--zero-by mean|start|none` — zero each point's series by its mean, its
   first epochs, or `none` to keep values exactly as published (default
   `mean`).
+- Viewer URL options: `?data=<file>` (grid), `?stations=<file>` (GPS
+  sites, default `unr_stations.parquet`), `?stride=N`, and
+  `?note=<text>` to show a note panel (empty `?note=` hides one set at
+  deploy time).
 - If no file is found, the page offers a local file picker (drag any
   compatible `.parquet` in — nothing is uploaded, parsing is in-browser).
 
@@ -97,20 +119,54 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   reference magnitudes (e.g. H 3, V 1 mm/yr). Arrows show the same field
   as the colors (per-date displacement, or velocity in velocity mode).
   The globe view gets a dark space backdrop.
-- Each chart has a `csv` button (dates + E/N/U ± σ of that point, in mm,
-  with the current referencing applied).
-- Find ID box zooms to a grid point / station by identifier.
+- Chart `fit` option: least-squares trajectory model per component —
+  polynomial of order 0–3 (1 = velocity), annual and semi-annual
+  sinusoids, and Heaviside steps at typed dates. Fitted curves are drawn
+  dashed and the estimates listed under the chart. Uncertainties assume
+  white noise, so they are optimistic for GPS (typically several times
+  smaller than MIDAS's).
+- Each chart has a `csv` button: a `#` header (grid or GPS site, id,
+  lat, lon, reference, velocity ± σ per component from the fit model if
+  one is on, else a straight line, plus the fit terms), then dates + E/N/U
+  ± σ of that point in mm with the current referencing applied. Read it
+  with `pandas.read_csv(path, comment="#")`.
+- Grid / GPS sites / Both switch (top left): swaps between the gridded
+  product and a stations file (`unr_stations.parquet` next to the HTML,
+  or `?stations=<file>`; build one with `--source stations`), keeping
+  the map view and the nearest date. "Both" draws grid nodes as squares
+  and stations as circles over the union of their dates; on each date
+  a set shows its own nearest date if that lies within half its date
+  spacing. Outside its record a site is grey (no data); a grid node is
+  hidden, or faded if the grid is drawn in a single color. Grid and
+  sites share the colormap and range, have separate size sliders, and
+  each has a swatch beside its slider: click it to draw that set in a
+  single color, double-click to choose the color.
+- Charts open on the clicked point's own record (stations start and
+  stop at different times); zoom out or scroll to see the full axis.
+- Search box (top left): `lat lon` or `lon lat` coordinates, a grid
+  point / station id (matched locally as you type), or a place name
+  (looked up on Enter via OpenStreetMap Nominatim).
 - Large files: a memory estimate is checked before loading, and a "Date
   stride" selector (`?stride=N`) loads only every Nth date to bound
   memory (e.g. the ~1 GB time-variable CA file fits comfortably with
   stride 5).
+- Sidebar: the `–` button in its title collapses the whole panel; the
+  Record and Data sections start collapsed (Data opens itself when a
+  load fails).
+- Record start / end (sidebar): filled from the data and editable; the
+  date slider and playback run between them (`Full` restores the whole
+  record).
 - Reference modes: none (values exactly as stored in the file), per-point
   temporal mean, first date, or any chosen date (displacement relative to
   that date).
-- Basemaps: Carto light/dark, OSM, Esri satellite; globe (default) or
-  Mercator projection; optional 3D terrain (AWS terrain tiles) with
-  adjustable exaggeration — right-drag / Ctrl+drag to tilt and rotate.
-- Tectonic plate boundaries overlay (Bird 2003, via
+- Basemaps: OpenFreeMap light/dark (Positron / Dark Matter vector styles,
+  no API key or account), OSM, Esri satellite, Google satellite hybrid;
+  globe (default) or Mercator projection; optional 3D terrain (AWS
+  terrain tiles) with adjustable exaggeration — right-drag / Ctrl+drag
+  to tilt and rotate. These are icon buttons in the lower-right corner
+  of the map, above the zoom control.
+- Tectonic plates overlay: its button cycles boundaries, boundaries
+  with plate names, off (Bird 2003, via
   [fraxen/tectonicplates](https://github.com/fraxen/tectonicplates));
   loads `PB2002_boundaries.json` next to the HTML if present, else from
   GitHub raw.
