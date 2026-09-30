@@ -9,42 +9,95 @@
 # data blobs never accumulate in history.
 #
 # Usage:
-#   ./deploy-pages.sh [DATA_PARQUET]
-# DATA_PARQUET defaults to OPERA_UNR_GNSS_grid_monthly.parquet (the global
-# monthly grid). It must be < 100 MB (GitHub Pages per-file limit).
+#   ./deploy-pages.sh [--stations FILE | --no-stations] [--note TEXT | --no-note] [DATA_PARQUET]
+#
+# DATA_PARQUET  the grid, default OPERA_UNR_GNSS_grid_monthly.parquet (the
+#               global monthly grid).
+# --stations    the "GPS sites" dataset, default
+#               OPERA_UNR_GNSS_stations_midas.parquet when it exists; build it with
+#                 python create-geoparquet.py --bbox -180 -90 180 90 --source midas \
+#                     --start-date 1994-01-01 \
+#                     --output-file OPERA_UNR_GNSS_stations_midas.parquet
+# --note        text shown in a note panel on the page. With a stations file
+#               and no --note, a note explains that the sites are a MIDAS
+#               velocity demo. --no-note shows none. (Visitors can still
+#               override it with ?note=<text>, or hide it with ?note=.)
+#
+# Each file must be < 100 MB (GitHub Pages per-file limit).
 set -euo pipefail
 
 REPO="opera-adt/geepers"
 REMOTE="https://github.com/${REPO}"
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-DATA_SRC="${1:-${SCRIPTS_DIR}/OPERA_UNR_GNSS_grid_monthly.parquet}"
+MIDAS_NOTE="GPS sites here are a simplified demo of the viewer: each station's \
+series is a straight line from its UNR MIDAS velocity over its observing span, \
+sampled monthly, not its measured positions (no seasonal signal, offsets, noise \
+or uncertainties)."
+
+DATA_SRC="${SCRIPTS_DIR}/OPERA_UNR_GNSS_grid_monthly.parquet"
+STATIONS_SRC="${SCRIPTS_DIR}/OPERA_UNR_GNSS_stations_midas.parquet"
+NOTE=""
+NOTE_GIVEN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --stations) STATIONS_SRC="$2"; shift 2 ;;
+        --no-stations) STATIONS_SRC=""; shift ;;
+        --note) NOTE="$2"; NOTE_GIVEN=1; shift 2 ;;
+        --no-note) NOTE=""; NOTE_GIVEN=1; shift ;;
+        -*) echo "error: unknown option: $1" >&2; exit 1 ;;
+        *) DATA_SRC="$1"; shift ;;
+    esac
+done
+[ -n "$STATIONS_SRC" ] && [ ! -f "$STATIONS_SRC" ] && {
+    echo "warning: no stations file ($STATIONS_SRC); deploying the grid only." >&2
+    STATIONS_SRC=""
+}
+if [ "$NOTE_GIVEN" = 0 ] && [ -n "$STATIONS_SRC" ]; then NOTE="$MIDAS_NOTE"; fi
+
 # The .zip extension is deliberate: it stops the GitHub Pages CDN from
 # gzipping the file, which would corrupt hyparquet's HTTP range reads.
 DATA_DEST="OPERA_UNR_GNSS_grid.parquet.zip"
+STATIONS_DEST="OPERA_UNR_GNSS_stations.parquet.zip"
 BOUNDARIES="${SCRIPTS_DIR}/PB2002_boundaries.json"
+PLATES="${SCRIPTS_DIR}/PB2002_plates.json"
 
-[ -f "$DATA_SRC" ] || { echo "error: data file not found: $DATA_SRC" >&2; exit 1; }
+check_size() {
+    [ -f "$1" ] || { echo "error: data file not found: $1" >&2; exit 1; }
+    local mb=$(( $(stat -c%s "$1") / 1024 / 1024 ))
+    if [ "$mb" -ge 100 ]; then
+        echo "error: $1 is ${mb} MB; GitHub Pages caps files at 100 MB." >&2
+        exit 1
+    fi
+}
+check_size "$DATA_SRC"
+[ -n "$STATIONS_SRC" ] && check_size "$STATIONS_SRC"
 size_mb=$(( $(stat -c%s "$DATA_SRC") / 1024 / 1024 ))
-if [ "$size_mb" -ge 100 ]; then
-    echo "error: $DATA_SRC is ${size_mb} MB; GitHub Pages caps files at 100 MB." >&2
-    exit 1
-fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# 1. Viewer: point the default DATA_URL at the hosted (renamed) dataset, and
-#    inject a "Docs" link (deploy-only, so running the HTML locally has no
-#    dead docs/ link).
-python3 - "$SCRIPTS_DIR/browse_unr_grid.html" "$WORK/index.html" "$DATA_DEST" <<'PY'
+# 1. Viewer: point the default dataset URLs at the hosted (renamed) files, set
+#    the note, and inject a "Docs" link (all deploy-only, so the HTML run
+#    locally has no note and no dead docs/ link).
+python3 - "$SCRIPTS_DIR/browse_unr_grid.html" "$WORK/index.html" "$DATA_DEST" \
+    "${STATIONS_SRC:+$STATIONS_DEST}" "$NOTE" <<'PY'
+import json
 import sys
-src, dst, data = sys.argv[1:4]
+src, dst, data, stations, note = sys.argv[1:6]
 html = open(src).read()
-old = "const DATA_URL = params.get('data') || 'unr_grid.parquet';"
-new = f"const DATA_URL = params.get('data') || '{data}';"
-assert html.count(old) == 1, "could not find DATA_URL default in viewer"
-html = html.replace(old, new)
+def replace_once(old, new):
+    global html
+    assert html.count(old) == 1, f"could not find in viewer: {old}"
+    html = html.replace(old, new)
+replace_once("const DATA_URL = params.get('data') || 'unr_grid.parquet';",
+             f"const DATA_URL = params.get('data') || '{data}';")
+if stations:
+    replace_once("params.get('stations') || 'unr_stations.parquet'",
+                 f"params.get('stations') || '{stations}'")
+# "</" is escaped so a note can never close the <script> it sits in
+note_js = json.dumps(note).replace("</", "<\\/")
+replace_once("const DEFAULT_NOTE = '';", f"const DEFAULT_NOTE = {note_js};")
 # Deploy-only Docs link (present only when docs/ is published alongside).
 credit = "funded by the JPL-led OPERA project. Viewer: JPL."
 if credit in html:
@@ -58,7 +111,9 @@ PY
 
 # 2. Static assets.
 cp "$DATA_SRC" "$WORK/$DATA_DEST"
+[ -n "$STATIONS_SRC" ] && cp "$STATIONS_SRC" "$WORK/$STATIONS_DEST"
 [ -f "$BOUNDARIES" ] && cp "$BOUNDARIES" "$WORK/PB2002_boundaries.json"
+[ -f "$PLATES" ] && cp "$PLATES" "$WORK/PB2002_plates.json"
 # .nojekyll (at root) disables Jekyll for the whole site, so the mkdocs
 # assets under docs/ (e.g. _mkdocstrings.css) are served too.
 : > "$WORK/.nojekyll"
@@ -82,7 +137,8 @@ https://opera-adt.github.io/geepers/ . Rebuilt by \`scripts/deploy-pages.sh\`.
 - \`index.html\` — self-contained viewer (MapLibre GL, uPlot, hyparquet inlined)
 - \`$DATA_DEST\` — RAW PARQUET (not a zip; the extension disables the Pages
   CDN gzip that would corrupt range reads — rename to .parquet after download)
-- \`PB2002_boundaries.json\` — tectonic plate boundaries (Bird 2003)
+- \`$STATIONS_DEST\` — GPS sites dataset, if deployed (same format)
+- \`PB2002_boundaries.json\`, \`PB2002_plates.json\` — tectonic plates (Bird 2003)
 - \`docs/\` — mkdocs project documentation (served at \`.../geepers/docs/\`)
 
 Other datasets can be viewed with \`?data=<url>\` (host must allow CORS + ranges).
