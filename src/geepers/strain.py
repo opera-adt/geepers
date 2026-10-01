@@ -3,7 +3,9 @@
 Differentiates a gridded east/north velocity field (e.g. the output of
 `geepers.collocation` or `geepers.gps_imaging`) into the 2D infinitesimal
 strain-rate tensor and rotation rate, using spherical-Earth metric factors
-to convert per-degree gradients into per-meter gradients.
+to convert per-degree gradients into per-meter gradients and the
+``tan(lat) / R`` curvature terms of the strain tensor on a sphere, so a
+rigid plate rotation is strain-free.
 
 Outputs (units: 1/yr when velocities are m/yr; multiply by 1e9 for
 nanostrain/yr):
@@ -52,11 +54,11 @@ def strain_rate_field(
 
     Examples
     --------
-    A uniform velocity field has no strain:
+    A field at rest has no strain:
 
     >>> import numpy as np
     >>> lon, lat = np.linspace(0, 1, 5), np.linspace(0, 1, 4)
-    >>> v = np.ones((4, 5))
+    >>> v = np.zeros((4, 5))
     >>> ds = strain_rate_field(lon, lat, v, v)
     >>> bool(np.allclose(ds.second_invariant, 0))
     True
@@ -86,10 +88,14 @@ def strain_rate_field(
     dve_dy = dve_dlat / deg2m
     dvn_dy = dvn_dlat / deg2m
 
-    exx = dve_dx
+    # Curvature terms: the east/north unit vectors rotate along a parallel,
+    # so without them a rigid plate rotation shows up as spurious strain
+    tan_lat_over_r = np.tan(np.deg2rad(lat))[:, np.newaxis] / EARTH_RADIUS
+
+    exx = dve_dx - v_north * tan_lat_over_r
     eyy = dvn_dy
-    exy = 0.5 * (dve_dy + dvn_dx)
-    rotation = 0.5 * (dvn_dx - dve_dy)
+    exy = 0.5 * (dve_dy + dvn_dx + v_east * tan_lat_over_r)
+    rotation = 0.5 * (dvn_dx - dve_dy + v_east * tan_lat_over_r)
     dilatation = exx + eyy
     max_shear = np.sqrt(((exx - eyy) / 2) ** 2 + exy**2)
     second_invariant = np.sqrt(exx**2 + eyy**2 + 2 * exy**2)

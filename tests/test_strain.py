@@ -14,12 +14,48 @@ def grid():
 
 
 class TestStrainRateField:
-    def test_uniform_field_zero_strain(self, grid):
+    def test_field_at_rest_zero_strain(self, grid):
         lon, lat = grid
-        v = np.full((lat.size, lon.size), 0.01)
+        v = np.zeros((lat.size, lon.size))
         ds = strain_rate_field(lon, lat, v, v)
         np.testing.assert_allclose(ds.second_invariant, 0, atol=1e-15)
         np.testing.assert_allclose(ds.rotation, 0, atol=1e-15)
+
+    def test_plate_rotation_on_sphere_no_strain(self):
+        # Regression: a rigid rotation about an Euler pole (~18 mm/yr here)
+        # used to give ~2 nanostrain/yr because the tan(lat)/R curvature
+        # terms of the spherical strain tensor were missing
+        lon = np.linspace(-122, -114, 81)
+        lat = np.linspace(32, 40, 81)
+        lon2d, lat2d = np.meshgrid(lon, lat)
+        lam, phi = np.deg2rad(lon2d), np.deg2rad(lat2d)
+        pole_lam, pole_phi = np.deg2rad(-80.0), np.deg2rad(-5.0)
+        rate = np.deg2rad(0.2) * 1e-6  # 0.2 deg/Myr in rad/yr
+        w = rate * np.array(
+            [
+                np.cos(pole_phi) * np.cos(pole_lam),
+                np.cos(pole_phi) * np.sin(pole_lam),
+                np.sin(pole_phi),
+            ]
+        )
+        r = EARTH_RADIUS * np.stack(
+            [np.cos(phi) * np.cos(lam), np.cos(phi) * np.sin(lam), np.sin(phi)]
+        )
+        v = np.cross(w, r, axisa=0, axisb=0, axisc=0)  # v = omega x r
+        east = np.stack([-np.sin(lam), np.cos(lam), np.zeros_like(lam)])
+        north = np.stack(
+            [-np.sin(phi) * np.cos(lam), -np.sin(phi) * np.sin(lam), np.cos(phi)]
+        )
+        up = r / EARTH_RADIUS
+        ve, vn = np.sum(v * east, axis=0), np.sum(v * north, axis=0)
+
+        ds = strain_rate_field(lon, lat, ve, vn)
+        assert np.hypot(ve, vn).mean() > 0.01  # > 10 mm/yr of plate motion
+        assert float(ds.second_invariant.max()) < 5e-11  # < 0.05 nanostrain/yr
+        # The vertical-axis rotation rate of a rigid plate is omega . up
+        np.testing.assert_allclose(
+            ds.rotation, np.sum(w[:, None, None] * up, axis=0), atol=5e-11
+        )
 
     def test_uniaxial_extension(self, grid):
         lon, lat = grid

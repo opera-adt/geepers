@@ -240,7 +240,8 @@ Feed the detected dates into `estimate_trend(step_dates=...)` or
 
 Differentiate a gridded horizontal velocity field (e.g. collocation or
 GPS Imaging output) into the 2D strain-rate tensor with spherical
-metric factors:
+metric factors and curvature terms (a rigid plate rotation is
+strain-free, so velocities need not be in a plate-fixed frame):
 
 ```python
 from geepers.strain import strain_rate_field
