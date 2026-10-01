@@ -94,6 +94,7 @@ modules for GNSS velocity fields (see
 |---|---|
 | `geepers.midas` | Robust MIDAS velocities (Blewitt et al., 2016) |
 | `geepers.trend` | Velocities with realistic uncertainties under power-law + white noise (validated against HectorP); fast Whittle method and parallel `estimate_trend_many` for networks |
+| `geepers.linearity` | Linearity test (linear vs quadratic vs piecewise under colored noise) and the validity horizon of a rate |
 | `geepers.variability` | Temporal & spatial velocity-stability metrics, spatial structure function |
 | `geepers.quality` | Gap percentage, station quality, reference selection |
 | `geepers.steps` | Detection of uncatalogued jumps (AIC sliding window) |

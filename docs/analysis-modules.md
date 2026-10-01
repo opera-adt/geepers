@@ -69,6 +69,33 @@ Notes:
 - `use_rmle=True` (default) applies the restricted-likelihood
   correction for the parameters absorbed by the deterministic model.
 
+## Is a single rate enough? (`geepers.linearity`)
+
+A velocity is only worth extrapolating if the series is linear.
+`linearity_test` compares a linear, a quadratic and a continuous
+piecewise-linear model (free breakpoint) under one colored-noise
+covariance and picks the lowest BIC; `validity_horizon` turns the
+result into the time over which the rate stays within a tolerance:
+
+```python
+from geepers.linearity import linearity_test, validity_horizon
+
+result = linearity_test(dates, up_mm, sampling_days=12)
+result.model                      # "linear" | "quadratic" | "piecewise"
+result.trend.velocity, result.trend.velocity_uncertainty
+result.p_values                   # each alternative against linear
+result.breakpoint, result.rate_before, result.rate_after
+result.acceleration, result.departure    # mm/yr^2, mm off the line
+
+horizon = validity_horizon(result, tolerance=10.0)   # 10 mm
+horizon.years, horizon.driver
+```
+
+Curvature and strongly correlated noise look alike over one record, so
+the verdict depends on the noise model: the default estimates the
+spectral index; `noise_model="FNWN"` (flicker) detects more but also
+flags more linear series when the noise is closer to a random walk.
+
 ## Station stability metrics (`geepers.variability`)
 
 Quality metrics extracted from the AUS GNSS screening workflow:

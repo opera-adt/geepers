@@ -111,6 +111,26 @@ its uncertainty. Slightly coarser $\kappa$ estimates than the exact
 method, but usable on decades of daily data and whole networks
 (`estimate_trend_many`).
 
+## Linearity test (`geepers.linearity`)
+
+Whether one rate describes a series is a model comparison. With the
+noise covariance $\mathbf{C}$ held fixed, each model's misfit is
+$\chi^2 = \mathbf{r}^\mathsf{T}\mathbf{C}^{-1}\mathbf{r}$ and the
+preferred model minimizes $\mathrm{BIC} = k\ln n + \chi^2$, with $k$
+counting a free breakpoint twice. $\mathbf{C}$ is estimated around the
+quadratic model: around a straight line, real curvature is absorbed
+into a steeper noise spectrum and can never be detected. Because the
+breakpoint is searched for, the piecewise statistic is the largest
+$\chi^2$ drop over all candidate breakpoints, which is not
+chi-square distributed (Davies, 1987); its p-value comes from the same
+statistic evaluated on simulated noise.
+
+The validity horizon is the time $T$ at which the expected extrapolation
+error reaches a tolerance $\epsilon$: $\sigma_v T = \epsilon$ for a
+linear series, $\sigma_v T + \tfrac12|a|T^2 = \epsilon$ when an
+acceleration $a$ is resolved, and $(\sigma_v + |\Delta v|)\,T = \epsilon$
+after a rate change $\Delta v$.
+
 ## Common-mode error (`geepers.cme`)
 
 Stack the detrended residuals of a network into a matrix (epochs ×
@@ -257,6 +277,9 @@ away from the center.
   (2013). Fast error analysis of continuous GNSS observations with
   missing data. *J. Geod.*, 87(4), 351-360.
   doi:10.1007/s00190-012-0605-0
+- Davies, R. B. (1987). Hypothesis testing when a nuisance parameter is
+  present only under the alternative. *Biometrika*, 74(1), 33-43.
+  doi:10.1093/biomet/74.1.33
 - Hammond, W. C., Blewitt, G., & Kreemer, C. (2016). GPS Imaging of
   vertical land motion in California and Nevada. *J. Geophys. Res.
   Solid Earth*, 121, 7681-7703. doi:10.1002/2016JB013458
