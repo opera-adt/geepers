@@ -146,9 +146,14 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   - A field-level spatial structure function (SSF) chart.
   - Detected steps of the clicked point are marked on its chart and listed
     with their sizes; the chart fit's `detect` button fills its steps.
-  The metrics are ports of `geepers.variability`, `geepers.quality`,
-  `geepers.steps` and `geepers.midas` and give the same numbers (SSF
-  distances in degrees, as there). Gap % counts against the file's own
+  The metrics are ports of `geepers.variability`, `geepers.gps_imaging`,
+  `geepers.quality`, `geepers.steps` and `geepers.midas` and give the
+  same numbers. The SSF is the GPS Imaging one (Hammond et al., 2016:
+  great-circle separation, scatter forced to grow with distance) and the
+  SSF score is the field SSF at each point's link lengths (Hammond et
+  al., 2021), near 1 where the network resolves the field. On large
+  views the SSF is built from a random subsample of the points. Gap %
+  counts against the file's own
   dates rather than a fixed step, which matters for monthly data.
 - Each chart has a `csv` button: a `#` header (grid or GPS site, id,
   lat, lon, reference, velocity ± σ per component from the fit model if

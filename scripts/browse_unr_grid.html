@@ -2564,7 +2564,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
         // ================= analysis =================
         // Network metrics over the points in view. The definitions are ports of
-        // geepers (variability.py, quality.py, steps.py, midas.py) so the viewer
+        // geepers (variability.py, gps_imaging.py, quality.py, steps.py, midas.py) so the viewer
         // and the Python package agree.
         const DAY_SEC = 86_400;
         const AN_METRICS = {
@@ -2577,7 +2577,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 seriesLabel: 'Neighbor relative median', seriesHelp: 'Median over the linked neighbors of the relative-series RMS',
             },
             similarity: { label: 'Neighbor similarity', unit: 'r', help: 'Median correlation of the detrended series with the linked neighbors' },
-            ssf: { label: 'SSF score', unit: '', help: 'Median of the SSF curve over the linked neighbors (geepers ssf_per_station)' },
+            ssf: { label: 'SSF score', unit: '', help: 'Median of the field SSF at the distances to the linked neighbors (geepers ssf_per_station; Hammond et al., 2021): near 1 where the network is dense enough to resolve the field' },
             medlink: { label: 'Median link length', unit: 'km', help: 'Median length of the point\u2019s enabled links' },
             temporal: { label: 'Temporal variability', unit: 'mm/yr', help: 'sqrt(median((v_window - v_full)^2)) of MIDAS velocities in sliding windows' },
             gaps: { label: 'Gap %', unit: '%', help: 'Missing samples against the dates in the data' },
@@ -2738,29 +2738,55 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
         }
 
-        // --- spatial structure function, port of geepers.variability (degrees, as there).
-        // `pairValue(i, j)` is the difference between points i and j: |v_i - v_j| for a
-        // field of values, or the relative-series RMS in the time-series mode.
-        const SSF_EDGES = Array.from({ length: 14 }, (_, k) => 10 ** (-2 + 0.25 * k));
+        // --- spatial structure function, port of geepers.gps_imaging.make_ssf
+        // (Hammond et al., 2016, doi:10.1002/2016JB013458, sec. 3.1): scatter of the
+        // pair differences in log-distance bins of great-circle separation, forced to
+        // grow with distance, inverted and normalized to 1, tapered to 0 in the far field.
+        // `pairValue(i, j)` is the signed difference v_j - v_i for a field of values
+        // (scatter = MAD about the bin median), or, with `signed` false, the
+        // relative-series RMS of the time-series mode (scatter = bin median).
+        const SSF_LOG_EDGES = [-2, ...Array.from({ length: 10 }, (_, k) => -1 + 0.25 * k)];
+        const SSF_EDGES = SSF_LOG_EDGES.map(e => 10 ** e);
+        const KM_PER_DEG = 6371 * Math.PI / 180;
+        const greatCircleDeg = (lon1, lat1, lon2, lat2) => haversineKm(lon1, lat1, lon2, lat2) / KM_PER_DEG;
 
-        function ssfCurve(lon, lat, pairValue, maxDiff) {
+        function ssfCurve(lon, lat, pairValue, maxDiff, signed = true) {
             const nBins = SSF_EDGES.length - 1, perBin = Array.from({ length: nBins }, () => []);
             for (let i = 0; i < lon.length; i++) {
                 for (let j = i + 1; j < lon.length; j++) {
                     const dv = pairValue(i, j);
-                    if (!(dv < maxDiff)) continue;
-                    const d = Math.hypot(lon[i] - lon[j], lat[i] - lat[j]);
-                    if (d < SSF_EDGES[0] || d > SSF_EDGES[nBins]) continue;
-                    let k = Math.min(nBins - 1, Math.floor((Math.log10(d) + 2) / 0.25));
-                    while (k > 0 && d < SSF_EDGES[k]) k--;
-                    while (k < nBins - 1 && d >= SSF_EDGES[k + 1]) k++;
-                    perBin[k].push(dv);
+                    if (!(Math.abs(dv) < maxDiff)) continue;
+                    const d = greatCircleDeg(lon[i], lat[i], lon[j], lat[j]);
+                    // The first bin (zero lag) holds no pairs; edges are inclusive on both sides
+                    for (let k = 1; k < nBins; k++) if (d >= SSF_EDGES[k] && d <= SSF_EDGES[k + 1]) perBin[k].push(dv);
                 }
             }
-            const inv = perBin.map(b => { const m = median(b); return m > 0 ? 1 / m : NaN; });
+            const scatter = new Array(nBins).fill(NaN);
+            for (let k = 1; k < nBins; k++) {
+                const b = perBin[k], md = median(b);
+                const spread = !b.length ? NaN : signed ? median(b.map(v => Math.abs(v - md))) : md;
+                const prev = scatter[k - 1];
+                // Non-decreasing with distance
+                scatter[k] = Number.isNaN(prev) ? spread : Number.isNaN(spread) ? prev : Math.max(prev, spread);
+            }
+            const inv = scatter.map(v => (v > 0 ? 1 / v : NaN));
             const finite = inv.filter(Number.isFinite);
             const maxInv = finite.length ? Math.max(...finite) : 1;
-            return [[0, 1], ...inv.map((v, k) => [Math.sqrt(SSF_EDGES[k] * SSF_EDGES[k + 1]), v / maxInv]), [180, 0]];
+            // Bins before the first populated one (or a zero-scatter field): flat at 1
+            const ssf = inv.map(v => (Number.isFinite(v) ? v / maxInv : 1));
+            ssf[nBins - 1] = 0;
+            ssf[nBins - 2] = 0.5 * (ssf[nBins - 3] + ssf[nBins - 1]);
+            ssf[nBins - 3] = 0.5 * (ssf[nBins - 4] + ssf[nBins - 2]);
+            const centers = ssf.map((_, k) => 10 ** (0.5 * (SSF_LOG_EDGES[k] + SSF_LOG_EDGES[k + 1])));
+            return [[0, 1], ...ssf.map((v, k) => [centers[k], v]), [180, 0]];
+        }
+
+        // Linear interpolation of the SSF curve at a separation in degrees
+        function ssfAt(curve, d) {
+            let k = 1;
+            while (k < curve.length - 1 && curve[k][0] < d) k++;
+            const [x0, y0] = curve[k - 1], [x1, y1] = curve[k];
+            return y0 + (y1 - y0) * Math.min(1, Math.max(0, (d - x0) / (x1 - x0)));
         }
 
         // RMS of the relative series x_j - x_i (mean removed) over common dates: how
@@ -2889,9 +2915,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             }
             const maxDiff = Number($('inp-an-maxdiff').value) || Infinity;
             const ssf = ssfCurve(sample.map(i => lon[i]), sample.map(i => lat[i]),
-                (u, v) => Math.abs(pairDiff(sample[u], sample[v])), maxDiff);
+                (u, v) => pairDiff(sample[u], sample[v]), maxDiff, mode !== 'series');
 
-            Object.assign(A, { idx, lon, lat, links, pairDiff, mode, comp, maxDiff, metrics: { temporal, gaps, steps } });
+            Object.assign(A, { idx, lon, lat, links, pairDiff, mode, comp, maxDiff, ssf, metrics: { temporal, gaps, steps } });
             A.summary = `${mode === 'rate' ? 'velocity' : mode === 'date' ? 'displacement at ' + S.dates[S.dateIdx] : 'time series'} of ${comp} · ` +
                 `SSF median ${median(ssf.map(r => r[1]).filter(Number.isFinite)).toFixed(2)}` +
                 (subsampled ? ` (SSF on ${cap} sampled points)` : '') +
@@ -2922,12 +2948,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 }
                 m.similarity[i] = median(own.map(o => o.l.corr).filter(Number.isFinite));
                 m.medlink[i] = median(own.map(o => o.l.km));
-                if (own.length >= 2) {
-                    const nb = own.map(o => o.j);
-                    const curve = ssfCurve(nb.map(j => A.lon[j]), nb.map(j => A.lat[j]),
-                        (u, v) => Math.abs(A.pairDiff(nb[u], nb[v])), A.maxDiff);
-                    m.ssf[i] = median(curve.map(r => r[1]).filter(Number.isFinite));
-                }
+                // Resolution index of Hammond et al. (2021, eq. 4), as geepers
+                // ssf_per_station: the field-level SSF at the neighbor separations
+                m.ssf[i] = median(own.map(o => ssfAt(A.ssf, o.l.km / KM_PER_DEG)));
             }
             const on = A.links.filter(l => l.on), kms = on.map(l => l.km);
             const cut = A.links.filter(l => l.cut).length, off = A.links.length - on.length - cut;
