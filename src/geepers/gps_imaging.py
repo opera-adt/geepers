@@ -81,7 +81,7 @@ def make_ssf(
     lon: ArrayLike,
     lat: ArrayLike,
     values: ArrayLike,
-    sigmas: ArrayLike,
+    sigmas: ArrayLike | None = None,
     *,
     max_difference: float = 10.0,
     log_bin_edges: np.ndarray | None = None,
@@ -91,9 +91,10 @@ def make_ssf(
     Bins the pairwise value differences by great-circle separation and
     computes the MAD (median absolute deviation about the bin median)
     per bin, forced to be non-decreasing with distance; the zero-lag bin
-    is anchored at the median measurement uncertainty. The inverted,
-    normalized curve is used as the distance-weighting function of the
-    median spatial filter.
+    is anchored at the median measurement uncertainty, or, without
+    uncertainties, the curve is flat at 1 up to the first populated bin
+    (Hammond et al., 2016, sec. 3.1). The inverted, normalized curve is
+    used as the distance-weighting function of the median spatial filter.
 
     Parameters
     ----------
@@ -101,8 +102,9 @@ def make_ssf(
         Station coordinates in degrees.
     values : array-like
         Station values (e.g. vertical velocities, mm/yr).
-    sigmas : array-like
-        1-sigma value uncertainties (anchor the zero-distance bin).
+    sigmas : array-like, optional
+        1-sigma value uncertainties (anchor the zero-distance bin). If
+        omitted, the near field is set to 1 instead.
     max_difference : float
         Pairs with ``|dv|`` larger than this are excluded. Default 10.
     log_bin_edges : np.ndarray, optional
@@ -121,7 +123,6 @@ def make_ssf(
     lon = np.asarray(lon, float)
     lat = np.asarray(lat, float)
     values = np.asarray(values, float)
-    sigmas = np.asarray(sigmas, float)
 
     iu, ju = np.triu_indices(len(values), k=1)
     dv = values[iu] - values[ju]
@@ -132,7 +133,9 @@ def make_ssf(
     n_bins = len(log_bin_edges) - 1
     centers = 10 ** (0.5 * (log_bin_edges[:-1] + log_bin_edges[1:]))
     scatter = np.full(n_bins, np.nan)
-    scatter[0] = np.nanmedian(sigmas)  # zero-lag: measurement noise floor
+    if sigmas is not None:
+        # zero-lag: measurement noise floor
+        scatter[0] = np.nanmedian(np.asarray(sigmas, float))
     for i in range(1, n_bins):
         in_bin = (dist >= 10 ** log_bin_edges[i]) & (dist <= 10 ** log_bin_edges[i + 1])
         mad = (
@@ -141,10 +144,17 @@ def make_ssf(
             else np.nan
         )
         # Force non-decreasing scatter with distance (Hammond et al.)
-        scatter[i] = np.nanmax(np.r_[scatter[:i], mad])
+        prev = scatter[i - 1]
+        scatter[i] = (
+            mad if np.isnan(prev) else (prev if np.isnan(mad) else max(prev, mad))
+        )
 
-    ssf = 1.0 / scatter
-    ssf /= np.nanmax(ssf)
+    with np.errstate(divide="ignore"):
+        ssf = 1.0 / scatter
+    ssf[~np.isfinite(ssf)] = np.nan
+    ssf /= np.nanmax(ssf) if np.isfinite(ssf).any() else 1.0
+    # Bins before the first populated one (or a zero-scatter field): flat at 1
+    ssf[np.isnan(ssf)] = 1.0
     # Taper the tail smoothly to zero
     ssf[-1] = 0.0
     ssf[-2] = 0.5 * (ssf[-3] + ssf[-1])

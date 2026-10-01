@@ -23,9 +23,9 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
-from scipy import stats
 from scipy.spatial import Delaunay
 
+from geepers.gps_imaging import great_circle_degrees, make_ssf
 from geepers.midas import midas
 
 __all__ = [
@@ -50,22 +50,23 @@ def spatial_structure_function(
     lat: ArrayLike,
     values: ArrayLike,
     *,
+    sigmas: ArrayLike | None = None,
     max_difference: float = 10.0,
-    bins: np.ndarray | None = None,
+    log_bin_edges: np.ndarray | None = None,
 ) -> np.ndarray:
     """Spatial structure function (SSF) of a scattered field.
 
-    Bins the absolute pairwise differences of `values` by station
-    separation and takes the median per bin; the inverted, normalized
-    curve measures how quickly coherence is lost with distance.
+    The GPS Imaging SSF (Hammond, W. C., Blewitt, G., & Kreemer, C., 2016,
+    GPS Imaging of vertical land motion in California and Nevada,
+    J. Geophys. Res. Solid Earth, 121, doi:10.1002/2016JB013458, sec. 3.1,
+    eqs. 1-2), computed by `geepers.gps_imaging.make_ssf`: the MAD of the
+    pairwise differences in log-distance bins of great-circle separation,
+    forced to grow with distance, inverted and normalized to 1.
 
     Interpretation: each point is the coherence at that separation
-    *relative to the most coherent bin*. A smooth field gives a curve
-    decaying from 1 toward 0; a spatially uncorrelated field gives a
-    flat curve near 1 (differences do not grow with distance). The
-    median of the curve is therefore *high* for structure-free
-    (noise-dominated) neighborhoods and *low* where nearby stations
-    agree much better than distant ones.
+    relative to the most coherent separation. A smooth field decays from
+    1 toward 0 over the length scale on which it varies; a spatially
+    uncorrelated field stays near 1 until the far-field taper.
 
     Parameters
     ----------
@@ -73,53 +74,30 @@ def spatial_structure_function(
         Station coordinates in degrees.
     values : array-like
         Field values (e.g. vertical velocities). NaNs are ignored.
+    sigmas : array-like, optional
+        1-sigma value uncertainties; they set the zero-distance scatter.
+        Without them the near field is flat at 1.
     max_difference : float
         Pairs with ``|dv|`` larger than this are treated as outliers and
         excluded (same units as `values`). Default 10.
-    bins : np.ndarray, optional
-        Distance bin edges in degrees. Default is log-spaced
-        ``10**arange(-2, 1.5, 0.25)`` following GPS Imaging.
+    log_bin_edges : np.ndarray, optional
+        log10-degree bin edges; default as in `make_ssf`.
 
     Returns
     -------
     np.ndarray
-        (n_bins + 2, 2) array of (distance in degrees, normalized SSF),
-        anchored at (0, 1) and (180, 0).
-
-    Notes
-    -----
-    Distances are Euclidean in degrees to match the GPS Imaging
-    convention; over continental scales this mixes lon/lat scales, so
-    treat the distance axis as nominal.
+        (n_bins + 2, 2) array of (great-circle distance in degrees, SSF),
+        anchored at (0, 1) and (180, 0) and non-increasing.
 
     """
-    if bins is None:
-        bins = 10 ** np.arange(-2, 1.5, 0.25)
-
-    lon = np.asarray(lon, float)
-    lat = np.asarray(lat, float)
-    values = np.asarray(values, float)
-
-    # Unique pairs only (upper triangle, no self-pairs)
-    iu, ju = np.triu_indices(len(values), k=1)
-    dist = np.hypot(lon[iu] - lon[ju], lat[iu] - lat[ju])
-    dv = np.abs(values[iu] - values[ju])
-    good = np.isfinite(dv) & (dv < max_difference)
-    dist, dv = dist[good], dv[good]
-
-    with np.errstate(invalid="ignore"):
-        medians, _, _ = stats.binned_statistic(dist, dv, "median", bins=bins)
-    centers = np.sqrt(bins[:-1] * bins[1:])  # geometric bin centers
-
-    # Invert and normalize: small differences -> high coherence.
-    # Guard against zero medians (identical values in a bin).
-    with np.errstate(divide="ignore"):
-        inv = 1.0 / medians
-    inv[~np.isfinite(inv)] = np.nan
-    max_inv = np.nanmax(inv) if np.isfinite(inv).any() else 1.0
-    ssf_vals = inv / max_inv
-
-    return np.vstack([[0.0, 1.0], np.c_[centers, ssf_vals], [180.0, 0.0]])
+    return make_ssf(
+        lon,
+        lat,
+        values,
+        sigmas,
+        max_difference=max_difference,
+        log_bin_edges=log_bin_edges,
+    )
 
 
 def delaunay_neighbors(lon: ArrayLike, lat: ArrayLike) -> dict[int, list[int]]:
@@ -151,13 +129,24 @@ def ssf_per_station(
     lat: ArrayLike,
     components: dict[str, ArrayLike],
     *,
-    max_difference: float = 30.0,
+    sigmas: dict[str, ArrayLike] | None = None,
+    max_difference: float = 10.0,
 ) -> pd.DataFrame:
-    """Median SSF score of each station's Delaunay neighborhood.
+    """Median SSF at the distances to each station's Delaunay neighbors.
 
-    For every station, computes the SSF over the station and its Delaunay
-    neighbors for each velocity component and reduces the curve to its median value —
-    a per-station coherence score in [0, 1].
+    The resolution index of Hammond, W. C., Blewitt, G., Kreemer, C., &
+    Nerem, R. S. (2021), GPS Imaging of global vertical land motion for
+    studies of sea level rise, J. Geophys. Res. Solid Earth, 126,
+    doi:10.1029/2021JB022355, eq. 4: one SSF per component is built from
+    all stations (`spatial_structure_function`), and each station scores
+    the median of that curve evaluated at the great-circle distances to
+    its Delaunay neighbors.
+
+    Interpretation: near 1, the neighbors are close compared with the
+    length scale over which the field decorrelates, so the field is well
+    resolved there; low values mark a network too sparse for the signal.
+    It measures network geometry against the regional signal, not the
+    station's own data quality (see `spatial_variability` for that).
 
     Parameters
     ----------
@@ -166,32 +155,40 @@ def ssf_per_station(
     components : dict[str, array-like]
         Mapping from component name (e.g. ``"east"``) to station values;
         one output column ``ssf_<name>`` per entry.
+    sigmas : dict[str, array-like], optional
+        Per-component 1-sigma uncertainties for the SSF zero-distance bin.
     max_difference : float
-        Outlier cut on pairwise differences. Default 30.
+        Outlier cut on pairwise differences for the SSF. Default 10.
 
     Returns
     -------
     pd.DataFrame
-        One row per station with columns ``ssf_n_neighbors`` (Delaunay
-        neighbors, not counting the station) and ``ssf_<component>``.
+        One row per station with columns ``ssf_n_neighbors`` and
+        ``ssf_<component>``.
 
     """
     lon = np.asarray(lon, float)
     lat = np.asarray(lat, float)
-    comps = {name: np.asarray(v, float) for name, v in components.items()}
     neighbors = delaunay_neighbors(lon, lat)
+    curves = {
+        name: spatial_structure_function(
+            lon,
+            lat,
+            np.asarray(vals, float),
+            sigmas=None if sigmas is None else sigmas.get(name),
+            max_difference=max_difference,
+        )
+        for name, vals in components.items()
+    }
 
     rows = []
     for i, nbrs in neighbors.items():
-        # Include the station itself, otherwise its score would not
-        # depend on its own value
-        idx = np.array([i, *nbrs])
+        dist = great_circle_degrees(lat[i], lon[i], lat[nbrs], lon[nbrs])
         row: dict[str, float] = {"ssf_n_neighbors": len(nbrs)}
-        for name, vals in comps.items():
-            curve = spatial_structure_function(
-                lon[idx], lat[idx], vals[idx], max_difference=max_difference
+        for name, curve in curves.items():
+            row[f"ssf_{name}"] = float(
+                np.median(np.interp(dist, curve[:, 0], curve[:, 1]))
             )
-            row[f"ssf_{name}"] = float(np.nanmedian(curve[:, 1]))
         rows.append(row)
     return pd.DataFrame(rows, index=list(neighbors.keys()))
 

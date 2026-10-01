@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from geepers.gps_imaging import great_circle_degrees
 from geepers.quality import gap_percentage
 from geepers.variability import (
     delaunay_neighbors,
@@ -64,19 +65,50 @@ class TestSSF:
         ssf = spatial_structure_function(lon, lat, np.zeros(len(lon)))
         assert not np.isinf(ssf[:, 1]).any()
 
+    def test_monotonic_and_flat_near_field(self, network):
+        # Hammond et al. (2016) sec. 3.1: forced to decrease with distance,
+        # and 1 in the near field
+        lon, lat = network
+        rng = np.random.default_rng(3)
+        values = 0.1 * lon + rng.normal(0, 0.5, len(lon))
+        for sigmas in (None, np.full(len(lon), 0.2)):
+            ssf = spatial_structure_function(lon, lat, values, sigmas=sigmas)
+            assert np.all(np.diff(ssf[:, 1]) <= 1e-12)
+            assert ssf[1, 1] == 1.0
+
+    def test_uses_great_circle_distance(self):
+        # Two stations 2 deg of longitude apart at 60 N are ~1 deg apart on
+        # the sphere: the pair must land in the bin holding 1 deg
+        lon = np.array([0.0, 2.0])
+        lat = np.array([60.0, 60.0])
+        ssf = spatial_structure_function(lon, lat, np.array([0.0, 1.0]))
+        centers = ssf[1:-1, 0]
+        populated = centers[np.argmin(np.abs(np.log10(centers) - np.log10(1.0)))]
+        assert populated < 1.5
+
 
 class TestSSFPerStation:
-    def test_score_depends_on_own_value(self, network):
-        # Regression: the neighborhood excluded the station itself, so an
-        # outlier at a station left that station's score unchanged
+    def test_matches_hammond_2021_eq4(self, network):
+        # Median of the regional SSF at the great-circle distances to the
+        # station's Delaunay neighbors
         lon, lat = network
-        rng = np.random.default_rng(1)
-        values = rng.normal(0, 1, len(lon))
-        base = ssf_per_station(lon, lat, {"up": values})
-        outlier = values.copy()
-        outlier[5] += 25.0
-        after = ssf_per_station(lon, lat, {"up": outlier})
-        assert after.loc[5, "ssf_up"] != base.loc[5, "ssf_up"]
+        values = 0.1 * lon + np.random.default_rng(1).normal(0, 0.5, len(lon))
+        df = ssf_per_station(lon, lat, {"up": values})
+        curve = spatial_structure_function(lon, lat, values)
+        nbrs = delaunay_neighbors(lon, lat)[5]
+        dist = great_circle_degrees(lat[5], lon[5], lat[nbrs], lon[nbrs])
+        expected = np.median(np.interp(dist, curve[:, 0], curve[:, 1]))
+        assert df.loc[5, "ssf_up"] == pytest.approx(expected)
+
+    def test_dense_scores_higher_than_sparse(self):
+        # A resolution index: close neighbors score higher than far ones
+        rng = np.random.default_rng(5)
+        dense = np.c_[rng.uniform(0, 1, 60), rng.uniform(0, 1, 60)]
+        sparse = np.c_[rng.uniform(6, 12, 8), rng.uniform(6, 12, 8)]
+        pts = np.vstack([dense, sparse])
+        values = 0.5 * pts[:, 0] + rng.normal(0, 0.2, len(pts))
+        df = ssf_per_station(pts[:, 0], pts[:, 1], {"up": values})
+        assert df["ssf_up"].iloc[:60].median() > df["ssf_up"].iloc[60:].median()
 
 
 class TestDelaunay:
