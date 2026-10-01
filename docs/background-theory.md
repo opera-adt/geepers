@@ -136,17 +136,22 @@ From a gridded horizontal velocity field, the 2D infinitesimal
 strain-rate tensor is
 
 $$
-\dot\varepsilon_{xx} = \partial_x v_e,\quad
+\dot\varepsilon_{xx} = \partial_x v_e - \tfrac{\tan\varphi}{R}\,v_n,\quad
 \dot\varepsilon_{yy} = \partial_y v_n,\quad
-\dot\varepsilon_{xy} = \tfrac12(\partial_y v_e + \partial_x v_n),
+\dot\varepsilon_{xy} = \tfrac12\left(\partial_y v_e + \partial_x v_n
+                       + \tfrac{\tan\varphi}{R}\,v_e\right),
 $$
 
 with gradients converted from per-degree to per-meter using spherical
-metric factors ($R\cos\varphi$ for longitude). Derived scalars:
+metric factors ($R\cos\varphi$ for longitude). The $\tan\varphi/R$
+terms account for the east/north unit vectors turning along a
+parallel; without them a rigid plate rotation would appear as strain.
+Derived scalars:
 dilatation $\dot\varepsilon_{xx}+\dot\varepsilon_{yy}$, maximum shear
 $\sqrt{(\dot\varepsilon_{xx}-\dot\varepsilon_{yy})^2/4+\dot\varepsilon_{xy}^2}$,
-rotation $\tfrac12(\partial_x v_n - \partial_y v_e)$, and the second
-invariant.
+rotation
+$\tfrac12(\partial_x v_n - \partial_y v_e + \tfrac{\tan\varphi}{R}\,v_e)$,
+and the second invariant.
 
 ## Velocity variability metrics (`geepers.variability`)
 
