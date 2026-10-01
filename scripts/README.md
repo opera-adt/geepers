@@ -169,6 +169,12 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   views the SSF is built from a random subsample of the points. Gap %
   counts against the file's own
   dates rather than a fixed step, which matters for monthly data.
+- **Linearity** checkbox next to Velocity (Display): colors the map by
+  whether one rate describes each point's series for the shown component
+  — 0 linear, 1 quadratic, 2 piecewise. Points are tested as they come
+  into view (in the background, up to 3,000 untested points at a time)
+  and results are kept while the dataset is loaded; untested points stay
+  grey, hover shows the verdict and the departure from a straight line.
 - The chart's `linearity` button runs the full linearity test on the
   point (port of `geepers.linearity`, flicker + white noise): per
   component the preferred model, the rate ± σ with colored noise, the

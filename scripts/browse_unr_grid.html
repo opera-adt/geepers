@@ -222,7 +222,8 @@
         .cmap-bar-click canvas { width: 100%; height: 10px; border-radius: 4px; display: block; }
         .cmap-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
         #an-ssf { margin-top: 6px; }
-        #stats { font-size: 11px; color: var(--muted); line-height: 1.55; }
+        #stats, #lin-status { font-size: 11px; color: var(--muted); line-height: 1.55; }
+        #lin-status:empty { display: none; }
 
         /* ---- Time bar (bottom center) ---- */
         #timebar {
@@ -547,7 +548,11 @@
                 <label style="min-width:0" title="Color points by linear trend (least-squares over the full record) instead of per-date displacement">
                     <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
                 </label>
+                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey.">
+                    <input type="checkbox" id="chk-lin"> Linearity
+                </label>
             </div>
+            <div id="lin-status"></div>
             <div id="disp-legend" class="cmap-bar-click" title="Click to change the colormap and range">
                 <canvas id="disp-legend-canvas" width="200" height="12"></canvas>
                 <div class="cmap-bar-labels"><span id="disp-leg-min"></span><span id="disp-leg-max"></span></div>
@@ -1081,6 +1086,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             hasSigma: false,    // sigma_* columns present in the file
             showRate: false,    // color map by linear trend instead of displacement
             rates: {},          // component -> Float32Array [nPoints], mm/yr (lazy)
+            showLin: false,     // color map by the linearity verdict instead of displacement
+            lin: {},            // component -> { code, dep, done } per point (filled for points in view)
             rateYears: null,    // dateSec converted to years (lazy)
         };
 
@@ -1341,7 +1348,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('leg-mid').textContent = fmt((S.vmin + S.vmax) / 2);
             $('leg-max').textContent = fmt(S.vmax);
             const propName = S.prop[0].toUpperCase() + S.prop.slice(1);
-            $('legend-title').textContent = S.showRate
+            $('legend-title').textContent = S.showLin
+                ? `${propName} linearity: 0 linear · 1 quadratic · 2 piecewise`
+                : S.showRate
                 ? `${propName} rate (mm/yr)`
                 : `${propName} (mm)` +
                   (S.refMode === 'mean' ? ' rel. mean'
@@ -1407,6 +1416,12 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         function autoRange() {
             const mat = S.mats[S.prop];
             if (!mat) return;
+            if (S.showLin) {   // the three model codes, not a data range
+                S.vmin = 0; S.vmax = 2;
+                $('inp-vmin').value = '0';
+                $('inp-vmax').value = '2';
+                return;
+            }
             if (S.showRate) {
                 const rates = computeRates(S.prop);
                 const sample = [];
@@ -1776,6 +1791,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             // Keep the vector overlay in sync with the camera
             resizeQuiver();
             map.on('move', drawQuiver);
+            map.on('moveend', computeLinearityInView);
             map.on('resize', () => { resizeQuiver(); drawQuiver(); });
             applyMapBackground();
 
@@ -1839,7 +1855,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                         $('hover-info').textContent =
                             `#${f.properties.sid}  ${f.geometry.coordinates[1].toFixed(3)}°, ` +
                             `${f.geometry.coordinates[0].toFixed(3)}°  →  ` +
-                            (Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data') +
+                            (S.showLin ? linearityHover(f.id)
+                                : Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data') +
                             analysisHover(f.id);
                     });
                     wireLinkEditing();
@@ -1956,8 +1973,83 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             drawQuiver();
         }
 
+        // --- linearity as a display mode: the verdict of the linearity test for the
+        // shown component, computed for the points in view and kept per component
+        const LIN_MODELS = ['linear', 'quadratic', 'piecewise'];
+        let linRun = 0;
+
+        function linState(comp) {
+            return S.lin[comp] ??= {
+                code: new Float32Array(S.nPoints).fill(NaN),
+                dep: new Float32Array(S.nPoints).fill(NaN),
+                done: new Uint8Array(S.nPoints),
+            };
+        }
+
+        function linearityHover(p) {
+            const st = S.lin[S.prop], code = st?.code[p];
+            if (!st?.done[p]) return 'not tested yet';
+            if (!Number.isFinite(code)) return 'too short for a linearity test';
+            return LIN_MODELS[code] + (code ? `, ${fmt(st.dep[p])} mm off a straight line` : '');
+        }
+
+        function applyLinToMap() {
+            const st = linState(S.prop);
+            if (!map?.getSource('grid')) return;
+            for (let p = 0; p < S.nPoints; p++) {
+                map.setFeatureState({ source: 'grid', id: p }, { v: Number.isFinite(st.code[p]) ? st.code[p] : null });
+            }
+            drawQuiver();
+            computeLinearityInView();
+        }
+
+        // Test the points in view that are not done yet, a slice at a time so the
+        // page stays responsive; a newer call (pan, zoom, component) supersedes it
+        function computeLinearityInView() {
+            if (!S.showLin || !map?.getSource('grid')) return;
+            const run = ++linRun, comp = S.prop, st = linState(comp), bounds = map.getBounds();
+            const view = [];
+            for (let p = 0; p < S.nPoints; p++) if (bounds.contains([S.points.lon[p], S.points.lat[p]])) view.push(p);
+            const todo = view.filter(p => !st.done[p]), status = $('lin-status');
+            if (todo.length > LIN.maxDisplay) {
+                status.textContent = `Linearity: ${todo.length.toLocaleString()} untested points in view; zoom in ` +
+                    `(up to ${LIN.maxDisplay.toLocaleString()} at a time).`;
+                return;
+            }
+            let k = 0;
+            const step = () => {
+                if (run !== linRun || !S.showLin || comp !== S.prop) return;
+                const until = performance.now() + 60;
+                while (k < todo.length && performance.now() < until) {
+                    const p = todo[k++], s = pointSeries(p, comp);
+                    const r = linearityTest(s.sec, s.y, { simulations: 0, withRate: false });
+                    st.done[p] = 1;
+                    if (r) { st.code[p] = LIN_MODELS.indexOf(r.model); st.dep[p] = r.departure; }
+                    map.setFeatureState({ source: 'grid', id: p }, { v: r ? st.code[p] : null });
+                }
+                if (k < todo.length) {
+                    status.textContent = `Linearity: testing ${k.toLocaleString()} / ${todo.length.toLocaleString()} points in view…`;
+                    setTimeout(step, 0);
+                    return;
+                }
+                const counts = LIN_MODELS.map((_, c) => view.filter(p => st.code[p] === c).length);
+                const tested = counts.reduce((a, b) => a + b, 0);
+                status.textContent = tested
+                    ? `Linearity in view: ${counts[0]} linear · ${counts[1]} quadratic · ${counts[2]} piecewise` +
+                      (view.length > tested ? ` · ${view.length - tested} too short` : '')
+                    : 'Linearity: no testable points in view.';
+            };
+            step();
+        }
+
+        function showDisplayMode() {
+            if (S.showLin) applyLinToMap();
+            else if (S.showRate) applyRateToMap();
+            else applyDate(S.dateIdx);
+        }
+
         function applyDate(t) {
-            if (S.showRate) { redrawCharts(); drawQuiver(); return; }   // map shows rates, not dates
+            if (S.showRate || S.showLin) { redrawCharts(); drawQuiver(); return; }   // map shows rates or linearity, not dates
             if ($('chk-autolive').checked) {   // live auto range follows the slider
                 autoRangeDate(t);
                 restyle();
@@ -2765,7 +2857,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // continuous piecewise-linear model (free breakpoint) are compared by BIC under
         // one power-law + white noise covariance, estimated around the quadratic model
         // (around a straight line, curvature is absorbed into a steeper noise spectrum).
-        const LIN = { tolerance: 10, maxPoints: 600, breakpoints: 50, minSegment: 1.5 };
+        const LIN = { tolerance: 10, maxPoints: 600, maxDisplay: 3000, breakpoints: 50, minSegment: 1.5 };
 
         // In-place lower Cholesky factor of a dense n x n matrix; false if not positive definite
         function cholesky(a, n) {
@@ -3807,16 +3899,22 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 rebuildRefRow();
                 autoRange();
                 restyle();
-                if (S.showRate) applyRateToMap();
-                else applyDate(S.dateIdx);
+                showDisplayMode();
             };
-            $('chk-rate').onchange = e => {
-                S.showRate = e.target.checked;
+            // Velocity and Linearity are alternative colorings of the map
+            const setDisplayMode = (rate, lin) => {
+                S.showRate = rate;
+                S.showLin = lin;
+                $('chk-rate').checked = rate;
+                $('chk-lin').checked = lin;
+                linRun++;                       // stop a linearity pass in flight
+                $('lin-status').textContent = '';
                 autoRange();
                 restyle();
-                if (S.showRate) applyRateToMap();
-                else applyDate(S.dateIdx);
+                showDisplayMode();
             };
+            $('chk-rate').onchange = e => setDisplayMode(e.target.checked, false);
+            $('chk-lin').onchange = e => setDisplayMode(false, e.target.checked);
             $('chk-invert').onchange = e => { S.invert = e.target.checked; restyle(); };
             $('chk-sym').onchange = () => { autoRange(); restyle(); };
             $('btn-auto').onclick = () => { autoRange(); restyle(); };
@@ -4054,6 +4152,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 restyle();
                 setDate(S.nDates - 1);
                 if (S.showRate) applyRateToMap();
+                if (S.showLin) applyLinToMap();
             }
             $('loading').style.display = 'none';
         }
@@ -4067,6 +4166,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             map = undefined;
             S.mats = {};
             S.rates = {};
+            S.lin = {};
             S.rateYears = null;
             S.refMode = 'none';
             S.refIdx = -1;
