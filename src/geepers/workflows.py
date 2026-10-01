@@ -35,6 +35,50 @@ from geepers.uncertainty import get_sigma_los_df
 logger = logging.getLogger("geepers")
 
 
+def merge_gps_insar(
+    df_gps: pd.DataFrame,
+    df_insar: pd.DataFrame,
+    tolerance: str | pd.Timedelta = "1D",
+) -> pd.DataFrame:
+    """Attach each InSAR epoch to its single nearest GPS epoch.
+
+    GPS solutions may be stamped at a different time of day than the
+    InSAR acquisitions, so epochs are matched to the nearest GPS row
+    within `tolerance` rather than by exact timestamp. Each InSAR epoch
+    lands on exactly one GPS row (matching from the GPS side instead
+    would copy it onto every GPS day within the tolerance).
+
+    Parameters
+    ----------
+    df_gps : pd.DataFrame
+        GPS table indexed by (unique, sorted) date.
+    df_insar : pd.DataFrame
+        InSAR table indexed by acquisition time.
+    tolerance : str or pd.Timedelta
+        Maximum time difference for a match. Default 1 day.
+
+    Returns
+    -------
+    pd.DataFrame
+        `df_gps` with the `df_insar` columns added; NaN on GPS rows
+        without a matching InSAR epoch.
+
+    """
+    insar_times = pd.DatetimeIndex(df_insar.index)
+    pos = df_gps.index.get_indexer(
+        insar_times, method="nearest", tolerance=pd.Timedelta(tolerance)
+    )
+    matched = pos >= 0
+    insar_on_gps = pd.DataFrame(
+        df_insar.to_numpy()[matched],
+        index=df_gps.index[pos[matched]],
+        columns=df_insar.columns,
+    )
+    # Two acquisitions closer together than the GPS sampling: keep the later
+    insar_on_gps = insar_on_gps[~insar_on_gps.index.duplicated(keep="last")]
+    return df_gps.join(insar_on_gps)
+
+
 def main(
     *,
     los_enu_file: Annotated[str | Path, tyro.conf.arg(aliases=["--los"])],
@@ -248,14 +292,8 @@ def main(
     logger.info("Merging GPS and InSAR tables per station")
     station_to_merged: dict[str, pd.DataFrame] = {}
     for station_id in tqdm(station_to_los_gps, desc="Merging GPS and InSAR"):
-        # Use asof merge in case GPS is datetime and insar is date
-        station_to_merged[station_id] = pd.merge_asof(
-            left=station_to_los_gps[station_id],
-            right=station_to_insar[station_id],
-            tolerance=pd.Timedelta("1D"),
-            direction="nearest",
-            left_index=True,
-            right_index=True,
+        station_to_merged[station_id] = merge_gps_insar(
+            station_to_los_gps[station_id], station_to_insar[station_id]
         )
 
     # Save results

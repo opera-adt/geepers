@@ -7,7 +7,7 @@ import pytest
 
 import geepers.gps as gps
 from geepers.quality import InsufficientDataError, select_gps_reference
-from geepers.workflows import main
+from geepers.workflows import main, merge_gps_insar
 
 
 def test_main(tmp_path, monkeypatch):
@@ -186,3 +186,32 @@ def test_select_gps_reference_no_coherence_data():
     # Should fall back to RMS-based selection even with coherence_priority=True
     ref_station = select_gps_reference(station_to_merged, coherence_priority=True)
     assert ref_station == "STAT_A"  # Lower RMS misfit
+
+
+@pytest.mark.parametrize("gps_hour", [0, 12])
+def test_merge_gps_insar_one_row_per_epoch(gps_hour):
+    """Regression: each InSAR epoch was copied onto 2-3 adjacent GPS days."""
+    gps_dates = pd.date_range("2020-01-01", periods=40, freq="D") + pd.Timedelta(
+        hours=gps_hour
+    )
+    df_gps = pd.DataFrame({"los_gps": np.arange(40.0)}, index=gps_dates)
+    insar_dates = pd.date_range("2020-01-05", periods=3, freq="12D")
+    df_insar = pd.DataFrame(
+        {"los_insar": [1.0, 2.0, 3.0], "temporal_coherence": 0.9}, index=insar_dates
+    )
+
+    merged = merge_gps_insar(df_gps, df_insar)
+
+    assert merged.index.equals(df_gps.index)
+    assert merged["los_gps"].tolist() == df_gps["los_gps"].tolist()
+    matched = merged.dropna(subset="los_insar")
+    assert matched["los_insar"].tolist() == [1.0, 2.0, 3.0]
+    assert (abs(matched.index - insar_dates) <= pd.Timedelta("12h")).all()
+
+
+def test_merge_gps_insar_respects_tolerance():
+    df_gps = pd.DataFrame(
+        {"los_gps": [0.0, 1.0]}, index=pd.to_datetime(["2020-01-01", "2020-01-02"])
+    )
+    df_insar = pd.DataFrame({"los_insar": [5.0]}, index=pd.to_datetime(["2020-01-10"]))
+    assert merge_gps_insar(df_gps, df_insar)["los_insar"].isna().all()
