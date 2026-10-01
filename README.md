@@ -100,6 +100,7 @@ modules for GNSS velocity fields (see
 | `geepers.cme` | Common-mode error estimation/removal (PCA/ICA) |
 | `geepers.gps_imaging` | Robust weighted-median interpolation (Hammond et al., 2016 GPS Imaging port) |
 | `geepers.collocation` | Least-squares collocation, ordinary kriging, plate-boundary separation |
+| `geepers.surface` | Polynomial trend surfaces for remove-restore interpolation |
 | `geepers.spline` | Elastically coupled east/north spline interpolation (Sandwell & Wessel, 2016) |
 | `geepers.cross_validation` | Spatially blocked cross-validation for choosing interpolation parameters and comparing methods |
 | `geepers.euler` | Euler pole estimation and plate-motion prediction |

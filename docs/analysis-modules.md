@@ -174,6 +174,27 @@ See the full worked example (with a verified before/after comparison on
 a synthetic two-plate field) in
 [How-To Guides: interpolating across plate boundaries](how-to-guides.md#how-to-interpolate-across-plate-boundaries-plate-separation-constraint).
 
+## Trend surfaces: remove-restore (`geepers.surface`)
+
+Collocation and the elastic spline model a zero-mean signal, so a
+regional offset or tilt left in the data is pulled toward zero away
+from the stations. Fit a low-degree polynomial surface, interpolate the
+residuals, and add the surface back:
+
+```python
+from geepers.surface import fit_polynomial_surface
+
+surface = fit_polynomial_surface(lon, lat, vu, sigma_u, degree=1)
+emp = empirical_covariance(lon, lat, surface.residuals, surface.residuals,
+                           sigma_u, sigma_u)
+# ... interpolate surface.residuals onto lon_g/lat_g -> signal_g
+vu_g = signal_g + surface.predict(lon_g, lat_g)
+```
+
+Keep `degree` at 0-2. For horizontal velocities remove the rigid plate
+rotation instead (see `geepers.euler` below). Ordinary kriging already
+handles an unknown constant mean, but not a tilt.
+
 ## Elastic vector spline (`geepers.spline`)
 
 Interpolates east and north velocities *jointly* as the response of a
