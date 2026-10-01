@@ -725,6 +725,7 @@
                     <option value="temporal" data-series-only>Temporal variability</option>
                     <option value="gaps" data-series-only>Gap %</option>
                     <option value="steps" data-series-only>Detected steps</option>
+                    <option value="linearity" data-series-only>Non-linearity</option>
                 </select>
             </div>
             <div id="an-legend" hidden>
@@ -843,6 +844,7 @@
                 <label style="font-weight:400;color:var(--muted)" title="Fit a trajectory model: polynomial, seasonal terms and steps">
                     <input type="checkbox" id="chk-fit"> fit
                 </label>
+                <button id="chart-lin" title="Linearity test of this point: is one rate enough? Compares linear, quadratic and piecewise-linear models under power-law + white noise (geepers.linearity). Takes a few seconds.">linearity</button>
                 <button id="chart-csv" title="Download this point's time series as CSV">csv</button>
                 <button id="chart-close" title="Close">✕</button>
             </span>
@@ -863,6 +865,7 @@
         <div id="chart-wrap" class="chart-wrap"><div id="chart"></div></div>
         <div class="fit-result" id="fit-result"></div>
         <div class="fit-result" id="step-result"></div>
+        <div class="fit-result" id="lin-result"></div>
         <div id="chart-block2" style="display:none">
             <div id="chart-title2">
                 <span id="chart-point2" style="color:#7c3aed">–</span>
@@ -2155,6 +2158,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 map.setFeatureState({ source: 'grid', id: S.sel[slot] }, { [cs.stateKey]: false });
             }
             S.sel[slot] = p;
+            if (slot === 0) $('lin-result').replaceChildren();
             map.setFeatureState({ source: 'grid', id: p }, { [cs.stateKey]: true });
             $('chart-panel').style.display = 'block';
             if (cs.block) $(cs.block).style.display = 'block';
@@ -2588,6 +2592,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             temporal: { label: 'Temporal variability', unit: 'mm/yr', help: 'sqrt(median((v_window - v_full)^2)) of MIDAS velocities in sliding windows' },
             gaps: { label: 'Gap %', unit: '%', help: 'Missing samples against the dates in the data' },
             steps: { label: 'Detected steps', unit: '', help: 'AIC step detections in the analysed component' },
+            linearity: { label: 'Non-linearity', unit: 'mm', help: 'Largest departure from a straight line of the preferred model (quadratic or piecewise; 0 where one rate is enough). Flicker + white noise, geepers.linearity' },
         };
         // Results of the last run: in-view point indices, links, per-point metrics
         const A = { idx: null, links: null, metrics: {}, stepsByPoint: {}, breaklines: null, fieldUnit: '', chart: null };
@@ -2753,6 +2758,315 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
         }
 
+        // ================= linearity =================
+        // Port of geepers.linearity: is one rate enough? A linear, a quadratic and a
+        // continuous piecewise-linear model (free breakpoint) are compared by BIC under
+        // one power-law + white noise covariance, estimated around the quadratic model
+        // (around a straight line, curvature is absorbed into a steeper noise spectrum).
+        const LIN = { tolerance: 10, maxPoints: 600, breakpoints: 50, minSegment: 1.5 };
+
+        // In-place lower Cholesky factor of a dense n x n matrix; false if not positive definite
+        function cholesky(a, n) {
+            for (let j = 0; j < n; j++) {
+                let s = a[j * n + j];
+                for (let k = 0; k < j; k++) s -= a[j * n + k] ** 2;
+                if (!(s > 0)) return false;
+                const d = Math.sqrt(s);
+                a[j * n + j] = d;
+                for (let i = j + 1; i < n; i++) {
+                    let v = a[i * n + j];
+                    for (let k = 0; k < j; k++) v -= a[i * n + k] * a[j * n + k];
+                    a[i * n + j] = v / d;
+                }
+            }
+            return true;
+        }
+
+        function forwardSolve(L, n, b) {
+            const x = new Float64Array(n);
+            for (let i = 0; i < n; i++) {
+                let s = b[i];
+                for (let k = 0; k < i; k++) s -= L[i * n + k] * x[k];
+                x[i] = s / L[i * n + i];
+            }
+            return x;
+        }
+
+        // Unit power-law covariance on a regular grid (Hosking fractional differencing,
+        // as geepers.trend): C = U U^T with U the Toeplitz matrix of the coefficients
+        function powerlawCov(kappa, m) {
+            const d = -kappa / 2, psi = new Float64Array(m);
+            psi[0] = 1;
+            for (let i = 1; i < m; i++) psi[i] = psi[i - 1] * (d + i - 1) / i;
+            const C = new Float64Array(m * m);
+            for (let lag = 0; lag < m; lag++) {
+                let acc = 0;
+                for (let j = 0; j + lag < m; j++) {
+                    acc += psi[j + lag] * psi[j];
+                    C[(j + lag) * m + j] = acc;
+                    C[j * m + j + lag] = acc;
+                }
+            }
+            return C;
+        }
+
+        const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+
+        // Least squares with the design given as columns: coefficients, (A^T A)^-1, RSS
+        function olsFit(cols, y) {
+            const p = cols.length;
+            const N = cols.map(r => cols.map(c => dot(r, c)));
+            const cov = invert(N);
+            if (!cov) return null;
+            const b = cols.map(c => dot(c, y));
+            const beta = cov.map(row => row.reduce((acc, v, c) => acc + v * b[c], 0));
+            const fit = new Float64Array(y.length);
+            for (let c = 0; c < p; c++) for (let i = 0; i < y.length; i++) fit[i] += cols[c][i] * beta[c];
+            let rss = 0;
+            for (let i = 0; i < y.length; i++) rss += (y[i] - fit[i]) ** 2;
+            return { beta, cov, rss, N };
+        }
+
+        // Nelder-Mead simplex with scipy's defaults, so both implementations stop alike
+        function nelderMead(f, x0, { xatol = 1e-4, fatol = 1e-6, maxiter = 300 } = {}) {
+            const n = x0.length;
+            let sim = [x0.slice(), ...x0.map((_, k) => x0.map((v, j) => (j !== k ? v : v !== 0 ? 1.05 * v : 0.00025)))];
+            let fs = sim.map(f);
+            const order = () => {
+                const idx = sim.map((_, i) => i).sort((a, b) => fs[a] - fs[b]);
+                sim = idx.map(i => sim[i]);
+                fs = idx.map(i => fs[i]);
+            };
+            order();
+            for (let it = 0; it < maxiter; it++) {
+                const dx = Math.max(...sim.slice(1).flatMap(s => s.map((v, j) => Math.abs(v - sim[0][j]))));
+                const df = Math.max(...fs.slice(1).map(v => Math.abs(v - fs[0])));
+                if (dx <= xatol && df <= fatol) break;
+                const xbar = x0.map((_, j) => sim.slice(0, n).reduce((acc, s) => acc + s[j], 0) / n);
+                const along = c => xbar.map((v, j) => v + c * (v - sim[n][j]));
+                const xr = along(1), fxr = f(xr);
+                let shrink = false;
+                if (fxr < fs[0]) {
+                    const xe = along(2), fxe = f(xe);
+                    [sim[n], fs[n]] = fxe < fxr ? [xe, fxe] : [xr, fxr];
+                } else if (fxr < fs[n - 1]) {
+                    [sim[n], fs[n]] = [xr, fxr];
+                } else if (fxr < fs[n]) {
+                    const xc = along(0.5), fxc = f(xc);
+                    if (fxc <= fxr) [sim[n], fs[n]] = [xc, fxc]; else shrink = true;
+                } else {
+                    const xcc = along(-0.5), fxcc = f(xcc);
+                    if (fxcc < fs[n]) [sim[n], fs[n]] = [xcc, fxcc]; else shrink = true;
+                }
+                if (shrink) {
+                    for (let k = 1; k <= n; k++) {
+                        sim[k] = sim[k].map((v, j) => sim[0][j] + 0.5 * (v - sim[0][j]));
+                        fs[k] = f(sim[k]);
+                    }
+                }
+                order();
+            }
+            return { x: sim[0], f: fs[0] };
+        }
+
+        // Restricted maximum likelihood of power-law + white noise around the design
+        // `cols` (geepers.trend "PLWN", or flicker + white when `kappaFixed` is given).
+        // Returns the design and data whitened by the fitted covariance.
+        function fitNoise(cols, y, obs, nEpochs, kappaFixed) {
+            const n = y.length, p = cols.length;
+            let cachedKappa = null, cached = null;
+            const powerlawAt = kappa => {
+                if (kappa !== cachedKappa) {
+                    const full = powerlawCov(kappa, nEpochs);
+                    cached = new Float64Array(n * n);
+                    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) cached[i * n + j] = full[obs[i] * nEpochs + obs[j]];
+                    cachedKappa = kappa;
+                }
+                return cached;
+            };
+            const evaluate = (kappa, z) => {
+                if (!(kappa >= -3 && kappa <= 0.01)) return { nll: 1e12 };
+                const phi = 1 / (1 + Math.exp(-z)), pl = powerlawAt(kappa), L = new Float64Array(n * n);
+                for (let i = 0; i < n * n; i++) L[i] = (1 - phi) * pl[i];
+                for (let i = 0; i < n; i++) L[i * n + i] += phi;
+                if (!cholesky(L, n)) return { nll: 1e12 };
+                let logdet = 0;
+                for (let i = 0; i < n; i++) logdet += 2 * Math.log(L[i * n + i]);
+                const yw = forwardSolve(L, n, y), cw = cols.map(c => forwardSolve(L, n, c));
+                const fit = olsFit(cw, yw);
+                if (!fit || !(fit.rss > 0)) return { nll: 1e12 };
+                const normal = Float64Array.from(fit.N.flat());
+                if (!cholesky(normal, p)) return { nll: 1e12 };
+                let logdetN = 0;
+                for (let i = 0; i < p; i++) logdetN += 2 * Math.log(normal[i * p + i]);
+                const dof = n - p, sigma2 = fit.rss / dof;
+                return { nll: 0.5 * (logdet + dof * Math.log(sigma2) + dof) + 0.5 * logdetN, kappa, phi, sigma2, fit, cw, yw, L };
+            };
+            let best;
+            if (kappaFixed === undefined) {
+                const starts = [-0.4, -1, -1.6].flatMap(k0 => [-2, 0, 2].map(z0 => ({ x: [k0, z0], v: evaluate(k0, z0).nll })));
+                starts.sort((a, b) => a.v - b.v);
+                for (const s of starts.slice(0, 2)) {
+                    const r = nelderMead(x => evaluate(x[0], x[1]).nll, s.x);
+                    if (!best || r.f < best.f) best = r;
+                }
+                best = evaluate(best.x[0], best.x[1]);
+            } else {
+                // One free parameter: bracket on a grid, then golden-section search
+                const f = z => evaluate(kappaFixed, z).nll;
+                const grid = [-8, -6, -4, -2, 0, 2, 4, 6, 8], vals = grid.map(f);
+                const k = vals.indexOf(Math.min(...vals));
+                let a = grid[Math.max(0, k - 1)], b = grid[Math.min(grid.length - 1, k + 1)];
+                const g = (Math.sqrt(5) - 1) / 2;
+                let c = b - g * (b - a), d = a + g * (b - a), fc = f(c), fd = f(d);
+                while (b - a > 1e-3) {
+                    if (fc < fd) { b = d; d = c; fd = fc; c = b - g * (b - a); fc = f(c); }
+                    else { a = c; c = d; fc = fd; d = a + g * (b - a); fd = f(d); }
+                }
+                best = evaluate(kappaFixed, (a + b) / 2);
+            }
+            if (!best.fit) return null;
+            // Whiten by the full covariance sigma2 * C, not the unit-scale one
+            const s = Math.sqrt(best.sigma2);
+            return {
+                ...best,
+                whiten: v => forwardSolve(best.L, n, v).map(x => x / s),
+                yw: best.yw.map(x => x / s),
+                cw: best.cw.map(c => c.map(x => x / s)),
+            };
+        }
+
+        // Complementary error function (Abramowitz & Stegun 7.1.26, |error| < 1.5e-7)
+        function erfc(x) {
+            const t = 1 / (1 + 0.3275911 * x);
+            return t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x);
+        }
+
+        // Averages in equal time bins so the dense covariance stays affordable:
+        // sample indices on the binned grid, bin means, and the bin length in days
+        function binSeries(sec, y, maxSamples, sampling) {
+            const span = (sec[sec.length - 1] - sec[0]) / DAY_SEC;
+            const binDays = sampling * Math.max(1, Math.ceil((Math.round(span / sampling) + 1) / maxSamples));
+            const sum = new Map(), count = new Map();
+            sec.forEach((s, i) => {
+                const k = Math.round((s - sec[0]) / DAY_SEC / binDays);
+                sum.set(k, (sum.get(k) || 0) + y[i]);
+                count.set(k, (count.get(k) || 0) + 1);
+            });
+            const obs = [...sum.keys()].sort((a, b) => a - b);
+            return { obs, y: Float64Array.from(obs, k => sum.get(k) / count.get(k)), binDays };
+        }
+
+        // Mean spacing of the date axis; unlike the median it is exact for monthly
+        // data, whose samples then fall on a regular grid without collisions
+        const meanSamplingDays = () => (S.dateSec[S.nDates - 1] - S.dateSec[0]) / (S.nDates - 1) / DAY_SEC;
+
+        // The linearity test of one series (seconds, values). `estimateKappa` false
+        // fixes the noise at flicker + white (fast, for the map); `simulations` sets
+        // the noise realizations behind the piecewise p-value (0 = skip); `withRate`
+        // adds the linear fit with its own noise, i.e. the rate one would extrapolate.
+        function linearityTest(sec, values, { maxSamples = 160, estimateKappa = true, simulations = 2000, withRate = true, sampling = meanSamplingDays() } = {}) {
+            if (values.length < 30) return null;
+            const { obs, y, binDays } = binSeries(sec, values, maxSamples, sampling);
+            const n = y.length, nEpochs = obs[n - 1] + 1;
+            const t = Float64Array.from(obs, k => k * binDays * DAY_SEC / YEAR_SEC);
+            if (n < 30 || t[n - 1] < 3) return null;
+            const kappaFixed = estimateKappa ? undefined : -1;
+            const col = f => Float64Array.from(t, f), w = 2 * Math.PI;
+            const lin = [col(() => 1), col(x => x), col(x => Math.cos(w * x)), col(x => Math.sin(w * x)),
+                col(x => Math.cos(2 * w * x)), col(x => Math.sin(2 * w * x))];
+            const tMean = t.reduce((a, b) => a + b, 0) / n;
+            const quad = col(x => (x - tMean) ** 2);
+
+            const noise = fitNoise([...lin, quad], y, obs, nEpochs, kappaFixed);
+            if (!noise) return null;
+            const yw = noise.yw, linW = noise.cw.slice(0, lin.length), quadW = noise.cw[lin.length];
+            const fitLin = olsFit(linW, yw), fitQuad = olsFit([...linW, quadW], yw);
+            if (!fitLin || !fitQuad) return null;
+            const k = lin.length, logN = Math.log(n);
+            const model = (cols, beta) => { const out = new Float64Array(n); cols.forEach((c, j) => { for (let i = 0; i < n; i++) out[i] += c[i] * beta[j]; }); return out; };
+            const departure = fit => { let m = 0; for (let i = 0; i < n; i++) m = Math.max(m, Math.abs(fit[i] - line[i])); return m; };
+            const line = model(lin, fitLin.beta);
+            const bic = { linear: k * logN + fitLin.rss, quadratic: (k + 1) * logN + fitQuad.rss };
+            const res = {
+                n, binDays, kappa: noise.kappa, bic,
+                acceleration: 2 * fitQuad.beta[k], accelerationSigma: 2 * Math.sqrt(fitQuad.cov[k][k]),
+                pQuadratic: erfc(Math.sqrt(Math.max(fitLin.rss - fitQuad.rss, 0) / 2)),
+                departure: 0,
+            };
+
+            // Continuous piecewise linear: + c * max(0, t - tBreak)
+            const lo = t[0] + LIN.minSegment, hi = t[n - 1] - LIN.minSegment;
+            let hingeFit = null;
+            if (hi > lo) {
+                // Orthonormal basis of the whitened linear design (modified Gram-Schmidt)
+                const q = [];
+                for (const c of linW) {
+                    const v = c.slice();
+                    for (const u of q) { const s = dot(u, v); for (let i = 0; i < n; i++) v[i] -= s * u[i]; }
+                    const norm = Math.sqrt(dot(v, v));
+                    q.push(v.map(x => x / norm));
+                }
+                const project = v => { for (const u of q) { const s = dot(u, v); for (let i = 0; i < n; i++) v[i] -= s * u[i]; } return v; };
+                const resid = project(yw.slice());
+                const units = [], breaks = [];
+                for (let b = 0; b < LIN.breakpoints; b++) {
+                    const tb = lo + (hi - lo) * b / (LIN.breakpoints - 1);
+                    const hw = noise.whiten(col(x => Math.max(0, x - tb))), full = Math.sqrt(dot(hw, hw));
+                    const part = project(hw), norm = Math.sqrt(dot(part, part));
+                    if (!(norm > 1e-10 * full)) continue;
+                    units.push(part.map(x => x / norm));
+                    breaks.push(tb);
+                }
+                const gains = units.map(u => dot(u, resid) ** 2);
+                const top = gains.indexOf(Math.max(...gains)), tBreak = breaks[top];
+                const hinge = col(x => Math.max(0, x - tBreak));
+                const fitH = olsFit([...linW, noise.whiten(hinge)], yw);
+                if (fitH) {
+                    bic.piecewise = (k + 2) * logN + fitH.rss;
+                    hingeFit = model([...lin, hinge], fitH.beta);
+                    Object.assign(res, {
+                        breakSec: sec[0] + tBreak * YEAR_SEC,
+                        rateBefore: fitH.beta[1], rateAfter: fitH.beta[1] + fitH.beta[k],
+                        rateChangeSigma: Math.sqrt(fitH.cov[k][k]),
+                    });
+                    if (simulations) {
+                        // Null distribution of the best gain over all breakpoints: the same
+                        // statistic on whitened noise (seeded, so a rerun gives the same value)
+                        let seed = 12345;
+                        const uniform = () => { seed = (seed + 0x6D2B79F5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+                        const z = new Float64Array(n);
+                        let exceed = 0;
+                        for (let s = 0; s < simulations; s++) {
+                            for (let i = 0; i < n; i++) z[i] = Math.sqrt(-2 * Math.log(1 - uniform())) * Math.cos(2 * Math.PI * uniform());
+                            let top0 = 0;
+                            for (const u of units) top0 = Math.max(top0, dot(u, z) ** 2);
+                            if (top0 >= gains[top]) exceed++;
+                        }
+                        res.pPiecewise = (1 + exceed) / (1 + simulations);
+                    }
+                }
+            }
+            res.model = ['linear', 'quadratic', 'piecewise'].filter(m => m in bic).reduce((a, b) => (bic[b] < bic[a] ? b : a));
+            if (res.model === 'quadratic') res.departure = departure(model([...lin, quad], fitQuad.beta));
+            if (res.model === 'piecewise') res.departure = departure(hingeFit);
+
+            if (withRate) {
+                const own = fitNoise(lin, y, obs, nEpochs, kappaFixed);
+                if (!own) return null;
+                res.rate = own.fit.beta[1];
+                res.rateSigma = Math.sqrt(own.sigma2 * own.fit.cov[1][1]);
+                // Validity horizon: when rate uncertainty plus the non-linearity found
+                // reaches the tolerance (geepers.linearity.validity_horizon)
+                const sv = res.rateSigma, tol = LIN.tolerance, a = Math.abs(res.acceleration);
+                let years = tol / sv;
+                if (res.model === 'quadratic' && a > 2 * res.accelerationSigma) years = (-sv + Math.sqrt(sv * sv + 2 * a * tol)) / a;
+                else if (res.model === 'piecewise') years = tol / (sv + Math.abs(res.rateAfter - res.rateBefore));
+                res.horizonYears = years;
+            }
+            return res;
+        }
+
         // --- spatial structure function, port of geepers.gps_imaging.make_ssf
         // (Hammond et al., 2016, doi:10.1002/2016JB013458, sec. 3.1): scatter of the
         // pair differences in log-distance bins of great-circle separation, forced to
@@ -2847,7 +3161,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const shown = (A.idx ? A.mode : $('sel-an-field').value) === 'series';
             document.querySelectorAll('.row[data-series-only]').forEach(row => { row.hidden = !next; });
             const sel = $('sel-an-metric');
-            sel.querySelectorAll('option[data-series-only]').forEach(o => { o.hidden = o.disabled = !shown; });
+            sel.querySelectorAll('option[data-series-only]').forEach(o => {
+                o.hidden = o.disabled = !shown || (A.idx && !A.metrics[o.value] && o.value !== 'similarity');
+            });
             if (sel.selectedOptions[0]?.disabled) sel.value = '';
         }
 
@@ -2934,6 +3250,13 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     steps[i] = byComp[comp].length;
                 });
                 Object.assign(metrics, { temporal, gaps, steps });
+                // Linearity is a dense noise fit per point: only for a modest view
+                A.linModels = null;
+                if (idx.length <= LIN.maxPoints) {
+                    const fits = series.map(s => linearityTest(s.sec, s.y, { estimateKappa: false, simulations: 0, withRate: false }));
+                    metrics.linearity = Float64Array.from(fits, f => (f ? f.departure : NaN));
+                    A.linModels = fits.map(f => f?.model);
+                }
             }
 
             // Field-level SSF over the view (all pairs, not just links; subsampled for speed)
@@ -2955,6 +3278,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             A.summary = `${mode === 'rate' ? 'velocity' : mode === 'date' ? 'displacement at ' + S.dates[S.dateIdx] : 'time series'} of ${comp} · ` +
                 `SSF median ${median(ssf.map(r => r[1]).filter(Number.isFinite)).toFixed(2)}` +
                 (subsampled ? ` (SSF on ${cap} sampled points)` : '') +
+                (isSeries && !metrics.linearity ? ` · non-linearity skipped (more than ${LIN.maxPoints} points; zoom in)` : '') +
                 ` · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
             applyBreaklines();
             drawSsfChart(ssf);
@@ -3227,13 +3551,36 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return lines;
         }
 
+        // Linearity of the primary chart's point, one line per component
+        function showLinearity() {
+            const p = S.sel[0], out = $('lin-result');
+            if (p < 0) return;
+            const date = sec => new Date(sec * 1000).toISOString().slice(0, 10);
+            const signed = v => (v > 0 ? '+' : '') + fmt(v);
+            out.replaceChildren(...COMPONENTS.map((c, i) => {
+                const s = pointSeries(p, c), r = linearityTest(s.sec, s.y);
+                const line = document.createElement('div'), name = document.createElement('b');
+                name.style.color = SERIES_COLORS[i];
+                name.textContent = c[0].toUpperCase();
+                if (!r) { line.append(name, 'too short for a linearity test (needs 30 samples over 3 years)'); return line; }
+                const parts = [`${r.model}`, `rate ${signed(r.rate)} ± ${fmt(r.rateSigma)} mm/yr`];
+                if (r.model === 'quadratic') parts.push(`acceleration ${signed(r.acceleration)} ± ${fmt(r.accelerationSigma)} mm/yr² (p ${r.pQuadratic.toFixed(3)})`);
+                if (r.model === 'piecewise') parts.push(`rate ${signed(r.rateBefore)} → ${signed(r.rateAfter)} mm/yr at ${date(r.breakSec)} (p ${r.pPiecewise.toFixed(3)})`);
+                if (r.model !== 'linear') parts.push(`${fmt(r.departure)} mm off the line`);
+                parts.push(`within ${LIN.tolerance} mm for ${r.horizonYears >= 100 ? '100+' : fmt(r.horizonYears)} yr`);
+                line.append(name, parts.join(' · '));
+                return line;
+            }));
+        }
+
         // Value of the shown metric at point p, for the hover line
         function analysisHover(p) {
             const key = $('sel-an-metric').value;
             if (!A.idx || !key) return '';
             const i = A.idx.indexOf(p);
             const v = i < 0 ? NaN : A.metrics[key][i];
-            return Number.isFinite(v) ? `  ·  ${metricLabel(key).label} ${fmt(v)}` : '';
+            const model = key === 'linearity' && A.linModels?.[i] ? ` (${A.linModels[i]})` : '';
+            return Number.isFinite(v) ? `  ·  ${metricLabel(key).label} ${fmt(v)}${model}` : '';
         }
 
         function resetAnalysis() {
@@ -3299,6 +3646,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
             $('sel-an-metric').onchange = () => { AN_CMAP.range = null; drawAnalysisLayers(); };
             $('sel-an-field').onchange = syncAnalysisControls;
+            $('chart-lin').onclick = () => {
+                if (S.sel[0] < 0) return;
+                $('lin-result').textContent = 'Linearity: computing…';
+                setTimeout(showLinearity, 30);   // let the message paint first
+            };
             syncAnalysisControls();
             $('chk-an-links').onchange = drawAnalysisLayers;
             $('chk-an-labels').onchange = () => {

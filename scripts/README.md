@@ -147,6 +147,10 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
     need a time series, so they (and their settings) are only computed
     and offered for the "Time series" field; a velocity or single-date
     field gets the spatial metrics only.
+  - Non-linearity (time-series field, up to 600 points in view): how far
+    the preferred of a linear, quadratic and piecewise-linear model
+    departs from a straight line (0 where one rate is enough), under
+    flicker + white noise. Hover shows the preferred model.
   - A field-level spatial structure function (SSF) chart.
   - Step detection needs both an AIC improvement and a step larger than
     "Step size" times the series' white-noise level (default 3); the AIC
@@ -163,6 +167,12 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   views the SSF is built from a random subsample of the points. Gap %
   counts against the file's own
   dates rather than a fixed step, which matters for monthly data.
+- The chart's `linearity` button runs the full linearity test on the
+  point (port of `geepers.linearity`, spectral index estimated): per
+  component the preferred model, the rate ± σ with colored noise, the
+  acceleration or rate change with its p-value, the departure from the
+  line, and how long the rate stays within 10 mm. Series longer than
+  160 samples are averaged in time bins first.
 - Each chart has a `csv` button: a `#` header (grid or GPS site, id,
   lat, lon, reference, velocity ± σ per component from the fit model if
   one is on, else a straight line, plus the fit terms), then dates + E/N/U
