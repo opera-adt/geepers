@@ -196,6 +196,31 @@ field is smoothed and the sigmas act as weights. There is no formal
 prediction uncertainty: judge the fit, and choose `damping`, on
 held-out stations.
 
+## Cross-validating an interpolation (`geepers.cross_validation`)
+
+Scores any interpolator on stations it has not seen — to choose its
+parameters or to compare methods. Stations are held out in whole
+spatial blocks: with random hold-out a close neighbor of every test
+station stays in training and the score is too optimistic.
+
+```python
+from geepers.collocation import ordinary_kriging
+from geepers.cross_validation import cross_validate
+
+def predict(train, test):          # fit on `train`, predict at `test`
+    out = ordinary_kriging(lon[train], lat[train], v[train], sigma[train],
+                           lon[test], lat[test], parameters)
+    return out.signal[:, 0]
+
+cv = cross_validate(predict, lon, lat, v, block_km=100, n_splits=5)
+cv.rmse, cv.mad             # per component; mad is the robust spread
+cv.residuals                # out-of-fold misfit at every station
+```
+
+Use a `block_km` larger than the correlation length of the field, and
+loop over candidate parameters keeping the lowest `cv.rmse`.
+`block_kfold` returns the train/test index sets directly.
+
 ## Euler poles and plate motion (`geepers.euler`)
 
 Estimate a rigid-plate rotation from horizontal GNSS velocities and

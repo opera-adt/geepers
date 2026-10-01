@@ -101,6 +101,7 @@ modules for GNSS velocity fields (see
 | `geepers.gps_imaging` | Robust weighted-median interpolation (Hammond et al., 2016 GPS Imaging port) |
 | `geepers.collocation` | Least-squares collocation, ordinary kriging, plate-boundary separation |
 | `geepers.spline` | Elastically coupled east/north spline interpolation (Sandwell & Wessel, 2016) |
+| `geepers.cross_validation` | Spatially blocked cross-validation for choosing interpolation parameters and comparing methods |
 | `geepers.euler` | Euler pole estimation and plate-motion prediction |
 | `geepers.strain` | Strain-rate/rotation fields from gridded velocities |
 | `geepers.validation` | GNSS-vs-InSAR validation: velocity scatter (MAD/RMSE/R²), structure function, semivariogram, per-epoch misfit |
