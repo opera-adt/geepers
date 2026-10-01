@@ -155,8 +155,8 @@ def ssf_per_station(
 ) -> pd.DataFrame:
     """Median SSF score of each station's Delaunay neighborhood.
 
-    For every station, computes the SSF over its Delaunay neighbors for
-    each velocity component and reduces the curve to its median value —
+    For every station, computes the SSF over the station and its Delaunay
+    neighbors for each velocity component and reduces the curve to its median value —
     a per-station coherence score in [0, 1].
 
     Parameters
@@ -172,8 +172,8 @@ def ssf_per_station(
     Returns
     -------
     pd.DataFrame
-        One row per station with columns ``ssf_n_neighbors`` and
-        ``ssf_<component>``.
+        One row per station with columns ``ssf_n_neighbors`` (Delaunay
+        neighbors, not counting the station) and ``ssf_<component>``.
 
     """
     lon = np.asarray(lon, float)
@@ -182,9 +182,11 @@ def ssf_per_station(
     neighbors = delaunay_neighbors(lon, lat)
 
     rows = []
-    for _i, nbrs in neighbors.items():
-        idx = np.array(nbrs)
-        row: dict[str, float] = {"ssf_n_neighbors": len(idx)}
+    for i, nbrs in neighbors.items():
+        # Include the station itself, otherwise its score would not
+        # depend on its own value
+        idx = np.array([i, *nbrs])
+        row: dict[str, float] = {"ssf_n_neighbors": len(nbrs)}
         for name, vals in comps.items():
             curve = spatial_structure_function(
                 lon[idx], lat[idx], vals[idx], max_difference=max_difference

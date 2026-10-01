@@ -65,6 +65,20 @@ class TestSSF:
         assert not np.isinf(ssf[:, 1]).any()
 
 
+class TestSSFPerStation:
+    def test_score_depends_on_own_value(self, network):
+        # Regression: the neighborhood excluded the station itself, so an
+        # outlier at a station left that station's score unchanged
+        lon, lat = network
+        rng = np.random.default_rng(1)
+        values = rng.normal(0, 1, len(lon))
+        base = ssf_per_station(lon, lat, {"up": values})
+        outlier = values.copy()
+        outlier[5] += 25.0
+        after = ssf_per_station(lon, lat, {"up": outlier})
+        assert after.loc[5, "ssf_up"] != base.loc[5, "ssf_up"]
+
+
 class TestDelaunay:
     def test_neighbors_symmetric(self, network):
         lon, lat = network
