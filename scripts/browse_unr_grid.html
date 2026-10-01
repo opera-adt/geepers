@@ -725,6 +725,7 @@
                     <option value="temporal" data-series-only>Temporal variability</option>
                     <option value="gaps" data-series-only>Gap %</option>
                     <option value="steps" data-series-only>Detected steps</option>
+                    <option value="linmodel" data-series-only>Linear or not</option>
                     <option value="linearity" data-series-only>Non-linearity</option>
                 </select>
             </div>
@@ -2592,6 +2593,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             temporal: { label: 'Temporal variability', unit: 'mm/yr', help: 'sqrt(median((v_window - v_full)^2)) of MIDAS velocities in sliding windows' },
             gaps: { label: 'Gap %', unit: '%', help: 'Missing samples against the dates in the data' },
             steps: { label: 'Detected steps', unit: '', help: 'AIC step detections in the analysed component' },
+            linmodel: { label: 'Preferred model: 0 linear · 1 quadratic · 2 piecewise', unit: '', help: 'Which of a linear, quadratic or piecewise-linear model describes the series (BIC, flicker + white noise, geepers.linearity). 0 = one rate is enough' },
             linearity: { label: 'Non-linearity', unit: 'mm', help: 'Largest departure from a straight line of the preferred model (quadratic or piecewise; 0 where one rate is enough). Flicker + white noise, geepers.linearity' },
         };
         // Results of the last run: in-view point indices, links, per-point metrics
@@ -3256,6 +3258,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     const fits = series.map(s => linearityTest(s.sec, s.y, { estimateKappa: false, simulations: 0, withRate: false }));
                     metrics.linearity = Float64Array.from(fits, f => (f ? f.departure : NaN));
                     A.linModels = fits.map(f => f?.model);
+                    const code = { linear: 0, quadratic: 1, piecewise: 2 };
+                    metrics.linmodel = Float64Array.from(fits, f => (f ? code[f.model] : NaN));
                 }
             }
 
@@ -3347,6 +3351,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const finite = Array.from(values).filter(Number.isFinite).sort((a, b) => a - b);
             let lo = finite[Math.floor(finite.length * 0.02)] ?? 0, hi = finite[Math.floor(finite.length * 0.98)] ?? 1;
             if (key === 'steps') { lo = 0; hi = Math.max(1, finite[finite.length - 1] ?? 1); }
+            if (key === 'linmodel') { lo = 0; hi = 2; }
             return hi > lo ? [lo, hi] : [lo, lo + 1];
         }
 
@@ -3579,6 +3584,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             if (!A.idx || !key) return '';
             const i = A.idx.indexOf(p);
             const v = i < 0 ? NaN : A.metrics[key][i];
+            if (key === 'linmodel') return A.linModels?.[i] ? `  ·  ${A.linModels[i]}` : '';
             const model = key === 'linearity' && A.linModels?.[i] ? ` (${A.linModels[i]})` : '';
             return Number.isFinite(v) ? `  ·  ${metricLabel(key).label} ${fmt(v)}${model}` : '';
         }

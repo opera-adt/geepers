@@ -151,6 +151,8 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
     the preferred of a linear, quadratic and piecewise-linear model
     departs from a straight line (0 where one rate is enough), under
     flicker + white noise. Hover shows the preferred model.
+    "Linear or not" colors the same result by model instead: 0 linear,
+    1 quadratic, 2 piecewise.
   - A field-level spatial structure function (SSF) chart.
   - Step detection needs both an AIC improvement and a step larger than
     "Step size" times the series' white-noise level (default 3); the AIC
