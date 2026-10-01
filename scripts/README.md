@@ -175,6 +175,8 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   into view (in the background, up to 3,000 untested points at a time)
   and results are kept while the dataset is loaded; untested points stay
   grey, hover shows the verdict and the departure from a straight line.
+  Offsets are not estimated yet (TODO): a series with an earthquake or
+  equipment step is reported as non-linear.
 - The chart's `linearity` button runs the full linearity test on the
   point (port of `geepers.linearity`, flicker + white noise): per
   component the preferred model, the rate ± σ with colored noise, the

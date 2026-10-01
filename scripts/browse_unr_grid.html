@@ -548,7 +548,7 @@
                 <label style="min-width:0" title="Color points by linear trend (least-squares over the full record) instead of per-date displacement">
                     <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
                 </label>
-                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey.">
+                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey. Offsets (earthquakes, equipment changes) are not estimated yet, so a series with one is reported as non-linear.">
                     <input type="checkbox" id="chk-lin"> Linearity
                 </label>
             </div>
@@ -2857,6 +2857,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // continuous piecewise-linear model (free breakpoint) are compared by BIC under
         // one power-law + white noise covariance, estimated around the quadratic model
         // (around a straight line, curvature is absorbed into a steeper noise spectrum).
+        // TODO: estimate offsets too. geepers.linearity takes `step_dates`; here none
+        // are passed, so an earthquake or equipment offset is reported as non-linearity.
+        // Feed the steps typed in the chart fit, the detected ones, or the UNR catalog.
         const LIN = { tolerance: 10, maxPoints: 600, maxDisplay: 3000, breakpoints: 50, minSegment: 1.5 };
 
         // In-place lower Cholesky factor of a dense n x n matrix; false if not positive definite
