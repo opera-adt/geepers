@@ -31,6 +31,29 @@ Run it locally with:
 jupyter lab docs/notebooks/geepers_tour.ipynb
 ```
 
+## Detecting steps and testing linearity (notebook)
+
+The [steps and linearity notebook](notebooks/steps_and_linearity.ipynb)
+answers the question that comes before quoting any velocity: does one
+rate describe this series, and for how long can it be extrapolated? On
+synthetic series with known truth, then on a real station next to the
+2019 Ridgecrest earthquakes, it shows how to
+
+1. find uncatalogued offsets with `detect_steps`, and why the size
+   check matters under temporally correlated noise;
+2. run `linearity_test` (linear vs quadratic vs piecewise) on 30-day
+   means, with the steps declared;
+3. read the verdict, the departure from a straight line and the
+   p-values, and turn them into a `validity_horizon`;
+4. see what goes wrong when a step is left out, and why the noise model
+   is kept at flicker + white.
+
+Sections 1-5 run offline; section 6 downloads one station from UNR.
+
+```bash
+jupyter lab docs/notebooks/steps_and_linearity.ipynb
+```
+
 ## Your first GPS-InSAR comparison
 
 1. **Gather inputs**: a stack of displacement rasters (one per date,

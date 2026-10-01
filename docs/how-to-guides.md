@@ -92,7 +92,9 @@ Two more cleaning steps that pay off before velocity fitting:
 from geepers.steps import detect_steps_enu
 from geepers.cme import estimate_cme, remove_cme
 
-# 1. Find uncatalogued jumps; feed them to the trend/MIDAS estimators
+# 1. Find uncatalogued jumps; feed them to the trend/MIDAS estimators.
+#    A detection must exceed 3x the series' day-to-day noise (min_step_sigma),
+#    or correlated noise is reported as steps.
 found = detect_steps_enu(df)                # complements UnrSource.steps()
 
 # 2. Estimate and remove the network common mode from detrended residuals
@@ -124,6 +126,51 @@ Use `noise_model="WN"` for a fast first pass (OLS-equivalent sigma,
 typically 5-10× too small), or `geepers.midas.midas` when robustness to
 unknown steps matters more than the noise model.
 
+## How to check that a single rate describes a series
+
+Find the offsets first, then test linearity with them declared. An
+undeclared offset is either reported as non-linear motion or, near
+mid-record, silently turned into a wrong rate.
+
+```python
+import pandas as pd
+from geepers.gps_sources import UnrSource
+from geepers.linearity import linearity_test, validity_horizon
+from geepers.steps import clean_step_dates, detect_steps
+
+src = UnrSource()
+df = src.timeseries("P595", start_date="2014-01-01")
+up = pd.Series(df["up"].to_numpy() * 1000, index=pd.DatetimeIndex(df["date"]))  # mm
+
+# 1. 30-day means (the dense noise fit is slow on daily data)
+monthly = up.resample("30D").mean().dropna()
+
+# 2. Offsets: detected in the data, plus the UNR catalog. clean_step_dates
+#    drops those outside the record and merges those within one sample,
+#    either of which would make the fit singular.
+steps = clean_step_dates(
+    detect_steps(up)["date"].tolist()
+    + src.steps(station_ids=["P595"])["date"].tolist(),
+    start=monthly.index[0], end=monthly.index[-1], min_separation_days=30,
+)
+
+# 3. Linearity with the offsets declared
+result = linearity_test(
+    monthly.index, monthly.to_numpy(), sampling_days=30, step_dates=steps
+)
+print(result.model, result.trend.velocity, result.trend.velocity_uncertainty)
+
+# 4. How long does the rate stay within 10 mm?
+print(validity_horizon(result, tolerance=10.0).years)
+```
+
+`result.model` is "linear", "quadratic" or "piecewise"; `departure` is
+how far the preferred model strays from a straight line (mm). Keep the
+default flicker + white noise model: a free spectral index explains
+offsets and rate changes as noise and calls everything linear. The
+[steps and linearity notebook](notebooks/steps_and_linearity.ipynb)
+works through each of these points.
+
 ## How to interpolate a velocity field onto a grid
 
 Robust, edge-preserving (GPS Imaging — cite Hammond et al., 2016):
@@ -150,9 +197,45 @@ at_stations, at_grid = interpolate_velocities(
 )
 ```
 
+Elastically coupled east/north interpolation for deforming zones
+(Sandwell & Wessel, 2016), after removing the rigid plate motion:
+
+```python
+from geepers.spline import fit_vector_spline
+
+spline = fit_vector_spline(lon, lat, ve, vn, se, sn, damping=0.1)
+ve_grid, vn_grid = spline.predict(gx, gy)
+```
+
+Three helpers apply to any of the methods:
+
+```python
+from geepers.cross_validation import cross_validate
+from geepers.masks import convex_hull_mask, distance_mask
+from geepers.surface import fit_polynomial_surface
+
+# Remove a regional tilt before collocation or the spline, restore it after
+surface = fit_polynomial_surface(lon, lat, v_up, sigma_up, degree=1)
+# ... interpolate surface.residuals -> signal_grid
+v_grid = signal_grid + surface.predict(gx, gy)
+
+# Blank grid nodes that no station supports
+keep = distance_mask(lon, lat, gx, gy, max_distance_km=75) & convex_hull_mask(lon, lat, gx, gy)
+v_grid = np.where(keep, v_grid, np.nan)
+
+# Score a method on held-out spatial blocks (choose parameters, compare methods)
+def predict(train, test):
+    fit = fit_vector_spline(lon[train], lat[train], ve[train], vn[train], damping=0.1)
+    return np.c_[fit.predict(lon[test], lat[test])]
+
+cv = cross_validate(predict, lon, lat, np.c_[ve, vn], block_km=100)
+print(cv.rmse)
+```
+
 Rules of thumb: GPS Imaging for vertical land motion, outlier-prone
 networks, and sharp boundaries; collocation for smooth horizontal
-fields where you need rigorous sigmas. See
+fields where you need rigorous sigmas; the vector spline for horizontal
+velocities in deforming zones. See
 [Analysis modules](analysis-modules.md#choosing-between-gps-imaging-and-collocation).
 
 ## How to interpolate across plate boundaries (plate-separation constraint)
@@ -268,7 +351,13 @@ python -m http.server 8123
 
 The viewer loads the Parquet directly in the browser (no server-side
 processing) with a date slider, per-point time-series charts, and WebM
-animation export. See `scripts/README.md` for details.
+animation export. Its analysis tools are ports of this package and give
+the same numbers: a Velocity or **Linearity** coloring of the map
+(linear / quadratic / piecewise per point), a `linearity` readout and
+step detection on each chart, and a network analysis panel (neighbor
+differences, structure function, temporal variability, gaps). For real
+station positions rather than the gridded product, export with
+`--source stations`. See `scripts/README.md` for details.
 
 ## How to point the download cache somewhere else
 

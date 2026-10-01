@@ -338,6 +338,9 @@ own, reports the wander of flicker or random-walk noise as steps.
 Smaller steps cannot be told apart from such noise; pass
 `min_step_sigma=0` for the AIC test alone.
 
+`clean_step_dates` turns a mixed list of detected and catalogued steps
+into one a fit can use (inside the record, no two within one sample).
+
 Feed the detected dates into `estimate_trend(step_dates=...)` or
 `midas(step_times=...)` so they are estimated, not smeared.
 
