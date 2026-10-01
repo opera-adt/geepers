@@ -174,6 +174,28 @@ See the full worked example (with a verified before/after comparison on
 a synthetic two-plate field) in
 [How-To Guides: interpolating across plate boundaries](how-to-guides.md#how-to-interpolate-across-plate-boundaries-plate-separation-constraint).
 
+## Elastic vector spline (`geepers.spline`)
+
+Interpolates east and north velocities *jointly* as the response of a
+thin elastic sheet to point forces at the stations (Sandwell & Wessel,
+2016 — the method behind GMT's `gpsgridder`), so the components are
+coupled through Poisson's ratio. Suited to deforming zones; remove the
+rigid plate motion first (see `geepers.euler`).
+
+```python
+from geepers.spline import fit_vector_spline
+
+spline = fit_vector_spline(lon, lat, ve, vn, sigma_e, sigma_n,
+                           poisson=0.5, damping=0.1)
+ve_g, vn_g = spline.predict(lon_g, lat_g)
+spline.residuals            # (n, 2) data - model at the stations
+```
+
+Without `damping` the spline passes through every station; with it the
+field is smoothed and the sigmas act as weights. There is no formal
+prediction uncertainty: judge the fit, and choose `damping`, on
+held-out stations.
+
 ## Euler poles and plate motion (`geepers.euler`)
 
 Estimate a rigid-plate rotation from horizontal GNSS velocities and
@@ -323,6 +345,9 @@ demonstrates everything on real data.
 - **GPS Imaging**: robust to outliers, preserves sharp boundaries, no
   covariance model to fit — best for vertical land motion maps and
   messy networks.
+- **Elastic vector spline**: couples east and north physically, with no
+  covariance model to fit — best for horizontal velocities in deforming
+  zones; no formal uncertainties.
 - **Collocation**: full covariance propagation, handles east/north
   jointly with cross-correlation, gives statistically rigorous
   uncertainties — best when the field is smooth and the covariance

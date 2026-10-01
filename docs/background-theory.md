@@ -217,6 +217,31 @@ $(C_0, d_0)$ come from the binned empirical covariogram of the data,
 with $C_0$ anchored at the noise-corrected variance
 $\overline{z^2} - \overline{\sigma^2}$.
 
+## Elastic vector spline (`geepers.spline`)
+
+Sandwell & Wessel (2016) interpolate the two horizontal components
+jointly by treating the velocity field as the displacement of a thin
+elastic sheet loaded by in-plane point forces $\mathbf{f}_j$ at the
+stations. With $\Delta x, \Delta y$ the offsets from a force,
+$r = \sqrt{\Delta x^2 + \Delta y^2}$ and Poisson's ratio $\nu$,
+
+$$
+\begin{aligned}
+v_e &= \sum_j \left[(3-\nu)\ln r + (1+\nu)\tfrac{\Delta y^2}{r^2}\right] f_{e,j}
+       - (1+\nu)\tfrac{\Delta x\,\Delta y}{r^2}\, f_{n,j},\\
+v_n &= \sum_j -(1+\nu)\tfrac{\Delta x\,\Delta y}{r^2}\, f_{e,j}
+       + \left[(3-\nu)\ln r + (1+\nu)\tfrac{\Delta x^2}{r^2}\right] f_{n,j}.
+\end{aligned}
+$$
+
+The forces follow from (weighted, optionally damped) least squares on
+the station velocities. $\nu$ sets how strongly the components couple
+($\nu=-1$ decouples them); damping trades fidelity to noisy data for
+smoothness. geepers evaluates the Green's functions on a conformal
+(oblique stereographic) plane centered on the network and rotates the
+components by the meridian convergence, so they stay true east/north
+away from the center.
+
 ## References
 
 - Blewitt, G., Kreemer, C., Hammond, W. C., & Gazeaux, J. (2016). MIDAS
@@ -236,6 +261,12 @@ $\overline{z^2} - \overline{\sigma^2}$.
   estimation of the 3-D intraplate deformation of the North American
   plate from GPS. *Geophys. Res. Lett.*, 47. doi:10.1029/2020GL087976
 - Moritz, H. (1980). *Advanced Physical Geodesy*. Wichmann, Karlsruhe.
+- Sandwell, D. T., & Wessel, P. (2016). Interpolation of 2-D vector
+  data using constraints from elasticity. *Geophys. Res. Lett.*,
+  43(20), 10703-10709. doi:10.1002/2016GL070340
+- Uieda, L. (2018). Verde: Processing and gridding spatial data using
+  Green's functions. *J. Open Source Softw.*, 3(29), 957.
+  doi:10.21105/joss.00957
 - Wdowinski, S., Bock, Y., Zhang, J., Fang, P., & Genrich, J.
   (1997). Southern California permanent GPS geodetic array:
   Spatial filtering of daily positions. *J. Geophys. Res.*, 102(B8),
