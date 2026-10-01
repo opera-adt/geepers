@@ -173,6 +173,29 @@ class TestEmpiricalCovariance:
         assert 0.3 * d0_true < d0 < 3 * d0_true
         assert emp.pearson > 0.8
 
+    def test_horizontal_uses_auto_covariance(self):
+        # Regression: for an east/north pair the covariogram was built from
+        # east x north products. For independent components that is ~zero
+        # at every lag, so d0 collapsed (or C0 came out negative and the
+        # collocation solve failed).
+        n = 350
+        c0_true, d0_true = 4.0, 150.0
+        rng = np.random.default_rng(3)
+        lon = rng.uniform(-124, -112, n)
+        lat = rng.uniform(32, 44, n)
+        C = signal_covariance(
+            lon, lat, lon, lat, np.array([c0_true, d0_true]), components=("up",)
+        )
+        L = np.linalg.cholesky(C + 1e-9 * np.eye(n))
+        noise = np.full(n, 0.3)
+        for _ in range(4):
+            east = L @ rng.normal(size=n) + rng.normal(0, 0.3, n)
+            north = L @ rng.normal(size=n) + rng.normal(0, 0.3, n)
+            emp = empirical_covariance(lon, lat, east, north, noise, noise)
+            c0, d0 = emp.parameters
+            assert c0 == pytest.approx(c0_true, rel=0.5)
+            assert 0.3 * d0_true < d0 < 3 * d0_true
+
 
 class TestGrid:
     def test_create_regular_grid(self):

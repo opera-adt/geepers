@@ -298,8 +298,9 @@ def empirical_covariance(
 ) -> EmpiricalCovariance:
     """Estimate an isotropic covariance function from scattered data.
 
-    Bins the cross-products of the (outlier-cleaned) observations by
-    separation distance, anchors the zero-lag variance at
+    Bins the products of the (outlier-cleaned) observations at station
+    pairs by separation distance (per component, then averaged),
+    anchors the zero-lag variance at
     ``mean(data^2) - mean(noise^2)`` for each component, and fits a
     first-order Gauss-Markov model ``C0 * exp(-d / d0)`` for the
     correlation length ``d0`` (C0 held fixed). The fit is run over two
@@ -355,8 +356,10 @@ def empirical_covariance(
     )
     s0 = float(np.std(np.c_[data1, data2]))
 
-    # Binned covariogram from all cross-products
-    cross = np.outer(data2, data1).ravel()
+    # Binned covariogram from the auto-products of each component, averaged
+    # like the zero-lag variance above. (East x north products would give
+    # the cross-covariance, which says nothing about the correlation length.)
+    cross = 0.5 * (np.outer(data1, data1) + np.outer(data2, data2)).ravel()
     d = dist.ravel()
     cross, d = cross[d > 0], d[d > 0]
     bin_sum, _, _ = stats.binned_statistic(d, cross, "sum", bins=bin_edges)
