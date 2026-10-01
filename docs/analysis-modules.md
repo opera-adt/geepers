@@ -301,6 +301,12 @@ found[["date", "step_size", "delta_aic"]]         # row per detection
 found = detect_steps_enu(df)                      # east/north/up columns
 ```
 
+A detection must also exceed `min_step_sigma` (default 3) times the
+series' white-noise level: the AIC test assumes white noise and, on its
+own, reports the wander of flicker or random-walk noise as steps.
+Smaller steps cannot be told apart from such noise; pass
+`min_step_sigma=0` for the AIC test alone.
+
 Feed the detected dates into `estimate_trend(step_dates=...)` or
 `midas(step_times=...)` so they are estimated, not smeared.
 

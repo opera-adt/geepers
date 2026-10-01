@@ -9,8 +9,12 @@ For every candidate epoch, two models are fit to a sliding window of the
 series: a line, and a line plus a Heaviside step at that epoch. The
 difference in the Akaike Information Criterion (AIC) between the two fits
 measures how strongly the data favor a step. Local maxima of the AIC
-improvement above a threshold are reported. This model-comparison approach
-follows the step-detection concept of
+improvement above a threshold are reported, provided the step is also
+larger than a multiple of the series' white-noise level: the AIC test
+assumes white noise, so on its own it reports the wander of temporally
+correlated (flicker, random-walk) noise as steps, the more so the more
+samples a window holds. This model-comparison approach follows the
+step-detection concept of
 
     Köhne, T., Riel, B., & Simons, M. (2023). Decomposition and Inference
     of Sources through Spatiotemporal Analysis of Network Signals: The
@@ -33,11 +37,35 @@ def _aic(rss: float, n: int, k: int) -> float:
     return n * np.log(max(rss, 1e-20) / n) + 2 * k
 
 
+def white_noise_sigma(values: np.ndarray) -> float:
+    """Robust white-noise level of a series from its first differences.
+
+    Differencing removes the trend and most of the temporally correlated
+    noise; the difference of two independent samples has variance
+    ``2 sigma**2``, and the scaled MAD keeps steps and outliers out of
+    the estimate.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Series values in time order, without NaNs.
+
+    Returns
+    -------
+    float
+        1-sigma white-noise level, in the units of `values`.
+
+    """
+    diffs = np.diff(values)
+    return float(1.4826 * np.median(np.abs(diffs - np.median(diffs))) / np.sqrt(2))
+
+
 def detect_steps(
     series: pd.Series,
     window_days: int = 60,
     min_step_ratio: float = 20.0,
     min_separation_days: int = 30,
+    min_step_sigma: float = 3.0,
 ) -> pd.DataFrame:
     """Detect step discontinuities in a single timeseries.
 
@@ -53,6 +81,12 @@ def detect_steps(
         qualify as a step. Larger means fewer, more confident detections.
     min_separation_days : int
         Merge detections closer than this, keeping the strongest.
+    min_step_sigma : float
+        Minimum step size, in units of the series' white-noise level
+        (`white_noise_sigma`). Rejects the small apparent steps that
+        temporally correlated noise produces; steps below about 3 sigma
+        cannot be told apart from such noise. Default 3; 0 disables the
+        check (AIC test only).
 
     Returns
     -------
@@ -69,6 +103,7 @@ def detect_steps(
     days = (clean.index - clean.index[0]).days.to_numpy(dtype=float)
     n = len(values)
     half = window_days / 2
+    min_size = min_step_sigma * white_noise_sigma(values)
 
     dates, sizes, delta_aics = [], [], []
     for i in range(1, n):
@@ -95,7 +130,7 @@ def detect_steps(
         rss_step = float(rss_step[0]) if len(rss_step) else 0.0
 
         delta = _aic(rss_line, m, 2) - _aic(rss_step, m, 3)
-        if delta > min_step_ratio:
+        if delta > min_step_ratio and abs(coeffs[2]) > min_size:
             dates.append(clean.index[i])
             sizes.append(float(coeffs[2]))
             delta_aics.append(float(delta))

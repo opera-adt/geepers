@@ -682,6 +682,12 @@
                 <span class="unit">d, ΔAIC</span>
                 <input type="number" id="inp-an-stepaic" value="20" min="0" step="any">
             </div>
+            <div class="row" title="Step detection: a step must also be larger than this many times the series' white-noise level (from its sample-to-sample differences). The AIC test alone reports the wander of time-correlated noise as steps; 0 switches this check off.">
+                <label>Step size</label>
+                <span class="unit">&gt;</span>
+                <input type="number" id="inp-an-stepsig" value="3" min="0" step="any">
+                <span class="unit">σ noise</span>
+            </div>
             <div class="row" title="Gap %: missing samples counted against the dates in the data - over each point's own first-to-last span, or over the Record start-end span (missing lead and tail time then counts as gaps).">
                 <label>Gaps over</label>
                 <select id="sel-an-gapspan">
@@ -2702,9 +2708,16 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         }
 
         // --- AIC step detection (line vs line + Heaviside), port of geepers.steps
-        function detectSteps(sec, y, windowDays, minRatio) {
+        // White-noise level from the first differences (robust; as geepers white_noise_sigma)
+        function whiteNoiseSigma(y) {
+            const d = y.slice(1).map((v, i) => v - y[i]), md = median(d);
+            return 1.4826 * median(d.map(v => Math.abs(v - md))) / Math.SQRT2;
+        }
+
+        function detectSteps(sec, y, windowDays, minRatio, minSigma = 3) {
             const n = y.length;
             if (n < 10) return [];
+            const minSize = minSigma * whiteNoiseSigma(y);
             const days = sec.map(s => (s - sec[0]) / DAY_SEC), half = windowDays / 2;
             const aic = (rss, m, k) => m * Math.log(Math.max(rss, 1e-20) / m) + 2 * k;
             const found = [];
@@ -2719,7 +2732,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 const step = lsq(days.slice(lo, hi).map((d, k) => [1, d - t0, lo + k >= i ? 1 : 0]), ys);
                 if (!line || !step) continue;
                 const delta = aic(line.rss, ys.length, 2) - aic(step.rss, ys.length, 3);
-                if (delta > minRatio) found.push({ sec: sec[i], day: t0, size: step.coef[2], delta });
+                if (delta > minRatio && Math.abs(step.coef[2]) > minSize) found.push({ sec: sec[i], day: t0, size: step.coef[2], delta });
             }
             // Keep the strongest detection within each cluster
             const minSep = Math.max(30, half);
@@ -2735,6 +2748,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return {
                 windowDays: typed > 0 ? typed : Math.max(60, 10 * samplingDays()),
                 minRatio: Number($('inp-an-stepaic').value) || 20,
+                // An empty box means the default; a typed 0 switches the check off
+                minSigma: $('inp-an-stepsig').value === '' ? 3 : Number($('inp-an-stepsig').value),
             };
         }
 
@@ -2885,7 +2900,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
             // Per-point time-series metrics (do not depend on the network)
             const minWin = Number($('inp-an-minwin').value) || 3, maxFrac = Number($('inp-an-maxfrac').value) || 0.75;
-            const { windowDays, minRatio } = stepParams();
+            const { windowDays, minRatio, minSigma } = stepParams();
             const temporal = new Float64Array(idx.length).fill(NaN), gaps = new Float64Array(idx.length).fill(NaN);
             const steps = new Float64Array(idx.length).fill(NaN);
             A.stepsByPoint = {};
@@ -2897,7 +2912,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 temporal[i] = temporalVariability(s.t, s.y, minWin, maxFrac);
                 const byComp = Object.fromEntries(COMPONENTS.map(c => {
                     const cs = c === comp ? s : pointSeries(p, c);
-                    return [c, detectSteps(cs.sec, cs.y, windowDays, minRatio)];
+                    return [c, detectSteps(cs.sec, cs.y, windowDays, minRatio, minSigma)];
                 }));
                 A.stepsByPoint[p] = byComp;
                 steps[i] = byComp[comp].length;
@@ -3246,10 +3261,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
         // Steps in any component of point p, merged like detectSteps merges one
         function detectPointSteps(p) {
-            const { windowDays, minRatio } = stepParams();
+            const { windowDays, minRatio, minSigma } = stepParams();
             const all = COMPONENTS.flatMap(comp => {
                 const s = pointSeries(p, comp);
-                return detectSteps(s.sec, s.y, windowDays, minRatio);
+                return detectSteps(s.sec, s.y, windowDays, minRatio, minSigma);
             }).sort((a, b) => b.delta - a.delta);
             const minSep = Math.max(30, windowDays / 2) * DAY_SEC, kept = [];
             for (const f of all) if (kept.every(k => Math.abs(k.sec - f.sec) >= minSep)) kept.push(f);

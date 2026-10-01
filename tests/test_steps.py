@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from geepers.steps import detect_steps, detect_steps_enu
-from geepers.synthetic import SyntheticStep, synthetic_timeseries
+from geepers.steps import detect_steps, detect_steps_enu, white_noise_sigma
+from geepers.synthetic import SyntheticStep, power_law_noise, synthetic_timeseries
 
 
 @pytest.fixture
@@ -56,6 +56,54 @@ class TestDetectSteps:
         values[::7] = np.nan
         found = detect_steps(_series(dates, values))
         assert len(found) == 1
+
+
+class TestMinimumStepSize:
+    @pytest.fixture
+    def colored(self):
+        """Ten years of daily white + flicker noise (mm) with no steps."""
+        dates = pd.date_range("2014-01-01", periods=3650, freq="D")
+        series = []
+        for seed in range(4):
+            rng = np.random.default_rng(seed)
+            noise = rng.normal(0, 2, 3650) + power_law_noise(3650, -1, 1.5, seed=seed)
+            series.append(_series(dates, noise))
+        return series
+
+    def test_white_noise_sigma(self):
+        rng = np.random.default_rng(0)
+        values = rng.normal(0, 2.0, 5000) + 0.01 * np.arange(5000)
+        values[2500:] += 40.0  # a step must not inflate the estimate
+        assert white_noise_sigma(values) == pytest.approx(2.0, rel=0.05)
+
+    def test_colored_noise_is_not_reported_as_steps(self, colored):
+        # Regression: the white-noise AIC test alone reports the wander of
+        # flicker noise as steps, increasingly so for longer windows
+        for window in (60, 300):
+            aic_only = sum(
+                len(detect_steps(s, window_days=window, min_step_sigma=0))
+                for s in colored
+            )
+            sized = sum(len(detect_steps(s, window_days=window)) for s in colored)
+            assert aic_only >= 4
+            assert sized <= 0.25 * aic_only
+
+    def test_real_step_survives_in_colored_noise(self, colored):
+        for series in colored:
+            with_step = series.copy()
+            with_step.iloc[1800:] += 15.0
+            found = detect_steps(with_step)
+            near = found[(found.date - series.index[1800]).abs().dt.days <= 10]
+            assert len(near) == 1
+            assert near.step_size.iloc[0] == pytest.approx(15.0, abs=5.0)
+
+    def test_step_below_the_size_limit_is_dropped(self, dates):
+        rng = np.random.default_rng(6)
+        values = rng.normal(scale=1.0, size=len(dates))
+        values[400:] += 2.5  # significant by AIC in a long window, below 3 sigma
+        series = _series(dates, values)
+        assert len(detect_steps(series, window_days=200, min_step_sigma=0)) == 1
+        assert detect_steps(series, window_days=200).empty
 
 
 class TestDetectStepsEnu:

@@ -127,8 +127,13 @@ For each candidate epoch, two models are fit in a sliding window
 centered on it: a line, and a line plus a step. The epoch is flagged
 when the AIC improvement of the step model exceeds a threshold —
 a parameter-counted version of the classic two-sample test that is
-robust to the trend itself. Detections closer than a minimum separation
-are merged, keeping the strongest.
+robust to the trend itself. Because that test assumes white noise, a
+detection must also exceed a multiple (default 3) of the series'
+white-noise level $\hat\sigma_w = 1.4826\,\mathrm{MAD}(\Delta y)/\sqrt2$,
+estimated from the first differences $\Delta y$; otherwise the wander of
+flicker or random-walk noise is reported as steps, increasingly so as
+the window holds more samples. Detections closer than a minimum
+separation are merged, keeping the strongest.
 
 ## Strain rates (`geepers.strain`)
 

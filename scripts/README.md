@@ -144,6 +144,10 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
     variability (MIDAS in sliding windows), gap % (against the dates in
     the file, over each point's span or the Record span), detected steps.
   - A field-level spatial structure function (SSF) chart.
+  - Step detection needs both an AIC improvement and a step larger than
+    "Step size" times the series' white-noise level (default 3); the AIC
+    test alone reports time-correlated noise as steps. 0 switches the
+    size check off.
   - Detected steps of the clicked point are marked on its chart and listed
     with their sizes; the chart fit's `detect` button fills its steps.
   The metrics are ports of `geepers.variability`, `geepers.gps_imaging`,
