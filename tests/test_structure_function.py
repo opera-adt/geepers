@@ -102,10 +102,9 @@ class TestEpochRMSE:
         merged, _ = merged_network
         # corrupt one acquisition across all stations *differently*
         bad_date = next(iter(merged.values())).index[30]
-        for k, df in merged.items():
-            df.loc[bad_date, "los_insar"] += np.random.default_rng(
-                hash(k) % 2**32
-            ).normal(0, 0.05)
+        # (seeded by position: str hashes change with PYTHONHASHSEED)
+        for i, df in enumerate(merged.values()):
+            df.loc[bad_date, "los_insar"] += np.random.default_rng(i).normal(0, 0.05)
         out = epoch_rmse(merged)
         assert out.loc[bad_date, "rmse"] > 3 * out["rmse"].median()
 
