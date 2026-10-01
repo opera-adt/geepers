@@ -104,6 +104,7 @@ modules for GNSS velocity fields (see
 | `geepers.cross_validation` | Spatially blocked cross-validation for choosing interpolation parameters and comparing methods |
 | `geepers.euler` | Euler pole estimation and plate-motion prediction |
 | `geepers.strain` | Strain-rate/rotation fields from gridded velocities |
+| `geepers.masks` | Distance and convex-hull masks to blank grid nodes not supported by stations |
 | `geepers.validation` | GNSS-vs-InSAR validation: velocity scatter (MAD/RMSE/R²), structure function, semivariogram, per-epoch misfit |
 | `geepers.synthetic` | Schema-valid synthetic networks and series for testing |
 

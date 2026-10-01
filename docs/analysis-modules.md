@@ -297,6 +297,24 @@ ds = strain_rate_field(lon_1d, lat_1d, ve_grid, vn_grid)
 ds.max_shear, ds.dilatation, ds.second_invariant, ds.rotation
 ```
 
+## Masking unsupported grid nodes (`geepers.masks`)
+
+Interpolators return a value everywhere, however far from the data.
+Blank the nodes that no station supports before mapping velocities or
+differentiating them into strain rates:
+
+```python
+from geepers.masks import distance_mask, convex_hull_mask
+
+near = distance_mask(lon, lat, lon_g, lat_g, max_distance_km=75)
+inside = convex_hull_mask(lon, lat, lon_g, lat_g, buffer_km=20)
+ve_g = np.where(near & inside, ve_g, np.nan)
+```
+
+`distance_mask` keeps nodes with a station (or `min_stations` of them)
+within a great-circle radius; `convex_hull_mask` keeps nodes the network
+surrounds, i.e. where the field is interpolated rather than extrapolated.
+
 ## Synthetic data (`geepers.synthetic`)
 
 Trajectory-model + colored-noise generators producing schema-valid
