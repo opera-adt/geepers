@@ -201,6 +201,27 @@
         }
         button.primary:hover { background: var(--accent-strong); }
 
+        .row .unit { flex: 0 0 auto; font-size: 11px; color: var(--muted); }
+        #an-stats { font-size: 11px; color: var(--muted); line-height: 1.5; }
+        #an-stats:empty { display: none; }
+        #an-legend-title { font-size: 11px; font-weight: 650; margin: 6px 0 4px; }
+        #an-legend-canvas { width: 100%; height: 10px; border-radius: 4px; display: block; }
+        #an-legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+        #an-legend[hidden], #an-ssf[hidden], #an-cmap-pop[hidden] { display: none; }
+        #an-legend { cursor: pointer; }
+        #analysis-section .row > label:first-child { cursor: help; }
+        #an-break-info { display: block; margin: -2px 0 4px 69px; white-space: normal; }
+        #an-break-info:empty { display: none; }
+        #an-cmap-pop, #disp-cmap-pop { margin-top: 6px; padding: 6px; border: 1px solid var(--hairline); border-radius: 8px; }
+        .cmap-pop[hidden] { display: none; }
+        .cmap-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+        .cmap-grid button { display: flex; flex-direction: column; gap: 2px; padding: 3px 5px; font-size: 10px; text-align: left; border-radius: 6px; overflow: hidden; }
+        .cmap-grid button.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+        .cmap-grid .cmap-bar { display: block; height: 7px; border-radius: 3px; }
+        .cmap-bar-click { cursor: pointer; margin: 6px 0; }
+        .cmap-bar-click canvas { width: 100%; height: 10px; border-radius: 4px; display: block; }
+        .cmap-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+        #an-ssf { margin-top: 6px; }
         #stats { font-size: 11px; color: var(--muted); line-height: 1.55; }
 
         /* ---- Time bar (bottom center) ---- */
@@ -241,6 +262,10 @@
 
         /* ---- Legend (bottom left) ---- */
         #legend { left: 12px; bottom: 14px; padding: 11px 14px; width: 212px; }
+        #legend-title, #legend-canvas, #legend-labels { cursor: pointer; }
+        #cmap-pop { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+        #cmap-pop[hidden] { display: none; }
+        #cmap-pop .row label { min-width: 44px; }
         #legend-canvas { width: 100%; height: 12px; border-radius: 4px; display: block; }
         #legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
         #legend-title { font-size: 12px; font-weight: 650; margin-bottom: 6px; letter-spacing: -0.01em; }
@@ -382,6 +407,7 @@
             font: inherit;
         }
         #inp-fit-steps { width: 150px; }
+        #btn-fit-detect { padding: 1px 8px; font-size: 11px; border-radius: 6px; }
         /* width:0 + min-width:100% → wrap to the chart's width instead of widening the panel */
         .fit-result { width: 0; min-width: 100%; margin-top: 2px; font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums; }
         .fit-result:empty { display: none; }
@@ -522,11 +548,12 @@
                     <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
                 </label>
             </div>
-            <div class="row">
-                <label>Colormap</label>
-                <select id="sel-cmap"></select>
-                <label style="min-width:0"><input type="checkbox" id="chk-invert"> inv</label>
+            <div id="disp-legend" class="cmap-bar-click" title="Click to change the colormap and range">
+                <canvas id="disp-legend-canvas" width="200" height="12"></canvas>
+                <div class="cmap-bar-labels"><span id="disp-leg-min"></span><span id="disp-leg-max"></span></div>
             </div>
+            <div id="disp-cmap-pop" class="cmap-pop" hidden>
+            <div id="disp-cmap-list" class="cmap-grid"></div>
             <div class="row">
                 <label>Range mm</label>
                 <input type="number" id="inp-vmin" step="any">
@@ -535,17 +562,22 @@
             <div class="row">
                 <label></label>
                 <button id="btn-auto">Auto</button>
-                <select id="sel-pctl" style="min-width:0" title="Percentile stretch used by Auto (and live) range">
+                <select id="sel-pctl" style="flex:0 0 auto" title="Percentile stretch used by Auto (and live) range">
                     <option value="2,98">p2–p98</option>
                     <option value="5,95">p5–p95</option>
                     <option value="10,90">p10–p90</option>
                     <option value="1,99">p1–p99</option>
                     <option value="0,100">min–max</option>
                 </select>
-                <label style="min-width:0"><input type="checkbox" id="chk-sym" checked> sym</label>
+            </div>
+            <div class="row">
+                <label></label>
+                <label style="min-width:0" title="Range symmetric about zero"><input type="checkbox" id="chk-sym" checked> sym</label>
                 <label style="min-width:0" title="Re-run auto range on every date change">
                     <input type="checkbox" id="chk-autolive"> live
                 </label>
+                <label style="min-width:0"><input type="checkbox" id="chk-invert"> invert</label>
+            </div>
             </div>
             <div class="row" id="row-size-grid">
                 <label>Grid size</label>
@@ -619,6 +651,97 @@
             </div>
         </details>
 
+        <details id="analysis-section">
+            <summary>Analysis</summary>
+            <div class="row" title="What the spatial metrics compare between points, for the component chosen under Display. Velocity: each point's linear rate. Displacement: the value at the current date. Time series: the whole record - for two points, the RMS of their relative series (difference, mean removed) over common dates.">
+                <label>Field</label>
+                <select id="sel-an-field">
+                    <option value="rate" selected>Velocity (mm/yr)</option>
+                    <option value="date">Displacement at date</option>
+                    <option value="series">Time series</option>
+                </select>
+            </div>
+            <div class="row" title="Delaunay links longer than this (km) are dropped before any metric - removes long links across the hull, oceans and data holes.">
+                <label>Max link</label>
+                <input type="number" id="inp-an-maxlink" value="300" min="0" step="any">
+                <span class="unit">km</span>
+            </div>
+            <div class="row" title="Spatial structure function: point pairs whose difference exceeds this are treated as outliers and skipped (field units: mm/yr, mm, or mm of relative RMS).">
+                <label>SSF max Δ</label>
+                <input type="number" id="inp-an-maxdiff" value="30" min="0" step="any">
+            </div>
+            <div class="row" title="Temporal variability: MIDAS velocities in half-overlapping windows, from this length (years) up to this fraction of each point's record, compared with its full-record velocity.">
+                <label>Windows</label>
+                <input type="number" id="inp-an-minwin" value="3" min="1" step="any">
+                <span class="unit">yr to</span>
+                <input type="number" id="inp-an-maxfrac" value="0.75" min="0.1" max="1" step="0.05">
+            </div>
+            <div class="row" title="Step detection: in a sliding window (days; empty = 10 samples, at least 60) a line and a line + step are fitted, and a step is reported where the AIC improves by more than this. Larger = fewer, more confident steps.">
+                <label>Steps</label>
+                <input type="number" id="inp-an-stepwin" min="10" step="any" placeholder="auto">
+                <span class="unit">d, ΔAIC</span>
+                <input type="number" id="inp-an-stepaic" value="20" min="0" step="any">
+            </div>
+            <div class="row" title="Gap %: missing samples counted against the dates in the data - over each point's own first-to-last span, or over the Record start-end span (missing lead and tail time then counts as gaps).">
+                <label>Gaps over</label>
+                <select id="sel-an-gapspan">
+                    <option value="own" selected>own span</option>
+                    <option value="record">Record span</option>
+                </select>
+            </div>
+            <div class="row">
+                <label></label>
+                <button id="btn-an-run" class="primary" title="Compute everything for the points in the current map view">Run on view</button>
+            </div>
+            <div id="an-stats"></div>
+            <div class="row" title="Delaunay network: enabled links solid (colored by length), disabled ones dashed grey. Click a link on the map to disable or re-enable it; the spatial metrics update.">
+                <label>Network</label>
+                <label style="min-width:0"><input type="checkbox" id="chk-an-links" checked> links</label>
+                <label style="min-width:0"><input type="checkbox" id="chk-an-labels"> km</label>
+                <button id="btn-an-reset" title="Re-enable every link (breakline cuts stay)">reset</button>
+            </div>
+            <div class="row" title="Breaklines (e.g. faults): links crossing one are disabled. Zipped shapefile, .shp, or GeoJSON, in lon/lat (EPSG:4326).">
+                <label>Breaklines</label>
+                <button id="btn-an-breaklines">Load…</button>
+                <button id="btn-an-clearbreak" hidden>clear</button>
+                <input type="file" id="inp-an-breaklines" accept=".zip,.shp,.geojson,.json" hidden>
+            </div>
+            <div id="an-break-info" class="unit"></div>
+            <div class="row" title="Per-point metric to color the map by. Hover a point for its value; click the colorbar for colormaps and range.">
+                <label>Map</label>
+                <select id="sel-an-metric">
+                    <option value="">None</option>
+                    <option value="rms">Spatial RMS</option>
+                    <option value="mad">Spatial MAD</option>
+                    <option value="similarity">Neighbor similarity</option>
+                    <option value="ssf">SSF score</option>
+                    <option value="medlink">Median link length</option>
+                    <option value="temporal">Temporal variability</option>
+                    <option value="gaps">Gap %</option>
+                    <option value="steps">Detected steps</option>
+                </select>
+            </div>
+            <div id="an-legend" hidden>
+                <div id="an-legend-title"></div>
+                <canvas id="an-legend-canvas" width="200" height="12"></canvas>
+                <div id="an-legend-labels"><span id="an-leg-min"></span><span id="an-leg-max"></span></div>
+            </div>
+            <div id="an-cmap-pop" class="cmap-pop" hidden>
+                <div id="an-cmap-list" class="cmap-grid"></div>
+                <div class="row">
+                    <label>Range</label>
+                    <input type="number" id="inp-an-min" step="any">
+                    <input type="number" id="inp-an-max" step="any">
+                </div>
+                <div class="row">
+                    <label></label>
+                    <button id="btn-an-auto">Auto (p2–p98)</button>
+                    <label style="min-width:0"><input type="checkbox" id="chk-an-invert"> invert</label>
+                </div>
+            </div>
+            <div id="an-ssf" hidden></div>
+        </details>
+
         <details id="data-section">
             <summary>Data</summary>
             <div id="stats">–</div>
@@ -688,6 +811,19 @@
         <div id="legend-title">Up (mm)</div>
         <canvas id="legend-canvas" width="200" height="12"></canvas>
         <div id="legend-labels"><span id="leg-min"></span><span id="leg-mid"></span><span id="leg-max"></span></div>
+        <div id="cmap-pop" class="cmap-pop" hidden>
+            <div id="cmap-list" class="cmap-grid"></div>
+            <div class="row">
+                <label>Range</label>
+                <input type="number" id="inp-leg-min" step="any">
+                <input type="number" id="inp-leg-max" step="any">
+            </div>
+            <div class="row">
+                <label></label>
+                <button id="btn-leg-auto" title="Percentile stretch chosen in the sidebar">Auto</button>
+                <label style="min-width:0"><input type="checkbox" id="chk-leg-invert"> invert</label>
+            </div>
+        </div>
         <div id="hover-info"></div>
     </div>
 
@@ -716,9 +852,11 @@
             <label title="Heaviside steps (offsets) at these dates, comma separated">
                 steps <input type="text" id="inp-fit-steps" placeholder="2019-07-06, …" spellcheck="false">
             </label>
+            <button id="btn-fit-detect" title="Find steps in this point's series (AIC; window and threshold in Analysis)">detect</button>
         </div>
         <div id="chart-wrap" class="chart-wrap"><div id="chart"></div></div>
         <div class="fit-result" id="fit-result"></div>
+        <div class="fit-result" id="step-result"></div>
         <div id="chart-block2" style="display:none">
             <div id="chart-title2">
                 <span id="chart-point2" style="color:#7c3aed">–</span>
@@ -729,6 +867,7 @@
             </div>
             <div id="chart-wrap2" class="chart-wrap"><div id="chart2"></div></div>
             <div class="fit-result" id="fit-result2"></div>
+            <div class="fit-result" id="step-result2"></div>
         </div>
         <div id="chart-hint">
             Drag = box zoom · wheel = zoom time · double-click = reset · click = jump to date ·
@@ -806,6 +945,11 @@ return maplibregl$1;
 var uPlot=function(){"use strict";const e="u-off",l="u-label",t="width",n="height",i="top",o="bottom",s="left",r="right",u="#000",a=u+"0",f="mousemove",c="mousedown",h="mouseup",d="mouseenter",p="mouseleave",m="dblclick",g="change",x="dppxchange",w="--",_="undefined"!=typeof window,b=_?document:null,v=_?window:null,k=_?navigator:null;let y,M;function S(e,l){if(null!=l){let t=e.classList;!t.contains(l)&&t.add(l)}}function E(e,l){let t=e.classList;t.contains(l)&&t.remove(l)}function T(e,l,t){e.style[l]=t+"px"}function z(e,l,t,n){let i=b.createElement(e);return null!=l&&S(i,l),null!=t&&t.insertBefore(i,n),i}function D(e,l){return z("div",e,l)}const P=new WeakMap;function A(l,t,n,i,o){let s="translate("+t+"px,"+n+"px)";s!=P.get(l)&&(l.style.transform=s,P.set(l,s),0>t||0>n||t>i||n>o?S(l,e):E(l,e))}const W=new WeakMap;function Y(e,l,t){let n=l+t;n!=W.get(e)&&(W.set(e,n),e.style.background=l,e.style.borderColor=t)}const C=new WeakMap;function F(e,l,t,n){let i=l+""+t;i!=C.get(e)&&(C.set(e,i),e.style.height=t+"px",e.style.width=l+"px",e.style.marginLeft=n?-l/2+"px":0,e.style.marginTop=n?-t/2+"px":0)}const H={passive:!0},R={...H,capture:!0};function G(e,l,t,n){l.addEventListener(e,t,n?R:H)}function I(e,l,t){l.removeEventListener(e,t,H)}function O(e,l,t,n){let i;t=t||0;let o=2147483647>=(n=n||l.length-1);for(;n-t>1;)i=o?t+n>>1:te((t+n)/2),e>l[i]?t=i:n=i;return e-l[t]>l[n]-e?n:t}function L(e,l,t,n){for(let i=1==n?l:t;i>=l&&t>=i;i+=n)if(null!=e[i])return i;return-1}function N(e,l,t,n){let i=ue(e),o=ue(l);e==l&&(-1==i?(e*=t,l/=t):(e/=t,l*=t));let s=10==t?ae:fe,r=1==o?ie:te,u=(1==i?te:ie)(s(le(e))),a=r(s(le(l))),f=re(t,u),c=re(t,a);return 10==t&&(0>u&&(f=Ee(f,-u)),0>a&&(c=Ee(c,-a))),n||2==t?(e=f*i,l=c*o):(e=Se(e,f),l=Me(l,c)),[e,l]}function j(e,l,t,n){let i=N(e,l,t,n);return 0==e&&(i[0]=0),0==l&&(i[1]=0),i}_&&function e(){let l=devicePixelRatio;y!=l&&(y=l,M&&I(g,M,e),M=matchMedia(`(min-resolution: ${y-.001}dppx) and (max-resolution: ${y+.001}dppx)`),G(g,M,e),v.dispatchEvent(new CustomEvent(x)))}();const U=.1,B={mode:3,pad:U},V={pad:0,soft:null,mode:0},$={min:V,max:V};function J(e,l,t,n){return He(t)?K(e,l,t):(V.pad=t,V.soft=n?0:null,V.mode=n?3:0,K(e,l,$))}function q(e,l){return null==e?l:e}function K(e,l,t){let n=t.min,i=t.max,o=q(n.pad,0),s=q(i.pad,0),r=q(n.hard,-he),u=q(i.hard,he),a=q(n.soft,he),f=q(i.soft,-he),c=q(n.mode,0),h=q(i.mode,0),d=l-e,p=ae(d),m=se(le(e),le(l)),g=ae(m),x=le(g-p);(1e-24>d||x>10)&&(d=0,0!=e&&0!=l||(d=1e-24,2==c&&a!=he&&(o=0),2==h&&f!=-he&&(s=0)));let w=d||m||1e3,_=ae(w),b=re(10,te(_)),v=Ee(Se(e-w*(0==d?0==e?.1:1:o),b/10),24),k=a>e||1!=c&&(3!=c||v>a)&&(2!=c||a>v)?he:a,y=se(r,k>v&&e>=k?k:oe(k,v)),M=Ee(Me(l+w*(0==d?0==l?.1:1:s),b/10),24),S=l>f||1!=h&&(3!=h||f>M)&&(2!=h||M>f)?-he:f,E=oe(u,M>S&&S>=l?S:se(S,M));return y==E&&0==y&&(E=100),[y,E]}const X=new Intl.NumberFormat(_?k.language:"en-US"),Z=e=>X.format(e),Q=Math,ee=Q.PI,le=Q.abs,te=Q.floor,ne=Q.round,ie=Q.ceil,oe=Q.min,se=Q.max,re=Q.pow,ue=Q.sign,ae=Q.log10,fe=Q.log2,ce=(e,l=1)=>Q.asinh(e/l),he=1/0;function de(e){return 1+(0|ae((e^e>>31)-(e>>31)))}function pe(e,l,t){return oe(se(e,l),t)}function me(e){return"function"==typeof e?e:()=>e}const ge=e=>e,xe=(e,l)=>l,we=()=>null,_e=()=>!0,be=(e,l)=>e==l,ve=/\.\d*?(?=9{6,}|0{6,})/gm,ke=e=>{if(Ce(e)||Te.has(e))return e;const l=""+e,t=l.match(ve);if(null==t)return e;let n=t[0].length-1;if(-1!=l.indexOf("e-")){let[e,t]=l.split("e");return+`${ke(e)}e${t}`}return Ee(e,n)};function ye(e,l){return ke(Ee(ke(e/l))*l)}function Me(e,l){return ke(ie(ke(e/l))*l)}function Se(e,l){return ke(te(ke(e/l))*l)}function Ee(e,l=0){if(Ce(e))return e;let t=10**l;return ne(e*t*(1+Number.EPSILON))/t}const Te=new Map;function ze(e){return((""+e).split(".")[1]||"").length}function De(e,l,t,n){let i=[],o=n.map(ze);for(let s=l;t>s;s++){let l=le(s),t=Ee(re(e,s),l);for(let r=0;n.length>r;r++){let u=10==e?+`${n[r]}e${s}`:n[r]*t,a=(0>s?l:0)+(o[r]>s?o[r]:0),f=10==e?u:Ee(u,a);i.push(f),Te.set(f,a)}}return i}const Pe={},Ae=[],We=[null,null],Ye=Array.isArray,Ce=Number.isInteger;function Fe(e){return"string"==typeof e}function He(e){let l=!1;if(null!=e){let t=e.constructor;l=null==t||t==Object}return l}function Re(e){return null!=e&&"object"==typeof e}const Ge=Object.getPrototypeOf(Uint8Array),Ie="__proto__";function Oe(e,l=He){let t;if(Ye(e)){let n=e.find((e=>null!=e));if(Ye(n)||l(n)){t=Array(e.length);for(let n=0;e.length>n;n++)t[n]=Oe(e[n],l)}else t=e.slice()}else if(e instanceof Ge)t=e.slice();else if(l(e)){t={};for(let n in e)n!=Ie&&(t[n]=Oe(e[n],l))}else t=e;return t}function Le(e){let l=arguments;for(let t=1;l.length>t;t++){let n=l[t];for(let l in n)l!=Ie&&(He(e[l])?Le(e[l],Oe(n[l])):e[l]=Oe(n[l]))}return e}function Ne(e,l,t){for(let n,i=0,o=-1;l.length>i;i++){let s=l[i];if(s>o){for(n=s-1;n>=0&&null==e[n];)e[n--]=null;for(n=s+1;t>n&&null==e[n];)e[o=n++]=null}}}const je="undefined"==typeof queueMicrotask?e=>Promise.resolve().then(e):queueMicrotask,Ue=["January","February","March","April","May","June","July","August","September","October","November","December"],Be=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];function Ve(e){return e.slice(0,3)}const $e=Be.map(Ve),Je=Ue.map(Ve),qe={MMMM:Ue,MMM:Je,WWWW:Be,WWW:$e};function Ke(e){return(10>e?"0":"")+e}const Xe={YYYY:e=>e.getFullYear(),YY:e=>(e.getFullYear()+"").slice(2),MMMM:(e,l)=>l.MMMM[e.getMonth()],MMM:(e,l)=>l.MMM[e.getMonth()],MM:e=>Ke(e.getMonth()+1),M:e=>e.getMonth()+1,DD:e=>Ke(e.getDate()),D:e=>e.getDate(),WWWW:(e,l)=>l.WWWW[e.getDay()],WWW:(e,l)=>l.WWW[e.getDay()],HH:e=>Ke(e.getHours()),H:e=>e.getHours(),h:e=>{let l=e.getHours();return 0==l?12:l>12?l-12:l},AA:e=>12>e.getHours()?"AM":"PM",aa:e=>12>e.getHours()?"am":"pm",a:e=>12>e.getHours()?"a":"p",mm:e=>Ke(e.getMinutes()),m:e=>e.getMinutes(),ss:e=>Ke(e.getSeconds()),s:e=>e.getSeconds(),fff:e=>function(e){return(10>e?"00":100>e?"0":"")+e}(e.getMilliseconds())};function Ze(e,l){l=l||qe;let t,n=[],i=/\{([a-z]+)\}|[^{]+/gi;for(;t=i.exec(e);)n.push("{"==t[0][0]?Xe[t[1]]:t[0]);return e=>{let t="";for(let i=0;n.length>i;i++)t+="string"==typeof n[i]?n[i]:n[i](e,l);return t}}const Qe=(new Intl.DateTimeFormat).resolvedOptions().timeZone,el=e=>e%1==0,ll=[1,2,2.5,5],tl=De(10,-32,0,ll),nl=De(10,0,32,ll),il=nl.filter(el),ol=tl.concat(nl),sl="{YYYY}",rl="\n"+sl,ul="{M}/{D}",al="\n"+ul,fl=al+"/{YY}",cl="{aa}",hl="{h}:{mm}"+cl,dl="\n"+hl,pl=":{ss}",ml=null;function gl(e){let l=1e3*e,t=60*l,n=60*t,i=24*n,o=30*i,s=365*i;return[(1==e?De(10,0,3,ll).filter(el):De(10,-3,0,ll)).concat([l,5*l,10*l,15*l,30*l,t,5*t,10*t,15*t,30*t,n,2*n,3*n,4*n,6*n,8*n,12*n,i,2*i,3*i,4*i,5*i,6*i,7*i,8*i,9*i,10*i,15*i,o,2*o,3*o,4*o,6*o,s,2*s,5*s,10*s,25*s,50*s,100*s]),[[s,sl,ml,ml,ml,ml,ml,ml,1],[28*i,"{MMM}",rl,ml,ml,ml,ml,ml,1],[i,ul,rl,ml,ml,ml,ml,ml,1],[n,"{h}"+cl,fl,ml,al,ml,ml,ml,1],[t,hl,fl,ml,al,ml,ml,ml,1],[l,pl,fl+" "+hl,ml,al+" "+hl,ml,dl,ml,1],[e,pl+".{fff}",fl+" "+hl,ml,al+" "+hl,ml,dl,ml,1]],function(l){return(r,u,a,f,c,h)=>{let d=[],p=c>=s,m=c>=o&&s>c,g=l(a),x=Ee(g*e,3),w=Sl(g.getFullYear(),p?0:g.getMonth(),m||p?1:g.getDate()),_=Ee(w*e,3);if(m||p){let t=m?c/o:0,n=p?c/s:0,i=x==_?x:Ee(Sl(w.getFullYear()+n,w.getMonth()+t,1)*e,3),r=new Date(ne(i/e)),u=r.getFullYear(),a=r.getMonth();for(let o=0;f>=i;o++){let s=Sl(u+n*o,a+t*o,1),r=s-l(Ee(s*e,3));i=Ee((+s+r)*e,3),i>f||d.push(i)}}else{let o=i>c?c:i,s=_+(te(a)-te(x))+Me(x-_,o);d.push(s);let p=l(s),m=p.getHours()+p.getMinutes()/t+p.getSeconds()/n,g=c/n,w=h/r.axes[u]._space;for(;s=Ee(s+c,1==e?0:3),f>=s;)if(g>1){let e=te(Ee(m+g,6))%24,t=l(s).getHours()-e;t>1&&(t=-1),s-=t*n,m=(m+g)%24,.7>Ee((s-d[d.length-1])/c,3)*w||d.push(s)}else d.push(s)}return d}}]}const[xl,wl,_l]=gl(1),[bl,vl,kl]=gl(.001);function yl(e,l){return e.map((e=>e.map(((t,n)=>0==n||8==n||null==t?t:l(1==n||0==e[8]?t:e[1]+t)))))}function Ml(e,l){return(t,n,i,o,s)=>{let r,u,a,f,c,h,d=l.find((e=>s>=e[0]))||l[l.length-1];return n.map((l=>{let t=e(l),n=t.getFullYear(),i=t.getMonth(),o=t.getDate(),s=t.getHours(),p=t.getMinutes(),m=t.getSeconds(),g=n!=r&&d[2]||i!=u&&d[3]||o!=a&&d[4]||s!=f&&d[5]||p!=c&&d[6]||m!=h&&d[7]||d[1];return r=n,u=i,a=o,f=s,c=p,h=m,g(t)}))}}function Sl(e,l,t){return new Date(e,l,t)}function El(e,l){return l(e)}function Tl(e,l){return(t,n,i,o)=>null==o?w:l(e(n))}De(2,-53,53,[1]);const zl={show:!0,live:!0,isolate:!1,mount:()=>{},markers:{show:!0,width:2,stroke:function(e,l){let t=e.series[l];return t.width?t.stroke(e,l):t.points.width?t.points.stroke(e,l):null},fill:function(e,l){return e.series[l].fill(e,l)},dash:"solid"},idx:null,idxs:null,values:[]},Dl=[0,0];function Pl(e,l,t,n=!0){return e=>{0==e.button&&(!n||e.target==l)&&t(e)}}function Al(e,l,t,n=!0){return e=>{(!n||e.target==l)&&t(e)}}const Wl={show:!0,x:!0,y:!0,lock:!1,move:function(e,l,t){return Dl[0]=l,Dl[1]=t,Dl},points:{one:!1,show:function(e,l){let i=e.cursor.points,o=D(),s=i.size(e,l);T(o,t,s),T(o,n,s);let r=s/-2;T(o,"marginLeft",r),T(o,"marginTop",r);let u=i.width(e,l,s);return u&&T(o,"borderWidth",u),o},size:function(e,l){return e.series[l].points.size},width:0,stroke:function(e,l){let t=e.series[l].points;return t._stroke||t._fill},fill:function(e,l){let t=e.series[l].points;return t._fill||t._stroke}},bind:{mousedown:Pl,mouseup:Pl,click:Pl,dblclick:Pl,mousemove:Al,mouseleave:Al,mouseenter:Al},drag:{setScale:!0,x:!0,y:!1,dist:0,uni:null,click:(e,l)=>{l.stopPropagation(),l.stopImmediatePropagation()},_x:!1,_y:!1},focus:{dist:(e,l,t,n,i)=>n-i,prox:-1,bias:0},hover:{skip:[void 0],prox:null,bias:0},left:-10,top:-10,idx:null,dataIdx:null,idxs:null,event:null},Yl={show:!0,stroke:"rgba(0,0,0,0.07)",width:2},Cl=Le({},Yl,{filter:xe}),Fl=Le({},Cl,{size:10}),Hl=Le({},Yl,{show:!1}),Rl='12px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',Gl="bold "+Rl,Il={show:!0,scale:"x",stroke:u,space:50,gap:5,size:50,labelGap:0,labelSize:30,labelFont:Gl,side:2,grid:Cl,ticks:Fl,border:Hl,font:Rl,lineGap:1.5,rotate:0},Ol={show:!0,scale:"x",auto:!1,sorted:1,min:he,max:-he,idxs:[]};function Ll(e,l){return l.map((e=>null==e?"":Z(e)))}function Nl(e,l,t,n,i,o,s){let r=[],u=Te.get(i)||0;for(let e=t=s?t:Ee(Me(t,i),u);n>=e;e=Ee(e+i,u))r.push(Object.is(e,-0)?0:e);return r}function jl(e,l,t,n,i){const o=[],s=e.scales[e.axes[l].scale].log,r=te((10==s?ae:fe)(t));i=re(s,r),10==s&&(i=ol[O(i,ol)]);let u=t,a=i*s;10==s&&(a=ol[O(a,ol)]);do{o.push(u),u+=i,10!=s||Te.has(u)||(u=Ee(u,Te.get(i))),a>u||(a=(i=u)*s,10==s&&(a=ol[O(a,ol)]))}while(n>=u);return o}function Ul(e,l,t,n,i){let o=e.scales[e.axes[l].scale].asinh,s=n>o?jl(e,l,se(o,t),n,i):[o],r=0>n||t>0?[]:[0];return(-o>t?jl(e,l,se(o,-n),-t,i):[o]).reverse().map((e=>-e)).concat(r,s)}const Bl=/./,Vl=/[12357]/,$l=/[125]/,Jl=/1/,ql=(e,l,t,n)=>e.map(((e,i)=>4==l&&0==e||i%n==0&&t.test(e.toExponential()[0>e?1:0])?e:null));function Kl(e,l,t){let n=e.axes[t],i=n.scale,o=e.scales[i],s=e.valToPos,r=n._space,u=s(10,i),a=s(9,i)-u<r?s(7,i)-u<r?s(5,i)-u<r?Jl:$l:Vl:Bl;if(a==Jl){let e=le(s(1,i)-u);if(r>e)return ql(l.slice().reverse(),o.distr,a,ie(r/e)).reverse()}return ql(l,o.distr,a,1)}function Xl(e,l,t){let n=e.axes[t],i=n.scale,o=n._space,s=e.valToPos,r=le(s(1,i)-s(2,i));return o>r?ql(l.slice().reverse(),3,Bl,ie(o/r)).reverse():l}function Zl(e,l,t,n){return null==n?w:null==l?"":Z(l)}const Ql={show:!0,scale:"y",stroke:u,space:30,gap:5,size:50,labelGap:0,labelSize:30,labelFont:Gl,side:3,grid:Cl,ticks:Fl,border:Hl,font:Rl,lineGap:1.5,rotate:0},et={scale:null,auto:!0,sorted:0,min:he,max:-he},lt=(e,l,t,n,i)=>i,tt={show:!0,auto:!0,sorted:0,gaps:lt,alpha:1,facets:[Le({},et,{scale:"x"}),Le({},et,{scale:"y"})]},nt={scale:"y",auto:!0,sorted:0,show:!0,spanGaps:!1,gaps:lt,alpha:1,points:{show:function(e,l){let{scale:t,idxs:n}=e.series[0],i=e._data[0],o=e.valToPos(i[n[0]],t,!0),s=e.valToPos(i[n[1]],t,!0);return le(s-o)/(e.series[l].points.space*y)>=n[1]-n[0]},filter:null},values:null,min:he,max:-he,idxs:[],path:null,clip:null};function it(e,l,t){return t/10}const ot={time:!0,auto:!0,distr:1,log:10,asinh:1,min:null,max:null,dir:1,ori:0},st=Le({},ot,{time:!1,ori:1}),rt={};function ut(e){let l=rt[e];return l||(l={key:e,plots:[],sub(e){l.plots.push(e)},unsub(e){l.plots=l.plots.filter((l=>l!=e))},pub(e,t,n,i,o,s,r){for(let u=0;l.plots.length>u;u++)l.plots[u]!=t&&l.plots[u].pub(e,t,n,i,o,s,r)}},null!=e&&(rt[e]=l)),l}function at(e,l,t){const n=e.mode,i=e.series[l],o=2==n?e._data[l]:e._data,s=e.scales,r=e.bbox;let u=o[0],a=2==n?o[1]:o[l],f=2==n?s[i.facets[0].scale]:s[e.series[0].scale],c=2==n?s[i.facets[1].scale]:s[i.scale],h=r.left,d=r.top,p=r.width,m=r.height,g=e.valToPosH,x=e.valToPosV;return 0==f.ori?t(i,u,a,f,c,g,x,h,d,p,m,xt,_t,vt,yt,St):t(i,u,a,f,c,x,g,d,h,m,p,wt,bt,kt,Mt,Et)}function ft(e,l){let t=0,n=0,i=q(e.bands,Ae);for(let e=0;i.length>e;e++){let o=i[e];o.series[0]==l?t=o.dir:o.series[1]==l&&(n|=1==o.dir?1:2)}return[t,1==n?-1:2==n?1:3==n?2:0]}function ct(e,l,t,n,i){let o=e.series[l],s=e.scales[2==e.mode?o.facets[1].scale:o.scale];return-1==i?s.min:1==i?s.max:3==s.distr?1==s.dir?s.min:s.max:0}function ht(e,l,t,n,i,o){return at(e,l,((e,l,s,r,u,a,f,c,h,d,p)=>{let m=e.pxRound;const g=0==r.ori?_t:bt;let x,w;1==r.dir*(0==r.ori?1:-1)?(x=t,w=n):(x=n,w=t);let _=m(a(l[x],r,d,c)),b=m(f(s[x],u,p,h)),v=m(a(l[w],r,d,c)),k=m(f(1==o?u.max:u.min,u,p,h)),y=new Path2D(i);return g(y,v,k),g(y,_,k),g(y,_,b),y}))}function dt(e,l,t,n,i,o){let s=null;if(e.length>0){s=new Path2D;const r=0==l?vt:kt;let u=t;for(let l=0;e.length>l;l++){let t=e[l];if(t[1]>t[0]){let e=t[0]-u;e>0&&r(s,u,n,e,n+o),u=t[1]}}let a=t+i-u,f=10;a>0&&r(s,u,n-f/2,a,n+o+f)}return s}function pt(e,l,t,n,i,o,s){let r=[],u=e.length;for(let a=1==i?t:n;a>=t&&n>=a;a+=i)if(null===l[a]){let f=a,c=a;if(1==i)for(;++a<=n&&null===l[a];)c=a;else for(;--a>=t&&null===l[a];)c=a;let h=o(e[f]),d=c==f?h:o(e[c]),p=f-i;h=s>0||0>p||p>=u?h:o(e[p]);let m=c+i;d=0>s||0>m||m>=u?d:o(e[m]),h>d||r.push([h,d])}return r}function mt(e){return 0==e?ge:1==e?ne:l=>ye(l,e)}function gt(e){let l=0==e?xt:wt,t=0==e?(e,l,t,n,i,o)=>{e.arcTo(l,t,n,i,o)}:(e,l,t,n,i,o)=>{e.arcTo(t,l,i,n,o)},n=0==e?(e,l,t,n,i)=>{e.rect(l,t,n,i)}:(e,l,t,n,i)=>{e.rect(t,l,i,n)};return(e,i,o,s,r,u=0,a=0)=>{0==u&&0==a?n(e,i,o,s,r):(u=oe(u,s/2,r/2),a=oe(a,s/2,r/2),l(e,i+u,o),t(e,i+s,o,i+s,o+r,u),t(e,i+s,o+r,i,o+r,a),t(e,i,o+r,i,o,a),t(e,i,o,i+s,o,u),e.closePath())}}const xt=(e,l,t)=>{e.moveTo(l,t)},wt=(e,l,t)=>{e.moveTo(t,l)},_t=(e,l,t)=>{e.lineTo(l,t)},bt=(e,l,t)=>{e.lineTo(t,l)},vt=gt(0),kt=gt(1),yt=(e,l,t,n,i,o)=>{e.arc(l,t,n,i,o)},Mt=(e,l,t,n,i,o)=>{e.arc(t,l,n,i,o)},St=(e,l,t,n,i,o,s)=>{e.bezierCurveTo(l,t,n,i,o,s)},Et=(e,l,t,n,i,o,s)=>{e.bezierCurveTo(t,l,i,n,s,o)};function Tt(){return(e,l,t,n,i)=>at(e,l,((l,o,s,r,u,a,f,c,h,d,p)=>{let m,g,{pxRound:x,points:w}=l;0==r.ori?(m=xt,g=yt):(m=wt,g=Mt);const _=Ee(w.width*y,3);let b=(w.size-w.width)/2*y,v=Ee(2*b,3),k=new Path2D,M=new Path2D,{left:S,top:E,width:T,height:z}=e.bbox;vt(M,S-v,E-v,T+2*v,z+2*v);const D=e=>{if(null!=s[e]){let l=x(a(o[e],r,d,c)),t=x(f(s[e],u,p,h));m(k,l+b,t),g(k,l,t,b,0,2*ee)}};if(i)i.forEach(D);else for(let e=t;n>=e;e++)D(e);return{stroke:_>0?k:null,fill:k,clip:M,flags:3}}))}function zt(e){return(l,t,n,i,o,s)=>{n!=i&&(o!=n&&s!=n&&e(l,t,n),o!=i&&s!=i&&e(l,t,i),e(l,t,s))}}const Dt=zt(_t),Pt=zt(bt);function At(e){const l=q(e?.alignGaps,0);return(e,t,n,i)=>at(e,t,((o,s,r,u,a,f,c,h,d,p,m)=>{let g,x,w=o.pxRound,_=e=>w(f(e,u,p,h)),b=e=>w(c(e,a,m,d));0==u.ori?(g=_t,x=Dt):(g=bt,x=Pt);const v=u.dir*(0==u.ori?1:-1),k={stroke:new Path2D,fill:null,clip:null,band:null,gaps:null,flags:1},y=k.stroke;let M,S,E,T=he,z=-he,D=_(s[1==v?n:i]),P=L(r,n,i,1*v),A=L(r,n,i,-1*v),W=_(s[P]),Y=_(s[A]),C=!1;for(let e=1==v?n:i;e>=n&&i>=e;e+=v){let l=_(s[e]),t=r[e];l==D?null!=t?(S=b(t),T==he&&(g(y,l,S),M=S),T=oe(S,T),z=se(S,z)):null===t&&(C=!0):(T!=he&&(x(y,D,T,z,M,S),E=D),null!=t?(S=b(t),g(y,l,S),T=z=M=S):(T=he,z=-he,null===t&&(C=!0)),D=l)}T!=he&&T!=z&&E!=D&&x(y,D,T,z,M,S);let[F,H]=ft(e,t);if(null!=o.fill||0!=F){let l=k.fill=new Path2D(y),n=b(o.fillTo(e,t,o.min,o.max,F));g(l,Y,n),g(l,W,n)}if(!o.spanGaps){let a=[];C&&a.push(...pt(s,r,n,i,v,_,l)),k.gaps=a=o.gaps(e,t,n,i,a),k.clip=dt(a,u.ori,h,d,p,m)}return 0!=H&&(k.band=2==H?[ht(e,t,n,i,y,-1),ht(e,t,n,i,y,1)]:ht(e,t,n,i,y,H)),k}))}function Wt(e,l,t,n,i,o,s=he){if(e.length>1){let r=null;for(let u=0,a=1/0;e.length>u;u++)if(void 0!==l[u]){if(null!=r){let l=le(e[u]-e[r]);a>l&&(a=l,s=le(t(e[u],n,i,o)-t(e[r],n,i,o)))}r=u}}return s}function Yt(e,l,t,n,i){const o=e.length;if(2>o)return null;const s=new Path2D;if(t(s,e[0],l[0]),2==o)n(s,e[1],l[1]);else{let t=Array(o),n=Array(o-1),r=Array(o-1),u=Array(o-1);for(let t=0;o-1>t;t++)r[t]=l[t+1]-l[t],u[t]=e[t+1]-e[t],n[t]=r[t]/u[t];t[0]=n[0];for(let e=1;o-1>e;e++)0===n[e]||0===n[e-1]||n[e-1]>0!=n[e]>0?t[e]=0:(t[e]=3*(u[e-1]+u[e])/((2*u[e]+u[e-1])/n[e-1]+(u[e]+2*u[e-1])/n[e]),isFinite(t[e])||(t[e]=0));t[o-1]=n[o-2];for(let n=0;o-1>n;n++)i(s,e[n]+u[n]/3,l[n]+t[n]*u[n]/3,e[n+1]-u[n]/3,l[n+1]-t[n+1]*u[n]/3,e[n+1],l[n+1])}return s}const Ct=new Set;function Ft(){for(let e of Ct)e.syncRect(!0)}_&&(G("resize",v,Ft),G("scroll",v,Ft,!0),G(x,v,(()=>{Kt.pxRatio=y})));const Ht=At(),Rt=Tt();function Gt(e,l,t,n){return(n?[e[0],e[1]].concat(e.slice(2)):[e[0]].concat(e.slice(1))).map(((e,n)=>It(e,n,l,t)))}function It(e,l,t,n){return Le({},0==l?t:n,e)}function Ot(e,l,t){return null==l?We:[l,t]}const Lt=Ot;function Nt(e,l,t){return null==l?We:J(l,t,U,!0)}function jt(e,l,t,n){return null==l?We:N(l,t,e.scales[n].log,!1)}const Ut=jt;function Bt(e,l,t,n){return null==l?We:j(l,t,e.scales[n].log,!1)}const Vt=Bt;function $t(e,l,t,n,i){let o=se(de(e),de(l)),s=l-e,r=O(i/n*s,t);do{let e=t[r],l=n*e/s;if(l>=i&&17>=o+(5>e?Te.get(e):0))return[e,l]}while(++r<t.length);return[0,0]}function Jt(e){let l,t;return[e=e.replace(/(\d+)px/,((e,n)=>(l=ne((t=+n)*y))+"px")),l,t]}function qt(e){e.show&&[e.font,e.labelFont].forEach((e=>{let l=Ee(e[2]*y,1);e[0]=e[0].replace(/[0-9.]+px/,l+"px"),e[1]=l}))}function Kt(u,g,_){const k={mode:q(u.mode,1)},M=k.mode;function P(e,l){return((3==l.distr?ae(e>0?e:l.clamp(k,e,l.min,l.max,l.key)):4==l.distr?ce(e,l.asinh):100==l.distr?l.fwd(e):e)-l._min)/(l._max-l._min)}function W(e,l,t,n){let i=P(e,l);return n+t*(-1==l.dir?1-i:i)}function C(e,l,t,n){let i=P(e,l);return n+t*(-1==l.dir?i:1-i)}function H(e,l,t,n){return 0==l.ori?W(e,l,t,n):C(e,l,t,n)}k.valToPosH=W,k.valToPosV=C;let R=!1;k.status=0;const L=k.root=D("uplot");null!=u.id&&(L.id=u.id),S(L,u.class),u.title&&(D("u-title",L).textContent=u.title);const V=z("canvas"),$=k.ctx=V.getContext("2d"),K=D("u-wrap",L);G("click",K,(e=>{e.target===Z&&(Hn!=Wn||Rn!=Yn)&&Vn.click(k,e)}),!0);const X=k.under=D("u-under",K);K.appendChild(V);const Z=k.over=D("u-over",K),te=+q((u=Oe(u)).pxAlign,1),ue=mt(te);(u.plugins||[]).forEach((e=>{e.opts&&(u=e.opts(k,u)||u)}));const fe=u.ms||.001,de=k.series=1==M?Gt(u.series||[],Ol,nt,!1):function(e,l){return e.map(((e,t)=>0==t?{}:Le({},l,e)))}(u.series||[null],tt),ge=k.axes=Gt(u.axes||[],Il,Ql,!0),ve=k.scales={},ke=k.bands=u.bands||[];ke.forEach((e=>{e.fill=me(e.fill||null),e.dir=q(e.dir,-1)}));const Me=2==M?de[1].facets[0].scale:de[0].scale,Se={axes:function(){for(let e=0;ge.length>e;e++){let l=ge[e];if(!l.show||!l._show)continue;let t,n,u=l.side,a=u%2,f=l.stroke(k,e),c=0==u||3==u?-1:1;if(l.label){let e=ne((l._lpos+l.labelGap*c)*y);dn(l.labelFont[0],f,"center",2==u?i:o),$.save(),1==a?(t=n=0,$.translate(e,ne($l+ql/2)),$.rotate((3==u?-ee:ee)/2)):(t=ne(Vl+Jl/2),n=e),$.fillText(l.label,t,n),$.restore()}let[h,d]=l._found;if(0==d)continue;let p=ve[l.scale],m=0==a?Jl:ql,g=0==a?Vl:$l,x=ne(l.gap*y),w=l._splits,_=2==p.distr?w.map((e=>un[e])):w,b=2==p.distr?un[w[1]]-un[w[0]]:h,v=l.ticks,M=l.border,S=v.show?ne(v.size*y):0,E=l._rotate*-ee/180,T=ue(l._pos*y),z=T+(S+x)*c;n=0==a?z:0,t=1==a?z:0,dn(l.font[0],f,1==l.align?s:2==l.align?r:E>0?s:0>E?r:0==a?"center":3==u?r:s,E||1==a?"middle":2==u?i:o);let D=l.font[1]*l.lineGap,P=w.map((e=>ue(H(e,p,m,g)))),A=l._values;for(let e=0;A.length>e;e++){let l=A[e];if(null!=l){0==a?t=P[e]:n=P[e],l=""+l;let i=-1==l.indexOf("\n")?[l]:l.split(/\n/gm);for(let e=0;i.length>e;e++){let l=i[e];E?($.save(),$.translate(t,n+e*D),$.rotate(E),$.fillText(l,0,0),$.restore()):$.fillText(l,t,n+e*D)}}}v.show&&kn(P,v.filter(k,_,e,d,b),a,u,T,S,Ee(v.width*y,3),v.stroke(k,e),v.dash,v.cap);let W=l.grid;W.show&&kn(P,W.filter(k,_,e,d,b),a,0==a?2:1,0==a?$l:Vl,0==a?ql:Jl,Ee(W.width*y,3),W.stroke(k,e),W.dash,W.cap),M.show&&kn([T],[1],0==a?1:0,0==a?1:2,1==a?$l:Vl,1==a?ql:Jl,Ee(M.width*y,3),M.stroke(k,e),M.dash,M.cap)}zi("drawAxes")},series:function(){Wt>0&&(de.forEach(((e,l)=>{if(l>0&&e.show&&(gn(l,!1),gn(l,!0),null==e._paths)){rn!=e.alpha&&($.globalAlpha=rn=e.alpha);let t=2==M?[0,g[l][0].length-1]:function(e){let l=pe(Yt-1,0,Wt-1),t=pe(Ft+1,0,Wt-1);for(;null==e[l]&&l>0;)l--;for(;null==e[t]&&Wt-1>t;)t++;return[l,t]}(g[l]);e._paths=e.paths(k,l,t[0],t[1]),1!=rn&&($.globalAlpha=rn=1)}})),de.forEach(((e,l)=>{if(l>0&&e.show){rn!=e.alpha&&($.globalAlpha=rn=e.alpha),null!=e._paths&&xn(l,!1);{let t=null!=e._paths?e._paths.gaps:null,n=e.points.show(k,l,Yt,Ft,t),i=e.points.filter(k,l,n,t);(n||i)&&(e.points._paths=e.points.paths(k,l,Yt,Ft,i),xn(l,!0))}1!=rn&&($.globalAlpha=rn=1),zi("drawSeries",l)}})))}},De=(u.drawOrder||["axes","series"]).map((e=>Se[e]));function Ce(e){let l=ve[e];if(null==l){let t=(u.scales||Pe)[e]||Pe;if(null!=t.from)Ce(t.from),ve[e]=Le({},ve[t.from],t,{key:e});else{l=ve[e]=Le({},e==Me?ot:st,t),l.key=e;let n=l.time,i=l.range,o=Ye(i);if((e!=Me||2==M&&!n)&&(!o||null!=i[0]&&null!=i[1]||(i={min:null==i[0]?B:{mode:1,hard:i[0],soft:i[0]},max:null==i[1]?B:{mode:1,hard:i[1],soft:i[1]}},o=!1),!o&&He(i))){let e=i;i=(l,t,n)=>null==t?We:J(t,n,e)}l.range=me(i||(n?Lt:e==Me?3==l.distr?Ut:4==l.distr?Vt:Ot:3==l.distr?jt:4==l.distr?Bt:Nt)),l.auto=me(!o&&l.auto),l.clamp=me(l.clamp||it),l._min=l._max=null}}}Ce("x"),Ce("y"),1==M&&de.forEach((e=>{Ce(e.scale)})),ge.forEach((e=>{Ce(e.scale)}));for(let e in u.scales)Ce(e);const Ge=ve[Me],Ie=Ge.distr;let Ne,Ue;0==Ge.ori?(S(L,"u-hz"),Ne=W,Ue=C):(S(L,"u-vt"),Ne=C,Ue=W);const Be={};for(let e in ve){let l=ve[e];null==l.min&&null==l.max||(Be[e]={min:l.min,max:l.max},l.min=l.max=null)}const Ve=u.tzDate||(e=>new Date(ne(e/fe))),$e=u.fmtDate||Ze,Je=1==fe?_l(Ve):kl(Ve),qe=Ml(Ve,yl(1==fe?wl:vl,$e)),Ke=Tl(Ve,El("{YYYY}-{MM}-{DD} {h}:{mm}{aa}",$e)),Xe=[],Qe=k.legend=Le({},zl,u.legend),el=Qe.show,ll=Qe.markers;let tl,nl,sl;Qe.idxs=Xe,ll.width=me(ll.width),ll.dash=me(ll.dash),ll.stroke=me(ll.stroke),ll.fill=me(ll.fill);let rl,ul=[],al=[],fl=!1,cl={};if(Qe.live){const e=de[1]?de[1].values:null;fl=null!=e,rl=fl?e(k,1,0):{_:0};for(let e in rl)cl[e]=w}if(el)if(tl=z("table","u-legend",L),sl=z("tbody",null,tl),Qe.mount(k,tl),fl){nl=z("thead",null,tl,sl);let e=z("tr",null,nl);for(var hl in z("th",null,e),rl)z("th",l,e).textContent=hl}else S(tl,"u-inline"),Qe.live&&S(tl,"u-live");const dl={show:!0},pl={show:!1},ml=new Map;function gl(e,l,t,n=!0){const i=ml.get(l)||{},o=xt.bind[e](k,l,t,n);o&&(G(e,l,i[e]=o),ml.set(l,i))}function Sl(e,l){const t=ml.get(l)||{};for(let n in t)null!=e&&n!=e||(I(n,l,t[n]),delete t[n]);null==e&&ml.delete(l)}let Dl=0,Pl=0,Al=0,Yl=0,Cl=0,Fl=0,Hl=Cl,Rl=Fl,Gl=Al,Bl=Yl,Vl=0,$l=0,Jl=0,ql=0;k.bbox={};let et=!1,lt=!1,rt=!1,at=!1,ft=!1,ht=!1;function dt(e,l,t){(t||e!=k.width||l!=k.height)&&pt(e,l),Sn(!1),rt=!0,lt=!0,Nn()}function pt(e,l){k.width=Dl=Al=e,k.height=Pl=Yl=l,Cl=Fl=0,function(){let e=!1,l=!1,t=!1,n=!1;ge.forEach((i=>{if(i.show&&i._show){let{side:o,_size:s}=i,r=s+(null!=i.label?i.labelSize:0);r>0&&(o%2?(Al-=r,3==o?(Cl+=r,n=!0):t=!0):(Yl-=r,0==o?(Fl+=r,e=!0):l=!0))}})),zt[0]=e,zt[1]=t,zt[2]=l,zt[3]=n,Al-=At[1]+At[3],Cl+=At[3],Yl-=At[2]+At[0],Fl+=At[0]}(),function(){let e=Cl+Al,l=Fl+Yl,t=Cl,n=Fl;function i(i,o){switch(i){case 1:return e+=o,e-o;case 2:return l+=o,l-o;case 3:return t-=o,t+o;case 0:return n-=o,n+o}}ge.forEach((e=>{if(e.show&&e._show){let l=e.side;e._pos=i(l,e._size),null!=e.label&&(e._lpos=i(l,e.labelSize))}}))}();let t=k.bbox;Vl=t.left=ye(Cl*y,.5),$l=t.top=ye(Fl*y,.5),Jl=t.width=ye(Al*y,.5),ql=t.height=ye(Yl*y,.5)}const gt=3;k.setSize=function({width:e,height:l}){dt(e,l)};const xt=k.cursor=Le({},Wl,{drag:{y:2==M}},u.cursor);if(null==xt.dataIdx){let e=xt.hover,l=e.skip=new Set(e.skip??[]);l.add(void 0);let t=e.prox=me(e.prox),n=e.bias??=0;xt.dataIdx=(e,i,o,s)=>{if(0==i)return o;let r=o,u=t(e,i,o,s)??he,a=u>=0&&he>u,f=0==Ge.ori?Al:Yl,c=xt.left,h=g[0],d=g[i];if(l.has(d[o])){r=null;let e,t=null,i=null;if(0==n||-1==n)for(e=o;null==t&&e-- >0;)l.has(d[e])||(t=e);if(0==n||1==n)for(e=o;null==i&&e++<d.length;)l.has(d[e])||(i=e);if(null!=t||null!=i)if(a){let e=c-(null==t?-1/0:Ne(h[t],Ge,f,0)),l=(null==i?1/0:Ne(h[i],Ge,f,0))-c;e>l?l>u||(r=i):e>u||(r=t)}else r=null==i?t:null==t||o-t>i-o?i:t}else a&&le(c-Ne(h[o],Ge,f,0))>u&&(r=null);return r}}const wt=e=>{xt.event=e};xt.idxs=Xe,xt._lock=!1;let _t=xt.points;_t.show=me(_t.show),_t.size=me(_t.size),_t.stroke=me(_t.stroke),_t.width=me(_t.width),_t.fill=me(_t.fill);const bt=k.focus=Le({},u.focus||{alpha:.3},xt.focus),vt=bt.prox>=0,kt=vt&&_t.one;let yt=[],Mt=[],St=[];function Et(e,l){let t=_t.show(k,l);if(t)return S(t,"u-cursor-pt"),S(t,e.class),A(t,-10,-10,Al,Yl),Z.insertBefore(t,yt[l]),t}function Tt(t,n){if(1==M||n>0){let e=1==M&&ve[t.scale].time,l=t.value;t.value=e?Fe(l)?Tl(Ve,El(l,$e)):l||Ke:l||Zl,t.label=t.label||(e?"Time":"Value")}if(kt||n>0){t.width=null==t.width?1:t.width,t.paths=t.paths||Ht||we,t.fillTo=me(t.fillTo||ct),t.pxAlign=+q(t.pxAlign,te),t.pxRound=mt(t.pxAlign),t.stroke=me(t.stroke||null),t.fill=me(t.fill||null),t._stroke=t._fill=t._paths=t._focus=null;let e=function(e){return Ee(1*(3+2*(e||1)),3)}(se(1,t.width)),l=t.points=Le({},{size:e,width:se(1,.2*e),stroke:t.stroke,space:2*e,paths:Rt,_stroke:null,_fill:null},t.points);l.show=me(l.show),l.filter=me(l.filter),l.fill=me(l.fill),l.stroke=me(l.stroke),l.paths=me(l.paths),l.pxAlign=t.pxAlign}if(el){let i=function(t,n){if(0==n&&(fl||!Qe.live||2==M))return We;let i=[],o=z("tr","u-series",sl,sl.childNodes[n]);S(o,t.class),t.show||S(o,e);let s=z("th",null,o);if(ll.show){let e=D("u-marker",s);if(n>0){let l=ll.width(k,n);l&&(e.style.border=l+"px "+ll.dash(k,n)+" "+ll.stroke(k,n)),e.style.background=ll.fill(k,n)}}let r=D(l,s);for(var u in r.textContent=t.label,n>0&&(ll.show||(r.style.color=t.width>0?ll.stroke(k,n):ll.fill(k,n)),gl("click",s,(e=>{if(xt._lock)return;wt(e);let l=de.indexOf(t);if((e.ctrlKey||e.metaKey)!=Qe.isolate){let e=de.some(((e,t)=>t>0&&t!=l&&e.show));de.forEach(((t,n)=>{n>0&&Qn(n,e?n==l?dl:pl:dl,!0,Pi.setSeries)}))}else Qn(l,{show:!t.show},!0,Pi.setSeries)}),!1),vt&&gl(d,s,(e=>{xt._lock||(wt(e),Qn(de.indexOf(t),ni,!0,Pi.setSeries))}),!1)),rl){let e=z("td","u-value",o);e.textContent="--",i.push(e)}return[o,i]}(t,n);ul.splice(n,0,i[0]),al.splice(n,0,i[1]),Qe.values.push(null)}if(xt.show){Xe.splice(n,0,null);let e=null;kt?0==n&&(e=Et(t,n)):n>0&&(e=Et(t,n)),yt.splice(n,0,e),Mt.splice(n,0,0),St.splice(n,0,0)}zi("addSeries",n)}k.addSeries=function(e,l){l=null==l?de.length:l,e=1==M?It(e,l,Ol,nt):It(e,l,{},tt),de.splice(l,0,e),Tt(de[l],l)},k.delSeries=function(e){if(de.splice(e,1),el){Qe.values.splice(e,1),al.splice(e,1);let l=ul.splice(e,1)[0];Sl(null,l.firstChild),l.remove()}xt.show&&(Xe.splice(e,1),yt.splice(e,1)[0].remove(),Mt.splice(e,1),St.splice(e,1)),zi("delSeries",e)};const zt=[!1,!1,!1,!1];function Dt(e,l,t){let[n,i,o,s]=t,r=l%2,u=0;return 0==r&&(s||i)&&(u=0==l&&!n||2==l&&!o?ne(Il.size/3):0),1==r&&(n||o)&&(u=1==l&&!i||3==l&&!s?ne(Ql.size/2):0),u}const Pt=k.padding=(u.padding||[Dt,Dt,Dt,Dt]).map((e=>me(q(e,Dt)))),At=k._padding=Pt.map(((e,l)=>e(k,l,zt,0)));let Wt,Yt=null,Ft=null;const Kt=1==M?de[0].idxs:null;let Xt,Zt,Qt,en,ln,tn,nn,on,sn,rn,un=null,an=!1;function fn(e,l){if(k.data=k._data=g=null==e?[]:e,2==M){Wt=0;for(let e=1;de.length>e;e++)Wt+=g[e][0].length}else{0==g.length&&(k.data=k._data=g=[[]]),un=g[0],Wt=un.length;let e=g;if(2==Ie){e=g.slice();let l=e[0]=Array(Wt);for(let e=0;Wt>e;e++)l[e]=e}k._data=g=e}if(Sn(!0),zi("setData"),2==Ie&&(rt=!0),!1!==l){let e=Ge;e.auto(k,an)?cn():Zn(Me,e.min,e.max),at=at||xt.left>=0,ht=!0,Nn()}}function cn(){let e,l;an=!0,1==M&&(Wt>0?(Yt=Kt[0]=0,Ft=Kt[1]=Wt-1,e=g[0][Yt],l=g[0][Ft],2==Ie?(e=Yt,l=Ft):e==l&&(3==Ie?[e,l]=N(e,e,Ge.log,!1):4==Ie?[e,l]=j(e,e,Ge.log,!1):Ge.time?l=e+ne(86400/fe):[e,l]=J(e,l,U,!0))):(Yt=Kt[0]=e=null,Ft=Kt[1]=l=null)),Zn(Me,e,l)}function hn(e,l,t,n,i,o){e??=a,t??=Ae,n??="butt",i??=a,o??="round",e!=Xt&&($.strokeStyle=Xt=e),i!=Zt&&($.fillStyle=Zt=i),l!=Qt&&($.lineWidth=Qt=l),o!=ln&&($.lineJoin=ln=o),n!=tn&&($.lineCap=tn=n),t!=en&&$.setLineDash(en=t)}function dn(e,l,t,n){l!=Zt&&($.fillStyle=Zt=l),e!=nn&&($.font=nn=e),t!=on&&($.textAlign=on=t),n!=sn&&($.textBaseline=sn=n)}function pn(e,l,t,n,i=0){if(n.length>0&&e.auto(k,an)&&(null==l||null==l.min)){let l=q(Yt,0),o=q(Ft,n.length-1),s=null==t.min?3==e.distr?function(e,l,t){let n=he,i=-he;for(let o=l;t>=o;o++){let l=e[o];null!=l&&l>0&&(n>l&&(n=l),l>i&&(i=l))}return[n,i]}(n,l,o):function(e,l,t,n){let i=he,o=-he;if(1==n)i=e[l],o=e[t];else if(-1==n)i=e[t],o=e[l];else for(let n=l;t>=n;n++){let l=e[n];null!=l&&(i>l&&(i=l),l>o&&(o=l))}return[i,o]}(n,l,o,i):[t.min,t.max];e.min=oe(e.min,t.min=s[0]),e.max=se(e.max,t.max=s[1])}}k.setData=fn;const mn={min:null,max:null};function gn(e,l){let t=l?de[e].points:de[e];t._stroke=t.stroke(k,e),t._fill=t.fill(k,e)}function xn(e,l){let t=l?de[e].points:de[e],{stroke:n,fill:i,clip:o,flags:s,_stroke:r=t._stroke,_fill:u=t._fill,_width:a=t.width}=t._paths;a=Ee(a*y,3);let f=null,c=a%2/2;l&&null==u&&(u=a>0?"#fff":r);let h=1==t.pxAlign&&c>0;if(h&&$.translate(c,c),!l){let e=Vl-a/2,l=$l-a/2,t=Jl+a,n=ql+a;f=new Path2D,f.rect(e,l,t,n)}l?_n(r,a,t.dash,t.cap,u,n,i,s,o):function(e,l,t,n,i,o,s,r,u,a,f){let c=!1;0!=u&&ke.forEach(((h,d)=>{if(h.series[0]==e){let e,p=de[h.series[1]],m=g[h.series[1]],x=(p._paths||Pe).band;Ye(x)&&(x=1==h.dir?x[0]:x[1]);let w=null;p.show&&x&&function(e,l,t){for(l=q(l,0),t=q(t,e.length-1);t>=l;){if(null!=e[l])return!0;l++}return!1}(m,Yt,Ft)?(w=h.fill(k,d)||o,e=p._paths.clip):x=null,_n(l,t,n,i,w,s,r,u,a,f,e,x),c=!0}})),c||_n(l,t,n,i,o,s,r,u,a,f)}(e,r,a,t.dash,t.cap,u,n,i,s,f,o),h&&$.translate(-c,-c)}const wn=3;function _n(e,l,t,n,i,o,s,r,u,a,f,c){hn(e,l,t,n,i),(u||a||c)&&($.save(),u&&$.clip(u),a&&$.clip(a)),c?(r&wn)==wn?($.clip(c),f&&$.clip(f),vn(i,s),bn(e,o,l)):2&r?(vn(i,s),$.clip(c),bn(e,o,l)):1&r&&($.save(),$.clip(c),f&&$.clip(f),vn(i,s),$.restore(),bn(e,o,l)):(vn(i,s),bn(e,o,l)),(u||a||c)&&$.restore()}function bn(e,l,t){t>0&&(l instanceof Map?l.forEach(((e,l)=>{$.strokeStyle=Xt=l,$.stroke(e)})):null!=l&&e&&$.stroke(l))}function vn(e,l){l instanceof Map?l.forEach(((e,l)=>{$.fillStyle=Zt=l,$.fill(e)})):null!=l&&e&&$.fill(l)}function kn(e,l,t,n,i,o,s,r,u,a){let f=s%2/2;1==te&&$.translate(f,f),hn(r,s,u,a,r),$.beginPath();let c,h,d,p,m=i+(0==n||3==n?-o:o);0==t?(h=i,p=m):(c=i,d=m);for(let n=0;e.length>n;n++)null!=l[n]&&(0==t?c=d=e[n]:h=p=e[n],$.moveTo(c,h),$.lineTo(d,p));$.stroke(),1==te&&$.translate(-f,-f)}function yn(e){let l=!0;return ge.forEach(((t,n)=>{if(!t.show)return;let i=ve[t.scale];if(null==i.min)return void(t._show&&(l=!1,t._show=!1,Sn(!1)));t._show||(l=!1,t._show=!0,Sn(!1));let o=t.side,s=o%2,{min:r,max:u}=i,[a,f]=function(e,l,t,n){let i,o=ge[e];if(n>0){let s=o._space=o.space(k,e,l,t,n);i=$t(l,t,o._incrs=o.incrs(k,e,l,t,n,s),n,s)}else i=[0,0];return o._found=i}(n,r,u,0==s?Al:Yl);if(0==f)return;let c=t._splits=t.splits(k,n,r,u,a,f,2==i.distr),h=2==i.distr?c.map((e=>un[e])):c,d=2==i.distr?un[c[1]]-un[c[0]]:a,p=t._values=t.values(k,t.filter(k,h,n,f,d),n,f,d);t._rotate=2==o?t.rotate(k,p,n,f):0;let m=t._size;t._size=ie(t.size(k,p,n,e)),null!=m&&t._size!=m&&(l=!1)})),l}function Mn(e){let l=!0;return Pt.forEach(((t,n)=>{let i=t(k,n,zt,e);i!=At[n]&&(l=!1),At[n]=i})),l}function Sn(e){de.forEach(((l,t)=>{t>0&&(l._paths=null,e&&(1==M?(l.min=null,l.max=null):l.facets.forEach((e=>{e.min=null,e.max=null}))))}))}let En,Tn,zn,Dn,Pn,An,Wn,Yn,Cn,Fn,Hn,Rn,Gn=!1,In=!1,On=[];function Ln(){In=!1;for(let e=0;On.length>e;e++)zi(...On[e]);On.length=0}function Nn(){Gn||(je(jn),Gn=!0)}function jn(){if(et&&(function(){for(let e in ve){let l=ve[e];null==Be[e]&&(null==l.min||null!=Be[Me]&&l.auto(k,an))&&(Be[e]=mn)}for(let e in ve){let l=ve[e];null==Be[e]&&null!=l.from&&null!=Be[l.from]&&(Be[e]=mn)}null!=Be[Me]&&Sn(!0);let e={};for(let l in Be){let t=Be[l];if(null!=t){let n=e[l]=Oe(ve[l],Re);if(null!=t.min)Le(n,t);else if(l!=Me||2==M)if(0==Wt&&null==n.from){let e=n.range(k,null,null,l);n.min=e[0],n.max=e[1]}else n.min=he,n.max=-he}}if(Wt>0){de.forEach(((l,t)=>{if(1==M){let n=l.scale,i=Be[n];if(null==i)return;let o=e[n];if(0==t){let e=o.range(k,o.min,o.max,n);o.min=e[0],o.max=e[1],Yt=O(o.min,g[0]),Ft=O(o.max,g[0]),Ft-Yt>1&&(o.min>g[0][Yt]&&Yt++,g[0][Ft]>o.max&&Ft--),l.min=un[Yt],l.max=un[Ft]}else l.show&&l.auto&&pn(o,i,l,g[t],l.sorted);l.idxs[0]=Yt,l.idxs[1]=Ft}else if(t>0&&l.show&&l.auto){let[n,i]=l.facets,o=n.scale,s=i.scale,[r,u]=g[t],a=e[o],f=e[s];null!=a&&pn(a,Be[o],n,r,n.sorted),null!=f&&pn(f,Be[s],i,u,i.sorted),l.min=i.min,l.max=i.max}}));for(let l in e){let t=e[l],n=Be[l];if(null==t.from&&(null==n||null==n.min)){let e=t.range(k,t.min==he?null:t.min,t.max==-he?null:t.max,l);t.min=e[0],t.max=e[1]}}}for(let l in e){let t=e[l];if(null!=t.from){let n=e[t.from];if(null==n.min)t.min=t.max=null;else{let e=t.range(k,n.min,n.max,l);t.min=e[0],t.max=e[1]}}}let l={},t=!1;for(let n in e){let i=e[n],o=ve[n];if(o.min!=i.min||o.max!=i.max){o.min=i.min,o.max=i.max;let e=o.distr;o._min=3==e?ae(o.min):4==e?ce(o.min,o.asinh):100==e?o.fwd(o.min):o.min,o._max=3==e?ae(o.max):4==e?ce(o.max,o.asinh):100==e?o.fwd(o.max):o.max,l[n]=t=!0}}if(t){de.forEach(((e,t)=>{2==M?t>0&&l.y&&(e._paths=null):l[e.scale]&&(e._paths=null)}));for(let e in l)rt=!0,zi("setScale",e);xt.show&&xt.left>=0&&(at=ht=!0)}for(let e in Be)Be[e]=null}(),et=!1),rt&&(function(){let e=!1,l=0;for(;!e;){l++;let t=yn(l),n=Mn(l);e=l==gt||t&&n,e||(pt(k.width,k.height),lt=!0)}}(),rt=!1),lt){if(T(X,s,Cl),T(X,i,Fl),T(X,t,Al),T(X,n,Yl),T(Z,s,Cl),T(Z,i,Fl),T(Z,t,Al),T(Z,n,Yl),T(K,t,Dl),T(K,n,Pl),V.width=ne(Dl*y),V.height=ne(Pl*y),ge.forEach((({_el:l,_show:t,_size:n,_pos:i,side:o})=>{if(null!=l)if(t){let t=o%2==1;T(l,t?"left":"top",i-(3===o||0===o?n:0)),T(l,t?"width":"height",n),T(l,t?"top":"left",t?Fl:Cl),T(l,t?"height":"width",t?Yl:Al),E(l,e)}else S(l,e)})),Xt=Zt=Qt=ln=tn=nn=on=sn=en=null,rn=1,di(!0),Cl!=Hl||Fl!=Rl||Al!=Gl||Yl!=Bl){Sn(!1);let e=Al/Gl,l=Yl/Bl;if(xt.show&&!at&&xt.left>=0){xt.left*=e,xt.top*=l,zn&&A(zn,ne(xt.left),0,Al,Yl),Dn&&A(Dn,0,ne(xt.top),Al,Yl);for(let t=0;yt.length>t;t++){let n=yt[t];null!=n&&(Mt[t]*=e,St[t]*=l,A(n,ie(Mt[t]),ie(St[t]),Al,Yl))}}if(qn.show&&!ft&&qn.left>=0&&qn.width>0){qn.left*=e,qn.width*=e,qn.top*=l,qn.height*=l;for(let e in gi)T(Kn,e,qn[e])}Hl=Cl,Rl=Fl,Gl=Al,Bl=Yl}zi("setSize"),lt=!1}Dl>0&&Pl>0&&($.clearRect(0,0,V.width,V.height),zi("drawClear"),De.forEach((e=>e())),zi("draw")),qn.show&&ft&&(Xn(qn),ft=!1),xt.show&&at&&(ci(null,!0,!1),at=!1),Qe.show&&Qe.live&&ht&&(ai(),ht=!1),R||(R=!0,k.status=1,zi("ready")),an=!1,Gn=!1}function Un(e,l){let t=ve[e];if(null==t.from){if(0==Wt){let n=t.range(k,l.min,l.max,e);l.min=n[0],l.max=n[1]}if(l.min>l.max){let e=l.min;l.min=l.max,l.max=e}if(Wt>1&&null!=l.min&&null!=l.max&&1e-16>l.max-l.min)return;e==Me&&2==t.distr&&Wt>0&&(l.min=O(l.min,g[0]),l.max=O(l.max,g[0]),l.min==l.max&&l.max++),Be[e]=l,et=!0,Nn()}}k.batch=function(e,l=!1){Gn=!0,In=l,e(k),jn(),l&&On.length>0&&queueMicrotask(Ln)},k.redraw=(e,l)=>{rt=l||!1,!1!==e?Zn(Me,Ge.min,Ge.max):Nn()},k.setScale=Un;let Bn=!1;const Vn=xt.drag;let $n=Vn.x,Jn=Vn.y;xt.show&&(xt.x&&(En=D("u-cursor-x",Z)),xt.y&&(Tn=D("u-cursor-y",Z)),0==Ge.ori?(zn=En,Dn=Tn):(zn=Tn,Dn=En),Hn=xt.left,Rn=xt.top);const qn=k.select=Le({show:!0,over:!0,left:0,width:0,top:0,height:0},u.select),Kn=qn.show?D("u-select",qn.over?Z:X):null;function Xn(e,l){if(qn.show){for(let l in e)qn[l]=e[l],l in gi&&T(Kn,l,e[l]);!1!==l&&zi("setSelect")}}function Zn(e,l,t){Un(e,{min:l,max:t})}function Qn(l,t,n,i){null!=t.focus&&function(e){if(e!=ti){let l=null==e,t=1!=bt.alpha;de.forEach(((n,i)=>{if(1==M||i>0){let o=l||0==i||i==e;n._focus=l?null:o,t&&function(e,l){de[e].alpha=l,xt.show&&yt[e]&&(yt[e].style.opacity=l),el&&ul[e]&&(ul[e].style.opacity=l)}(i,o?1:bt.alpha)}})),ti=e,t&&Nn()}}(l),null!=t.show&&de.forEach(((n,i)=>{0>=i||l!=i&&null!=l||(n.show=t.show,function(l){let t=el?ul[l]:null;de[l].show?t&&E(t,e):(t&&S(t,e),A(kt?yt[0]:yt[l],-10,-10,Al,Yl))}(i),2==M?(Zn(n.facets[0].scale,null,null),Zn(n.facets[1].scale,null,null)):Zn(n.scale,null,null),Nn())})),!1!==n&&zi("setSeries",l,t),i&&Yi("setSeries",k,l,t)}let ei,li,ti;k.setSelect=Xn,k.setSeries=Qn,k.addBand=function(e,l){e.fill=me(e.fill||null),e.dir=q(e.dir,-1),ke.splice(l=null==l?ke.length:l,0,e)},k.setBand=function(e,l){Le(ke[e],l)},k.delBand=function(e){null==e?ke.length=0:ke.splice(e,1)};const ni={focus:!0};function ii(e,l,t){let n=ve[l];t&&(e=e/y-(1==n.ori?Fl:Cl));let i=Al;1==n.ori&&(i=Yl,e=i-e),-1==n.dir&&(e=i-e);let o=n._min,s=o+e/i*(n._max-o),r=n.distr;return 3==r?re(10,s):4==r?((e,l=1)=>Q.sinh(e)*l)(s,n.asinh):100==r?n.bwd(s):s}function oi(e,l){T(Kn,s,qn.left=e),T(Kn,t,qn.width=l)}function si(e,l){T(Kn,i,qn.top=e),T(Kn,n,qn.height=l)}el&&vt&&gl(p,tl,(e=>{xt._lock||(wt(e),null!=ti&&Qn(null,ni,!0,Pi.setSeries))})),k.valToIdx=e=>O(e,g[0]),k.posToIdx=function(e,l){return O(ii(e,Me,l),g[0],Yt,Ft)},k.posToVal=ii,k.valToPos=(e,l,t)=>0==ve[l].ori?W(e,ve[l],t?Jl:Al,t?Vl:0):C(e,ve[l],t?ql:Yl,t?$l:0),k.setCursor=(e,l,t)=>{Hn=e.left,Rn=e.top,ci(null,l,t)};let ri=0==Ge.ori?oi:si,ui=1==Ge.ori?oi:si;function ai(e,l){if(null!=e&&(e.idxs?e.idxs.forEach(((e,l)=>{Xe[l]=e})):(e=>void 0===e)(e.idx)||Xe.fill(e.idx),Qe.idx=Xe[0]),el&&Qe.live){for(let e=0;de.length>e;e++)(e>0||1==M&&!fl)&&fi(e,Xe[e]);!function(){if(el&&Qe.live)for(let e=2==M?1:0;de.length>e;e++){if(0==e&&fl)continue;let l=Qe.values[e],t=0;for(let n in l)al[e][t++].firstChild.nodeValue=l[n]}}()}ht=!1,!1!==l&&zi("setLegend")}function fi(e,l){let t,n=de[e],i=0==e&&2==Ie?un:g[e];fl?t=n.values(k,e,l)??cl:(t=n.value(k,null==l?null:i[l],e,l),t=null==t?cl:{_:t}),Qe.values[e]=t}function ci(e,l,t){let n;Cn=Hn,Fn=Rn,[Hn,Rn]=xt.move(k,Hn,Rn),xt.left=Hn,xt.top=Rn,xt.show&&(zn&&A(zn,ne(Hn),0,Al,Yl),Dn&&A(Dn,0,ne(Rn),Al,Yl)),ei=he,li=null;let i=0==Ge.ori?Al:Yl,o=1==Ge.ori?Al:Yl;if(0>Hn||0==Wt||Yt>Ft){n=xt.idx=null;for(let e=0;de.length>e;e++){let l=yt[e];null!=l&&A(l,-10,-10,Al,Yl)}vt&&Qn(null,ni,!0,null==e&&Pi.setSeries),Qe.live&&(Xe.fill(n),ht=!0)}else{let e,l,t;1==M&&(e=0==Ge.ori?Hn:Rn,l=ii(e,Me),n=xt.idx=O(l,g[0],Yt,Ft),t=Ne(g[0][n],Ge,i,0));let s=-10,r=-10,u=0,a=0,f=!0,c="",h="";for(let e=2==M?1:0;de.length>e;e++){let d=de[e],p=Xe[e],m=null==p?null:1==M?g[e][p]:g[e][1][p],x=xt.dataIdx(k,e,n,l),w=null==x?null:1==M?g[e][x]:g[e][1][x];ht=ht||w!=m||x!=p,Xe[e]=x;let _=x==n?t:Ne(1==M?g[0][x]:g[e][0][x],Ge,i,0);if(e>0&&d.show){let l=null==w?-10:Ue(w,1==M?ve[d.scale]:ve[d.facets[1].scale],o,0);if(vt&&null!=w){let t=1==Ge.ori?Hn:Rn,n=le(bt.dist(k,e,x,l,t));if(ei>n){let l=bt.bias;if(0!=l){let i=ii(t,d.scale),o=0>i?-1:1;o!=(0>w?-1:1)||(1==o?1==l?i>w:w>i:1==l?w>i:i>w)||(ei=n,li=e)}else ei=n,li=e}}if(ht||kt){let t,n;0==Ge.ori?(t=_,n=l):(t=l,n=_);let i,o,d,p,m,g,x=!0,w=_t.bbox;if(null!=w){x=!1;let l=w(k,e);d=l.left,p=l.top,i=l.width,o=l.height}else d=t,p=n,i=o=_t.size(k,e);if(g=_t.fill(k,e),m=_t.stroke(k,e),kt)e!=li||ei>bt.prox||(s=d,r=p,u=i,a=o,f=x,c=g,h=m);else{let l=yt[e];null!=l&&(Mt[e]=d,St[e]=p,F(l,i,o,x),Y(l,g,m),A(l,ie(d),ie(p),Al,Yl))}}}}if(kt){let e=bt.prox;if(ht||(null==ti?e>=ei:ei>e||li!=ti)){let e=yt[0];Mt[0]=s,St[0]=r,F(e,u,a,f),Y(e,c,h),A(e,ie(s),ie(r),Al,Yl)}}}if(qn.show&&Bn)if(null!=e){let[l,t]=Pi.scales,[n,s]=Pi.match,[r,u]=e.cursor.sync.scales,a=e.cursor.drag;if($n=a._x,Jn=a._y,$n||Jn){let a,f,c,h,d,{left:p,top:m,width:g,height:x}=e.select,w=e.scales[r].ori,_=e.posToVal,b=null!=l&&n(l,r),v=null!=t&&s(t,u);b&&$n?(0==w?(a=p,f=g):(a=m,f=x),c=ve[l],h=Ne(_(a,r),c,i,0),d=Ne(_(a+f,r),c,i,0),ri(oe(h,d),le(d-h))):ri(0,i),v&&Jn?(1==w?(a=p,f=g):(a=m,f=x),c=ve[t],h=Ue(_(a,u),c,o,0),d=Ue(_(a+f,u),c,o,0),ui(oe(h,d),le(d-h))):ui(0,o)}else xi()}else{let e=le(Cn-Pn),l=le(Fn-An);if(1==Ge.ori){let t=e;e=l,l=t}$n=Vn.x&&e>=Vn.dist,Jn=Vn.y&&l>=Vn.dist;let t,n,s=Vn.uni;null!=s?$n&&Jn&&($n=e>=s,Jn=l>=s,$n||Jn||(l>e?Jn=!0:$n=!0)):Vn.x&&Vn.y&&($n||Jn)&&($n=Jn=!0),$n&&(0==Ge.ori?(t=Wn,n=Hn):(t=Yn,n=Rn),ri(oe(t,n),le(n-t)),Jn||ui(0,o)),Jn&&(1==Ge.ori?(t=Wn,n=Hn):(t=Yn,n=Rn),ui(oe(t,n),le(n-t)),$n||ri(0,i)),$n||Jn||(ri(0,0),ui(0,0))}if(Vn._x=$n,Vn._y=Jn,null==e){if(t){if(null!=Ai){let[e,l]=Pi.scales;Pi.values[0]=null!=e?ii(0==Ge.ori?Hn:Rn,e):null,Pi.values[1]=null!=l?ii(1==Ge.ori?Hn:Rn,l):null}Yi(f,k,Hn,Rn,Al,Yl,n)}if(vt){let e=t&&Pi.setSeries,l=bt.prox;null==ti?ei>l||Qn(li,ni,!0,e):ei>l?Qn(null,ni,!0,e):li!=ti&&Qn(li,ni,!0,e)}}ht&&(Qe.idx=n,ai()),!1!==l&&zi("setCursor")}k.setLegend=ai;let hi=null;function di(e=!1){e?hi=null:(hi=Z.getBoundingClientRect(),zi("syncRect",hi))}function pi(e,l,t,n,i,o){xt._lock||Bn&&null!=e&&0==e.movementX&&0==e.movementY||(mi(e,l,t,n,i,o,0,!1,null!=e),null!=e?ci(null,!0,!0):ci(l,!0,!1))}function mi(e,l,t,n,i,o,s,r,u){if(null==hi&&di(!1),wt(e),null!=e)t=e.clientX-hi.left,n=e.clientY-hi.top;else{if(0>t||0>n)return Hn=-10,void(Rn=-10);let[e,s]=Pi.scales,r=l.cursor.sync,[u,a]=r.values,[f,c]=r.scales,[h,d]=Pi.match,p=l.axes[0].side%2==1,m=0==Ge.ori?Al:Yl,g=1==Ge.ori?Al:Yl,x=p?o:i,w=p?i:o,_=p?n:t,b=p?t:n;if(t=null!=f?h(e,f)?H(u,ve[e],m,0):-10:m*(_/x),n=null!=c?d(s,c)?H(a,ve[s],g,0):-10:g*(b/w),1==Ge.ori){let e=t;t=n,n=e}}u&&(t>1&&Al-1>t||(t=ye(t,Al)),n>1&&Yl-1>n||(n=ye(n,Yl))),r?(Pn=t,An=n,[Wn,Yn]=xt.move(k,t,n)):(Hn=t,Rn=n)}Object.defineProperty(k,"rect",{get:()=>(null==hi&&di(!1),hi)});const gi={width:0,height:0,left:0,top:0};function xi(){Xn(gi,!1)}let wi,_i,bi,vi;function ki(e,l,t,n,i,o){Bn=!0,$n=Jn=Vn._x=Vn._y=!1,mi(e,l,t,n,i,o,0,!0,!1),null!=e&&(gl(h,b,yi,!1),Yi(c,k,Wn,Yn,Al,Yl,null));let{left:s,top:r,width:u,height:a}=qn;wi=s,_i=r,bi=u,vi=a,xi()}function yi(e,l,t,n,i,o){Bn=Vn._x=Vn._y=!1,mi(e,l,t,n,i,o,0,!1,!0);let{left:s,top:r,width:u,height:a}=qn,f=u>0||a>0,c=wi!=s||_i!=r||bi!=u||vi!=a;if(f&&c&&Xn(qn),Vn.setScale&&f&&c){let e=s,l=u,t=r,n=a;if(1==Ge.ori&&(e=r,l=a,t=s,n=u),$n&&Zn(Me,ii(e,Me),ii(e+l,Me)),Jn)for(let e in ve){let l=ve[e];e!=Me&&null==l.from&&l.min!=he&&Zn(e,ii(t+n,e),ii(t,e))}xi()}else xt.lock&&(xt._lock=!xt._lock,ci(null,!0,!1));null!=e&&(Sl(h,b),Yi(h,k,Hn,Rn,Al,Yl,null))}function Mi(e){xt._lock||(wt(e),cn(),xi(),null!=e&&Yi(m,k,Hn,Rn,Al,Yl,null))}function Si(){ge.forEach(qt),dt(k.width,k.height,!0)}G(x,v,Si);const Ei={};Ei.mousedown=ki,Ei.mousemove=pi,Ei.mouseup=yi,Ei.dblclick=Mi,Ei.setSeries=(e,l,t,n)=>{-1!=(t=(0,Pi.match[2])(k,l,t))&&Qn(t,n,!0,!1)},xt.show&&(gl(c,Z,ki),gl(f,Z,pi),gl(d,Z,(e=>{wt(e),di(!1)})),gl(p,Z,(function(e){if(xt._lock)return;wt(e);let l=Bn;if(Bn){let e,l,t=!0,n=!0,i=10;0==Ge.ori?(e=$n,l=Jn):(e=Jn,l=$n),e&&l&&(t=i>=Hn||Hn>=Al-i,n=i>=Rn||Rn>=Yl-i),e&&t&&(Hn=Wn>Hn?0:Al),l&&n&&(Rn=Yn>Rn?0:Yl),ci(null,!0,!0),Bn=!1}Hn=-10,Rn=-10,ci(null,!0,!0),l&&(Bn=l)})),gl(m,Z,Mi),Ct.add(k),k.syncRect=di);const Ti=k.hooks=u.hooks||{};function zi(e,l,t){In?On.push([e,l,t]):e in Ti&&Ti[e].forEach((e=>{e.call(null,k,l,t)}))}(u.plugins||[]).forEach((e=>{for(let l in e.hooks)Ti[l]=(Ti[l]||[]).concat(e.hooks[l])}));const Di=(e,l,t)=>t,Pi=Le({key:null,setSeries:!1,filters:{pub:_e,sub:_e},scales:[Me,de[1]?de[1].scale:null],match:[be,be,Di],values:[null,null]},xt.sync);2==Pi.match.length&&Pi.match.push(Di),xt.sync=Pi;const Ai=Pi.key,Wi=ut(Ai);function Yi(e,l,t,n,i,o,s){Pi.filters.pub(e,l,t,n,i,o,s)&&Wi.pub(e,l,t,n,i,o,s)}function Ci(){zi("init",u,g),fn(g||u.data,!1),Be[Me]?Un(Me,Be[Me]):cn(),ft=qn.show&&(qn.width>0||qn.height>0),at=ht=!0,dt(u.width,u.height)}return Wi.sub(k),k.pub=function(e,l,t,n,i,o,s){Pi.filters.sub(e,l,t,n,i,o,s)&&Ei[e](null,l,t,n,i,o,s)},k.destroy=function(){Wi.unsub(k),Ct.delete(k),ml.clear(),I(x,v,Si),L.remove(),tl?.remove(),zi("destroy")},de.forEach(Tt),ge.forEach((function(e,l){if(e._show=e.show,e.show){let t=ve[e.scale];null==t&&(e.scale=e.side%2?de[1].scale:Me,t=ve[e.scale]);let n=t.time;e.size=me(e.size),e.space=me(e.space),e.rotate=me(e.rotate),Ye(e.incrs)&&e.incrs.forEach((e=>{!Te.has(e)&&Te.set(e,ze(e))})),e.incrs=me(e.incrs||(2==t.distr?il:n?1==fe?xl:bl:ol)),e.splits=me(e.splits||(n&&1==t.distr?Je:3==t.distr?jl:4==t.distr?Ul:Nl)),e.stroke=me(e.stroke),e.grid.stroke=me(e.grid.stroke),e.ticks.stroke=me(e.ticks.stroke),e.border.stroke=me(e.border.stroke);let i=e.values;e.values=Ye(i)&&!Ye(i[0])?me(i):n?Ye(i)?Ml(Ve,yl(i,$e)):Fe(i)?function(e,l){let t=Ze(l);return(l,n)=>n.map((l=>t(e(l))))}(Ve,i):i||qe:i||Ll,e.filter=me(e.filter||(3>t.distr||10!=t.log?3==t.distr&&2==t.log?Xl:xe:Kl)),e.font=Jt(e.font),e.labelFont=Jt(e.labelFont),e._size=e.size(k,null,l,0),e._space=e._rotate=e._incrs=e._found=e._splits=e._values=null,e._size>0&&(zt[l]=!0,e._el=D("u-axis",K))}})),_?_ instanceof HTMLElement?(_.appendChild(L),Ci()):_(k,Ci):Ci(),k}Kt.assign=Le,Kt.fmtNum=Z,Kt.rangeNum=J,Kt.rangeLog=N,Kt.rangeAsinh=j,Kt.orient=at,Kt.pxRatio=y,Kt.join=function(e,l){if(function(e){let l=e[0][0],t=l.length;for(let n=1;e.length>n;n++){let i=e[n][0];if(i.length!=t)return!1;if(i!=l)for(let e=0;t>e;e++)if(i[e]!=l[e])return!1}return!0}(e)){let l=e[0].slice();for(let t=1;e.length>t;t++)l.push(...e[t].slice(1));return function(e,l=100){const t=e.length;if(1>=t)return!0;let n=0,i=t-1;for(;i>=n&&null==e[n];)n++;for(;i>=n&&null==e[i];)i--;if(n>=i)return!0;const o=se(1,te((i-n+1)/l));for(let l=e[n],t=n+o;i>=t;t+=o){const n=e[t];if(null!=n){if(l>=n)return!1;l=n}}return!0}(l[0])||(l=function(e){let l=e[0],t=l.length,n=Array(t);for(let e=0;n.length>e;e++)n[e]=e;n.sort(((e,t)=>l[e]-l[t]));let i=[];for(let l=0;e.length>l;l++){let o=e[l],s=Array(t);for(let e=0;t>e;e++)s[e]=o[n[e]];i.push(s)}return i}(l)),l}let t=new Set;for(let l=0;e.length>l;l++){let n=e[l][0],i=n.length;for(let e=0;i>e;e++)t.add(n[e])}let n=[Array.from(t).sort(((e,l)=>e-l))],i=n[0].length,o=new Map;for(let e=0;i>e;e++)o.set(n[0][e],e);for(let t=0;e.length>t;t++){let s=e[t],r=s[0];for(let e=1;s.length>e;e++){let u=s[e],a=Array(i).fill(void 0),f=l?l[t][e]:1,c=[];for(let e=0;u.length>e;e++){let l=u[e],t=o.get(r[e]);null===l?0!=f&&(a[t]=l,2==f&&c.push(t)):a[t]=l}Ne(a,c,i),n.push(a)}}return n},Kt.fmtDate=Ze,Kt.tzDate=function(e,l){let t;return"UTC"==l||"Etc/UTC"==l?t=new Date(+e+6e4*e.getTimezoneOffset()):l==Qe?t=e:(t=new Date(e.toLocaleString("en-US",{timeZone:l})),t.setMilliseconds(e.getMilliseconds())),t},Kt.sync=ut;{Kt.addGap=function(e,l,t){let n=e[e.length-1];n&&n[0]==l?n[1]=t:e.push([l,t])},Kt.clipGaps=dt;let e=Kt.paths={points:Tt};e.linear=At,e.stepped=function(e){const l=q(e.align,1),t=q(e.ascDesc,!1),n=q(e.alignGaps,0),i=q(e.extend,!1);return(e,o,s,r)=>at(e,o,((u,a,f,c,h,d,p,m,g,x,w)=>{let _=u.pxRound,{left:b,width:v}=e.bbox,k=e=>_(d(e,c,x,m)),M=e=>_(p(e,h,w,g)),S=0==c.ori?_t:bt;const E={stroke:new Path2D,fill:null,clip:null,band:null,gaps:null,flags:1},T=E.stroke,z=c.dir*(0==c.ori?1:-1);s=L(f,s,r,1),r=L(f,s,r,-1);let D=M(f[1==z?s:r]),P=k(a[1==z?s:r]),A=P,W=P;i&&-1==l&&(W=b,S(T,W,D)),S(T,P,D);for(let e=1==z?s:r;e>=s&&r>=e;e+=z){let t=f[e];if(null==t)continue;let n=k(a[e]),i=M(t);1==l?S(T,n,D):S(T,A,i),S(T,n,i),D=i,A=n}let Y=A;i&&1==l&&(Y=b+v,S(T,Y,D));let[C,F]=ft(e,o);if(null!=u.fill||0!=C){let l=E.fill=new Path2D(T),t=M(u.fillTo(e,o,u.min,u.max,C));S(l,Y,t),S(l,W,t)}if(!u.spanGaps){let i=[];i.push(...pt(a,f,s,r,z,k,n));let h=u.width*y/2,d=t||1==l?h:-h,p=t||-1==l?-h:h;i.forEach((e=>{e[0]+=d,e[1]+=p})),E.gaps=i=u.gaps(e,o,s,r,i),E.clip=dt(i,c.ori,m,g,x,w)}return 0!=F&&(E.band=2==F?[ht(e,o,s,r,T,-1),ht(e,o,s,r,T,1)]:ht(e,o,s,r,T,F)),E}))},e.bars=function(e){const l=q((e=e||Pe).size,[.6,he,1]),t=e.align||0,n=e.gap||0;let i=e.radius;i=null==i?[0,0]:"number"==typeof i?[i,0]:i;const o=me(i),s=1-l[0],r=q(l[1],he),u=q(l[2],1),a=q(e.disp,Pe),f=q(e.each,(()=>{})),{fill:c,stroke:h}=a;return(e,l,i,d)=>at(e,l,((p,m,g,x,w,_,b,v,k,M,S)=>{let E,T,z=p.pxRound,D=t,P=n*y,A=r*y,W=u*y;0==x.ori?[E,T]=o(e,l):[T,E]=o(e,l);const Y=x.dir*(0==x.ori?1:-1);let C,F,H,R=0==x.ori?vt:kt,G=0==x.ori?f:(e,l,t,n,i,o,s)=>{f(e,l,t,i,n,s,o)},I=q(e.bands,Ae).find((e=>e.series[0]==l)),O=p.fillTo(e,l,p.min,p.max,null!=I?I.dir:0),L=z(b(O,w,S,k)),N=M,j=z(p.width*y),U=!1,B=null,V=null,$=null,J=null;null==c||0!=j&&null==h||(U=!0,B=c.values(e,l,i,d),V=new Map,new Set(B).forEach((e=>{null!=e&&V.set(e,new Path2D)})),j>0&&($=h.values(e,l,i,d),J=new Map,new Set($).forEach((e=>{null!=e&&J.set(e,new Path2D)}))));let{x0:K,size:X}=a;if(null!=K&&null!=X){D=1,m=K.values(e,l,i,d),2==K.unit&&(m=m.map((l=>e.posToVal(v+l*M,x.key,!0))));let t=X.values(e,l,i,d);F=2==X.unit?t[0]*M:_(t[0],x,M,v)-_(0,x,M,v),N=Wt(m,g,_,x,M,v,N),H=N-F+P}else N=Wt(m,g,_,x,M,v,N),H=N*s+P,F=N-H;1>H&&(H=0),F/2>j||(j=0),5>H&&(z=ge);let Z=H>0;F=z(pe(N-H-(Z?j:0),W,A)),C=(0==D?F/2:D==Y?0:F)-D*Y*((0==D?P/2:0)+(Z?j/2:0));const Q={stroke:null,fill:null,clip:null,band:null,gaps:null,flags:0},ee=U?null:new Path2D;let le=null;if(null!=I)le=e.data[I.series[1]];else{let{y0:t,y1:n}=a;null!=t&&null!=n&&(g=n.values(e,l,i,d),le=t.values(e,l,i,d))}let ne=E*F,ie=T*F;for(let t=1==Y?i:d;t>=i&&d>=t;t+=Y){let n=g[t];if(null==n)continue;if(null!=le){let e=le[t]??0;if(n-e==0)continue;L=b(e,w,S,k)}let i=_(2!=x.distr||null!=a?m[t]:t,x,M,v),o=b(q(n,O),w,S,k),s=z(i-C),r=z(se(o,L)),u=z(oe(o,L)),f=r-u;if(null!=n){let i=0>n?ie:ne,o=0>n?ne:ie;U?(j>0&&null!=$[t]&&R(J.get($[t]),s,u+te(j/2),F,se(0,f-j),i,o),null!=B[t]&&R(V.get(B[t]),s,u+te(j/2),F,se(0,f-j),i,o)):R(ee,s,u+te(j/2),F,se(0,f-j),i,o),G(e,l,t,s-j/2,u,F+j,f)}}return j>0?Q.stroke=U?J:ee:U||(Q._fill=0==p.width?p._fill:p._stroke??p._fill,Q.width=0),Q.fill=U?V:ee,Q}))},e.spline=function(e){return function(e,l){const t=q(l?.alignGaps,0);return(l,n,i,o)=>at(l,n,((s,r,u,a,f,c,h,d,p,m,g)=>{let x,w,_,b=s.pxRound,v=e=>b(c(e,a,m,d)),k=e=>b(h(e,f,g,p));0==a.ori?(x=xt,_=_t,w=St):(x=wt,_=bt,w=Et);const y=a.dir*(0==a.ori?1:-1);i=L(u,i,o,1),o=L(u,i,o,-1);let M=v(r[1==y?i:o]),S=M,E=[],T=[];for(let e=1==y?i:o;e>=i&&o>=e;e+=y)if(null!=u[e]){let l=v(r[e]);E.push(S=l),T.push(k(u[e]))}const z={stroke:e(E,T,x,_,w,b),fill:null,clip:null,band:null,gaps:null,flags:1},D=z.stroke;let[P,A]=ft(l,n);if(null!=s.fill||0!=P){let e=z.fill=new Path2D(D),t=k(s.fillTo(l,n,s.min,s.max,P));_(e,S,t),_(e,M,t)}if(!s.spanGaps){let e=[];e.push(...pt(r,u,i,o,y,v,t)),z.gaps=e=s.gaps(l,n,i,o,e),z.clip=dt(e,a.ori,d,p,m,g)}return 0!=A&&(z.band=2==A?[ht(l,n,i,o,D,-1),ht(l,n,i,o,D,1)]:ht(l,n,i,o,D,A)),z}))}(Yt,e)}}return Kt}();
 
     </script>
+    <!-- delaunator v5.0.1 (inlined, ISC, Copyright (c) 2021, Mapbox) -->
+    <script>
+!function(t,i){"object"==typeof exports&&"undefined"!=typeof module?module.exports=i():"function"==typeof define&&define.amd?define(i):(t="undefined"!=typeof globalThis?globalThis:t||self).Delaunator=i()}(this,(function(){"use strict";const t=11102230246251565e-32,i=134217729,s=(3+8*t)*t;function e(t,i,s,e,n){let h,r,l,o,a=i[0],f=e[0],c=0,u=0;f>a==f>-a?(h=a,a=i[++c]):(h=f,f=e[++u]);let _=0;if(c<t&&u<s)for(f>a==f>-a?(r=a+h,l=h-(r-a),a=i[++c]):(r=f+h,l=h-(r-f),f=e[++u]),h=r,0!==l&&(n[_++]=l);c<t&&u<s;)f>a==f>-a?(r=h+a,o=r-h,l=h-(r-o)+(a-o),a=i[++c]):(r=h+f,o=r-h,l=h-(r-o)+(f-o),f=e[++u]),h=r,0!==l&&(n[_++]=l);for(;c<t;)r=h+a,o=r-h,l=h-(r-o)+(a-o),a=i[++c],h=r,0!==l&&(n[_++]=l);for(;u<s;)r=h+f,o=r-h,l=h-(r-o)+(f-o),f=e[++u],h=r,0!==l&&(n[_++]=l);return 0===h&&0!==_||(n[_++]=h),_}function n(t){return new Float64Array(t)}const h=22204460492503146e-32,r=11093356479670487e-47,l=n(4),o=n(8),a=n(12),f=n(16),c=n(4);function u(t,n,u,_,d,g){const y=(n-g)*(u-d),w=(t-d)*(_-g),b=y-w,A=Math.abs(y+w);return Math.abs(b)>=33306690738754716e-32*A?b:-function(t,n,u,_,d,g,y){let w,b,A,k,M,p,x,S,T,z,U,m,K,L,v,F,P,E;const H=t-d,I=u-d,N=n-g,j=_-g;L=H*j,p=i*H,x=p-(p-H),S=H-x,p=i*j,T=p-(p-j),z=j-T,v=S*z-(L-x*T-S*T-x*z),F=N*I,p=i*N,x=p-(p-N),S=N-x,p=i*I,T=p-(p-I),z=I-T,P=S*z-(F-x*T-S*T-x*z),U=v-P,M=v-U,l[0]=v-(U+M)+(M-P),m=L+U,M=m-L,K=L-(m-M)+(U-M),U=K-F,M=K-U,l[1]=K-(U+M)+(M-F),E=m+U,M=E-m,l[2]=m-(E-M)+(U-M),l[3]=E;let q=function(t,i){let s=i[0];for(let e=1;e<t;e++)s+=i[e];return s}(4,l),D=h*y;if(q>=D||-q>=D)return q;if(M=t-H,w=t-(H+M)+(M-d),M=u-I,A=u-(I+M)+(M-d),M=n-N,b=n-(N+M)+(M-g),M=_-j,k=_-(j+M)+(M-g),0===w&&0===b&&0===A&&0===k)return q;if(D=r*y+s*Math.abs(q),q+=H*k+j*w-(N*A+I*b),q>=D||-q>=D)return q;L=w*j,p=i*w,x=p-(p-w),S=w-x,p=i*j,T=p-(p-j),z=j-T,v=S*z-(L-x*T-S*T-x*z),F=b*I,p=i*b,x=p-(p-b),S=b-x,p=i*I,T=p-(p-I),z=I-T,P=S*z-(F-x*T-S*T-x*z),U=v-P,M=v-U,c[0]=v-(U+M)+(M-P),m=L+U,M=m-L,K=L-(m-M)+(U-M),U=K-F,M=K-U,c[1]=K-(U+M)+(M-F),E=m+U,M=E-m,c[2]=m-(E-M)+(U-M),c[3]=E;const B=e(4,l,4,c,o);L=H*k,p=i*H,x=p-(p-H),S=H-x,p=i*k,T=p-(p-k),z=k-T,v=S*z-(L-x*T-S*T-x*z),F=N*A,p=i*N,x=p-(p-N),S=N-x,p=i*A,T=p-(p-A),z=A-T,P=S*z-(F-x*T-S*T-x*z),U=v-P,M=v-U,c[0]=v-(U+M)+(M-P),m=L+U,M=m-L,K=L-(m-M)+(U-M),U=K-F,M=K-U,c[1]=K-(U+M)+(M-F),E=m+U,M=E-m,c[2]=m-(E-M)+(U-M),c[3]=E;const C=e(B,o,4,c,a);L=w*k,p=i*w,x=p-(p-w),S=w-x,p=i*k,T=p-(p-k),z=k-T,v=S*z-(L-x*T-S*T-x*z),F=b*A,p=i*b,x=p-(p-b),S=b-x,p=i*A,T=p-(p-A),z=A-T,P=S*z-(F-x*T-S*T-x*z),U=v-P,M=v-U,c[0]=v-(U+M)+(M-P),m=L+U,M=m-L,K=L-(m-M)+(U-M),U=K-F,M=K-U,c[1]=K-(U+M)+(M-F),E=m+U,M=E-m,c[2]=m-(E-M)+(U-M),c[3]=E;const G=e(C,a,4,c,f);return f[G-1]}(t,n,u,_,d,g,A)}const _=Math.pow(2,-52),d=new Uint32Array(512);class g{static from(t,i=M,s=p){const e=t.length,n=new Float64Array(2*e);for(let h=0;h<e;h++){const e=t[h];n[2*h]=i(e),n[2*h+1]=s(e)}return new g(n)}constructor(t){const i=t.length>>1;if(i>0&&"number"!=typeof t[0])throw new Error("Expected coords to contain numbers.");this.coords=t;const s=Math.max(2*i-5,0);this._triangles=new Uint32Array(3*s),this._halfedges=new Int32Array(3*s),this._hashSize=Math.ceil(Math.sqrt(i)),this._hullPrev=new Uint32Array(i),this._hullNext=new Uint32Array(i),this._hullTri=new Uint32Array(i),this._hullHash=new Int32Array(this._hashSize),this._ids=new Uint32Array(i),this._dists=new Float64Array(i),this.update()}update(){const{coords:t,_hullPrev:i,_hullNext:s,_hullTri:e,_hullHash:n}=this,h=t.length>>1;let r=1/0,l=1/0,o=-1/0,a=-1/0;for(let i=0;i<h;i++){const s=t[2*i],e=t[2*i+1];s<r&&(r=s),e<l&&(l=e),s>o&&(o=s),e>a&&(a=e),this._ids[i]=i}const f=(r+o)/2,c=(l+a)/2;let d,g,w;for(let i=0,s=1/0;i<h;i++){const e=y(f,c,t[2*i],t[2*i+1]);e<s&&(d=i,s=e)}const k=t[2*d],M=t[2*d+1];for(let i=0,s=1/0;i<h;i++){if(i===d)continue;const e=y(k,M,t[2*i],t[2*i+1]);e<s&&e>0&&(g=i,s=e)}let p=t[2*g],x=t[2*g+1],S=1/0;for(let i=0;i<h;i++){if(i===d||i===g)continue;const s=b(k,M,p,x,t[2*i],t[2*i+1]);s<S&&(w=i,S=s)}let T=t[2*w],z=t[2*w+1];if(S===1/0){for(let i=0;i<h;i++)this._dists[i]=t[2*i]-t[0]||t[2*i+1]-t[1];A(this._ids,this._dists,0,h-1);const i=new Uint32Array(h);let s=0;for(let t=0,e=-1/0;t<h;t++){const n=this._ids[t],h=this._dists[n];h>e&&(i[s++]=n,e=h)}return this.hull=i.subarray(0,s),this.triangles=new Uint32Array(0),void(this.halfedges=new Uint32Array(0))}if(u(k,M,p,x,T,z)<0){const t=g,i=p,s=x;g=w,p=T,x=z,w=t,T=i,z=s}const U=function(t,i,s,e,n,h){const r=s-t,l=e-i,o=n-t,a=h-i,f=r*r+l*l,c=o*o+a*a,u=.5/(r*a-l*o);return{x:t+(a*f-l*c)*u,y:i+(r*c-o*f)*u}}(k,M,p,x,T,z);this._cx=U.x,this._cy=U.y;for(let i=0;i<h;i++)this._dists[i]=y(t[2*i],t[2*i+1],U.x,U.y);A(this._ids,this._dists,0,h-1),this._hullStart=d;let m=3;s[d]=i[w]=g,s[g]=i[d]=w,s[w]=i[g]=d,e[d]=0,e[g]=1,e[w]=2,n.fill(-1),n[this._hashKey(k,M)]=d,n[this._hashKey(p,x)]=g,n[this._hashKey(T,z)]=w,this.trianglesLen=0,this._addTriangle(d,g,w,-1,-1,-1);for(let h,r,l=0;l<this._ids.length;l++){const o=this._ids[l],a=t[2*o],f=t[2*o+1];if(l>0&&Math.abs(a-h)<=_&&Math.abs(f-r)<=_)continue;if(h=a,r=f,o===d||o===g||o===w)continue;let c=0;for(let t=0,i=this._hashKey(a,f);t<this._hashSize&&(c=n[(i+t)%this._hashSize],-1===c||c===s[c]);t++);c=i[c];let y,b=c;for(;y=s[b],u(a,f,t[2*b],t[2*b+1],t[2*y],t[2*y+1])>=0;)if(b=y,b===c){b=-1;break}if(-1===b)continue;let A=this._addTriangle(b,o,s[b],-1,-1,e[b]);e[o]=this._legalize(A+2),e[b]=A,m++;let k=s[b];for(;y=s[k],u(a,f,t[2*k],t[2*k+1],t[2*y],t[2*y+1])<0;)A=this._addTriangle(k,o,y,e[o],-1,e[k]),e[o]=this._legalize(A+2),s[k]=k,m--,k=y;if(b===c)for(;y=i[b],u(a,f,t[2*y],t[2*y+1],t[2*b],t[2*b+1])<0;)A=this._addTriangle(y,o,b,-1,e[b],e[y]),this._legalize(A+2),e[y]=A,s[b]=b,m--,b=y;this._hullStart=i[o]=b,s[b]=i[k]=o,s[o]=k,n[this._hashKey(a,f)]=o,n[this._hashKey(t[2*b],t[2*b+1])]=b}this.hull=new Uint32Array(m);for(let t=0,i=this._hullStart;t<m;t++)this.hull[t]=i,i=s[i];this.triangles=this._triangles.subarray(0,this.trianglesLen),this.halfedges=this._halfedges.subarray(0,this.trianglesLen)}_hashKey(t,i){return Math.floor(function(t,i){const s=t/(Math.abs(t)+Math.abs(i));return(i>0?3-s:1+s)/4}(t-this._cx,i-this._cy)*this._hashSize)%this._hashSize}_legalize(t){const{_triangles:i,_halfedges:s,coords:e}=this;let n=0,h=0;for(;;){const r=s[t],l=t-t%3;if(h=l+(t+2)%3,-1===r){if(0===n)break;t=d[--n];continue}const o=r-r%3,a=l+(t+1)%3,f=o+(r+2)%3,c=i[h],u=i[t],_=i[a],g=i[f];if(w(e[2*c],e[2*c+1],e[2*u],e[2*u+1],e[2*_],e[2*_+1],e[2*g],e[2*g+1])){i[t]=g,i[r]=c;const e=s[f];if(-1===e){let i=this._hullStart;do{if(this._hullTri[i]===f){this._hullTri[i]=t;break}i=this._hullPrev[i]}while(i!==this._hullStart)}this._link(t,e),this._link(r,s[h]),this._link(h,f);const l=o+(r+1)%3;n<d.length&&(d[n++]=l)}else{if(0===n)break;t=d[--n]}}return h}_link(t,i){this._halfedges[t]=i,-1!==i&&(this._halfedges[i]=t)}_addTriangle(t,i,s,e,n,h){const r=this.trianglesLen;return this._triangles[r]=t,this._triangles[r+1]=i,this._triangles[r+2]=s,this._link(r,e),this._link(r+1,n),this._link(r+2,h),this.trianglesLen+=3,r}}function y(t,i,s,e){const n=t-s,h=i-e;return n*n+h*h}function w(t,i,s,e,n,h,r,l){const o=t-r,a=i-l,f=s-r,c=e-l,u=n-r,_=h-l,d=f*f+c*c,g=u*u+_*_;return o*(c*g-d*_)-a*(f*g-d*u)+(o*o+a*a)*(f*_-c*u)<0}function b(t,i,s,e,n,h){const r=s-t,l=e-i,o=n-t,a=h-i,f=r*r+l*l,c=o*o+a*a,u=.5/(r*a-l*o),_=(a*f-l*c)*u,d=(r*c-o*f)*u;return _*_+d*d}function A(t,i,s,e){if(e-s<=20)for(let n=s+1;n<=e;n++){const e=t[n],h=i[e];let r=n-1;for(;r>=s&&i[t[r]]>h;)t[r+1]=t[r--];t[r+1]=e}else{let n=s+1,h=e;k(t,s+e>>1,n),i[t[s]]>i[t[e]]&&k(t,s,e),i[t[n]]>i[t[e]]&&k(t,n,e),i[t[s]]>i[t[n]]&&k(t,s,n);const r=t[n],l=i[r];for(;;){do{n++}while(i[t[n]]<l);do{h--}while(i[t[h]]>l);if(h<n)break;k(t,n,h)}t[s+1]=t[h],t[h]=r,e-n+1>=h-s?(A(t,i,n,e),A(t,i,s,h-1)):(A(t,i,s,h-1),A(t,i,n,e))}}function k(t,i,s){const e=t[i];t[i]=t[s],t[s]=e}function M(t){return t[0]}function p(t){return t[1]}return g}));
+    </script>
+
     <!-- hyparquet (inlined IIFE bundle, MIT) -->
     <script>
 var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDescriptor;var Pt=Object.getOwnPropertyNames;var $t=Object.prototype.hasOwnProperty;var Ct=(e,t)=>{for(var n in t)Ae(e,n,{get:t[n],enumerable:!0})},Ft=(e,t,n,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let i of Pt(t))!$t.call(e,i)&&i!==n&&Ae(e,i,{get:()=>t[i],enumerable:!(r=Mt(t,i))||r.enumerable});return e};var kt=e=>Ft(Ae({},"__esModule",{value:!0}),e);var In={};Ct(In,{asyncBufferFromUrl:()=>pt,byteLengthFromUrl:()=>Pe,cachedAsyncBuffer:()=>yt,flatten:()=>K,parquetMetadata:()=>se,parquetMetadataAsync:()=>$,parquetQuery:()=>Ut,parquetRead:()=>ze,parquetReadObjects:()=>F,parquetSchema:()=>T,readColumnIndex:()=>lt,readOffsetIndex:()=>le,snappyUncompress:()=>ye,toJson:()=>ce});var Ee=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_LEN_BYTE_ARRAY"],S=["PLAIN","GROUP_VAR_INT","PLAIN_DICTIONARY","RLE","BIT_PACKED","DELTA_BINARY_PACKED","DELTA_LENGTH_BYTE_ARRAY","DELTA_BYTE_ARRAY","RLE_DICTIONARY","BYTE_STREAM_SPLIT"],Ke=["REQUIRED","OPTIONAL","REPEATED"],Ze=["UTF8","MAP","MAP_KEY_VALUE","LIST","ENUM","DECIMAL","DATE","TIME_MILLIS","TIME_MICROS","TIMESTAMP_MILLIS","TIMESTAMP_MICROS","UINT_8","UINT_16","UINT_32","UINT_64","INT_8","INT_16","INT_32","INT_64","JSON","BSON","INTERVAL"],Qe=["UNCOMPRESSED","SNAPPY","GZIP","LZO","BROTLI","LZ4","ZSTD","LZ4_RAW"],ne=["DATA_PAGE","INDEX_PAGE","DICTIONARY_PAGE","DATA_PAGE_V2"],Je=["UNORDERED","ASCENDING","DESCENDING"],Xe=["SPHERICAL","VINCENTY","THOMAS","ANDOYER","KARNEY"];function ie(e){let t=re(e);if(t.type===1)return{type:"Point",coordinates:Ie(e,t)};if(t.type===2)return{type:"LineString",coordinates:be(e,t)};if(t.type===3)return{type:"Polygon",coordinates:et(e,t)};if(t.type===4){let n=[];for(let r=0;r<t.count;r++)n.push(Ie(e,re(e)));return{type:"MultiPoint",coordinates:n}}else if(t.type===5){let n=[];for(let r=0;r<t.count;r++)n.push(be(e,re(e)));return{type:"MultiLineString",coordinates:n}}else if(t.type===6){let n=[];for(let r=0;r<t.count;r++)n.push(et(e,re(e)));return{type:"MultiPolygon",coordinates:n}}else if(t.type===7){let n=[];for(let r=0;r<t.count;r++)n.push(ie(e));return{type:"GeometryCollection",geometries:n}}else throw new Error(`Unsupported geometry type: ${t.type}`)}function re(e){let{view:t}=e,n=t.getUint8(e.offset++)===1,r=t.getUint32(e.offset,n);e.offset+=4;let i=r%1e3,f=Math.floor(r/1e3),s=0;i>1&&i<=7&&(s=t.getUint32(e.offset,n),e.offset+=4);let o=2;return f&&o++,f===3&&o++,{littleEndian:n,type:i,dim:o,count:s}}function Ie(e,t){let n=[];for(let r=0;r<t.dim;r++){let i=e.view.getFloat64(e.offset,t.littleEndian);e.offset+=8,n.push(i)}return n}function be(e,t){let n=[];for(let r=0;r<t.count;r++)n.push(Ie(e,t));return n}function et(e,t){let{view:n}=e,r=[];for(let i=0;i<t.count;i++){let f=n.getUint32(e.offset,t.littleEndian);e.offset+=4,r.push(be(e,{...t,count:f}))}return r}var tt=new TextDecoder,B={timestampFromMilliseconds(e){return new Date(Number(e))},timestampFromMicroseconds(e){return new Date(Number(e/1000n))},timestampFromNanoseconds(e){return new Date(Number(e/1000000n))},dateFromDays(e){return new Date(e*864e5)},stringFromBytes(e){return e&&tt.decode(e)},jsonFromBytes(e){return e&&JSON.parse(tt.decode(e))},geometryFromBytes(e){return e&&ie({view:new DataView(e.buffer,e.byteOffset,e.byteLength),offset:0})},geographyFromBytes(e){return e&&ie({view:new DataView(e.buffer,e.byteOffset,e.byteLength),offset:0})},uuidFromBytes(e){if(!e)return;let t=Array.from(e,n=>n.toString(16).padStart(2,"0")).join("");return t.slice(0,8)+"-"+t.slice(8,12)+"-"+t.slice(12,16)+"-"+t.slice(16,20)+"-"+t.slice(20,32)}};function ve(e,t,n,r){if(t&&n.endsWith("_DICTIONARY")){let i=e;e instanceof Uint8Array&&!(t instanceof Uint8Array)&&(i=new t.constructor(e.length));for(let f=0;f<e.length;f++)i[f]=t[e[f]];return i}else return xe(e,r)}function xe(e,t){let{element:n,parsers:r,utf8:i=!0,schemaPath:f}=t,{type:s,converted_type:o,logical_type:a}=n,_=n.repetition_type!=="REQUIRED";if(f?.some(l=>l.element.logical_type?.type==="VARIANT")&&s==="BYTE_ARRAY"&&o!=="UTF8"&&a?.type!=="STRING")return e;if(o==="DECIMAL"){let u=10**-(n.scale||0),m=new Array(e.length);for(let y=0;y<m.length;y++)e[y]instanceof Uint8Array?m[y]=Te(e[y])*u:m[y]=Number(e[y])*u;return m}if(!o&&s==="INT96")return Array.from(e).map(l=>r.timestampFromNanoseconds(qt(l)));if(o==="DATE")return Array.from(e).map(l=>r.dateFromDays(l));if(o==="TIMESTAMP_MILLIS")return Array.from(e).map(l=>r.timestampFromMilliseconds(l));if(o==="TIMESTAMP_MICROS")return Array.from(e).map(l=>r.timestampFromMicroseconds(l));if(o==="JSON")return e.map(l=>r.jsonFromBytes(l));if(o==="BSON")throw new Error("parquet bson not supported");if(o==="INTERVAL")throw new Error("parquet interval not supported");if(a?.type==="GEOMETRY")return e.map(l=>r.geometryFromBytes(l));if(a?.type==="GEOGRAPHY")return e.map(l=>r.geographyFromBytes(l));if(a?.type==="UUID")return e.map(l=>r.uuidFromBytes(l));if(o==="UTF8"||a?.type==="STRING"||i&&s==="BYTE_ARRAY")return e.map(l=>r.stringFromBytes(l));if(o==="UINT_64"||a?.type==="INTEGER"&&a.bitWidth===64&&!a.isSigned){if(e instanceof BigInt64Array)return new BigUint64Array(e.buffer,e.byteOffset,e.length);let l=_?new Array(e.length):new BigUint64Array(e.length);for(let u=0;u<l.length;u++)l[u]=e[u];return l}if(o==="UINT_32"||a?.type==="INTEGER"&&a.bitWidth===32&&!a.isSigned){if(e instanceof Int32Array)return new Uint32Array(e.buffer,e.byteOffset,e.length);let l=_?new Array(e.length):new Uint32Array(e.length);for(let u=0;u<l.length;u++)l[u]=e[u]<0?4294967296+e[u]:e[u];return l}if(a?.type==="FLOAT16")return Array.from(e).map(Re);if(a?.type==="TIMESTAMP"){let{unit:l}=a,u=r.timestampFromMilliseconds;l==="MICROS"&&(u=r.timestampFromMicroseconds),l==="NANOS"&&(u=r.timestampFromNanoseconds);let m=new Array(e.length);for(let y=0;y<m.length;y++)m[y]=u(e[y]);return m}return e}function Te(e){if(!e.length)return 0;let t=0n;for(let r of e)t=t*256n+BigInt(r);let n=e.length*8;return t>=2n**BigInt(n-1)&&(t-=2n**BigInt(n)),Number(t)}function qt(e){let t=(e>>64n)-2440588n,n=e&0xffffffffffffffffn;return t*86400000000000n+n}function Re(e){if(!e)return;let t=e[1]<<8|e[0],n=t>>15?-1:1,r=t>>10&31,i=t&1023;return r===0?n*2**-14*(i/1024):r===31?i?NaN:n*(1/0):n*2**(r-15)*(1+i/1024)}function nt(e,t,n){let r=e[t],i=[],f=1;if(r.num_children)for(;i.length<r.num_children;){let s=e[t+f],o=nt(e,t+f,[...n,s.name]);f+=o.count,i.push(o)}return{count:f,element:r,children:i,path:n}}function fe(e,t){let n=nt(e,0,[]),r=[n];for(let i of t){let f=n.children.find(s=>s.element.name===i);if(!f)throw new Error(`parquet schema element not found: ${t}`);r.push(f),n=f}return r}function Le(e){let t=[];function n(r){if(r.children.length)for(let i of r.children)n(i);else t.push(r.path.join("."))}return n(e),t}function Ne(e){let t=0;for(let{element:n}of e)n.repetition_type==="REPEATED"&&t++;return t}function W(e){let t=0;for(let{element:n}of e.slice(1))n.repetition_type!=="REQUIRED"&&t++;return t}function rt(e){if(!e||e.element.converted_type!=="LIST"||e.children.length>1)return!1;let t=e.children[0];return!(t.children.length>1||t.element.repetition_type!=="REPEATED")}function it(e){if(!e||e.element.converted_type!=="MAP"||e.children.length>1)return!1;let t=e.children[0];return!(t.children.length!==2||t.element.repetition_type!=="REPEATED"||t.children.find(i=>i.element.name==="key")?.element.repetition_type==="REPEATED"||t.children.find(i=>i.element.name==="value")?.element.repetition_type==="REPEATED")}function Se(e){if(e.length!==2)return!1;let[,t]=e;return!(t.element.repetition_type==="REPEATED"||t.children.length)}function L(e){let t={},n=0;for(;e.offset<e.view.byteLength;){let r=e.view.getUint8(e.offset++),i=r&15;if(i===0)break;let f=r>>4;n=f?n+f:ft(e),t[`field_${n}`]=Be(e,i)}return t}function Be(e,t){switch(t){case 1:return!0;case 2:return!1;case 3:return e.view.getInt8(e.offset++);case 4:case 5:return ft(e);case 6:return oe(e);case 7:{let n=e.view.getFloat64(e.offset,!0);return e.offset+=8,n}case 8:{let n=O(e),r=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,n);return e.offset+=n,r}case 9:{let n=e.view.getUint8(e.offset++),r=n&15,i=n>>4;i===15&&(i=O(e));let f=r===1||r===2,s=new Array(i);for(let o=0;o<i;o++)s[o]=f?Be(e,3)===1:Be(e,r);return s}case 12:return L(e);default:throw new Error(`thrift unhandled type: ${t}`)}}function O(e){let t=0,n=0;for(;;){let r=e.view.getUint8(e.offset++);if(t|=(r&127)<<n,!(r&128))return t;n+=7}}function Yt(e){let t=0n,n=0n;for(;;){let r=e.view.getUint8(e.offset++);if(t|=BigInt(r&127)<<n,!(r&128))return t;n+=7n}}function ft(e){let t=O(e);return t>>>1^-(t&1)}function oe(e){let t=Yt(e);return t>>1n^-(t&1n)}function ot(e,t){let n=new Map,r=t?.find(({key:f})=>f==="geo")?.value,i=(r&&JSON.parse(r)?.columns)??{};for(let[f,s]of Object.entries(i)){if(s.encoding!=="WKB")continue;let o=s.edges==="spherical"?"GEOGRAPHY":"GEOMETRY",a=s.crs?.id??s.crs?.ids?.[0],_=a?`${a.authority}:${a.code.toString()}`:void 0;n.set(f,{type:o,crs:_})}for(let f=1;f<e.length;f++){let{logical_type:s,name:o,num_children:a,type:_}=e[f];if(a){f+=a;continue}_==="BYTE_ARRAY"&&!s&&(e[f].logical_type=n.get(o))}}var Oe=1<<19,Gt=new TextDecoder;function N(e){return e&&Gt.decode(e)}async function $(e,{parsers:t,initialFetchSize:n=Oe,geoparquet:r=!0}={}){if(!e||!(e.byteLength>=0))throw new Error("parquet expected AsyncBuffer");let i=Math.max(0,e.byteLength-n),f=await e.slice(i,e.byteLength),s=new DataView(f);if(s.getUint32(f.byteLength-4,!0)!==827474256)throw new Error("parquet file invalid (footer != PAR1)");let o=s.getUint32(f.byteLength-8,!0);if(o>e.byteLength-8)throw new Error(`parquet metadata length ${o} exceeds available buffer ${e.byteLength-8}`);if(o+8>n){let a=e.byteLength-o-8,_=await e.slice(a,i),c=new ArrayBuffer(o+8),l=new Uint8Array(c);return l.set(new Uint8Array(_)),l.set(new Uint8Array(f),i-a),se(c,{parsers:t,geoparquet:r})}else return se(f,{parsers:t,geoparquet:r})}function se(e,{parsers:t,geoparquet:n=!0}={}){if(!(e instanceof ArrayBuffer))throw new Error("parquet expected ArrayBuffer");let r=new DataView(e);if(t={...B,...t},r.byteLength<8)throw new Error("parquet file is too short");if(r.getUint32(r.byteLength-4,!0)!==827474256)throw new Error("parquet file invalid (footer != PAR1)");let i=r.byteLength-8,f=r.getUint32(i,!0);if(f>r.byteLength-8)throw new Error(`parquet metadata length ${f} exceeds available buffer ${r.byteLength-8}`);let s=i-f,a=L({view:r,offset:s}),_=a.field_1,c=a.field_2.map(p=>({type:Ee[p.field_1],type_length:p.field_2,repetition_type:Ke[p.field_3],name:N(p.field_4),num_children:p.field_5,converted_type:Ze[p.field_6],scale:p.field_7,precision:p.field_8,field_id:p.field_9,logical_type:Vt(p.field_10)})),l=c.filter(p=>p.type),u=a.field_3,m=a.field_4.map(p=>({columns:p.field_1.map((d,w)=>({file_path:N(d.field_1),file_offset:d.field_2,meta_data:d.field_3&&{type:Ee[d.field_3.field_1],encodings:d.field_3.field_2?.map(h=>S[h]),path_in_schema:d.field_3.field_3.map(N),codec:Qe[d.field_3.field_4],num_values:d.field_3.field_5,total_uncompressed_size:d.field_3.field_6,total_compressed_size:d.field_3.field_7,key_value_metadata:d.field_3.field_8?.map(h=>({key:N(h.field_1),value:N(h.field_2)})),data_page_offset:d.field_3.field_9,index_page_offset:d.field_3.field_10,dictionary_page_offset:d.field_3.field_11,statistics:jt(d.field_3.field_12,l[w],t),encoding_stats:d.field_3.field_13?.map(h=>({page_type:ne[h.field_1],encoding:S[h.field_2],count:h.field_3})),bloom_filter_offset:d.field_3.field_14,bloom_filter_length:d.field_3.field_15,size_statistics:d.field_3.field_16&&{unencoded_byte_array_data_bytes:d.field_3.field_16.field_1,repetition_level_histogram:d.field_3.field_16.field_2,definition_level_histogram:d.field_3.field_16.field_3},geospatial_statistics:d.field_3.field_17&&{bbox:d.field_3.field_17.field_1&&{xmin:d.field_3.field_17.field_1.field_1,xmax:d.field_3.field_17.field_1.field_2,ymin:d.field_3.field_17.field_1.field_3,ymax:d.field_3.field_17.field_1.field_4,zmin:d.field_3.field_17.field_1.field_5,zmax:d.field_3.field_17.field_1.field_6,mmin:d.field_3.field_17.field_1.field_7,mmax:d.field_3.field_17.field_1.field_8},geospatial_types:d.field_3.field_17.field_2}},offset_index_offset:d.field_4,offset_index_length:d.field_5,column_index_offset:d.field_6,column_index_length:d.field_7,crypto_metadata:d.field_8,encrypted_column_metadata:d.field_9})),total_byte_size:p.field_2,num_rows:p.field_3,sorting_columns:p.field_4?.map(d=>({column_idx:d.field_1,descending:d.field_2,nulls_first:d.field_3})),file_offset:p.field_5,total_compressed_size:p.field_6,ordinal:p.field_7})),y=a.field_5?.map(p=>({key:N(p.field_1),value:N(p.field_2)})),g=N(a.field_6);return n&&ot(c,y),{version:_,schema:c,num_rows:u,row_groups:m,key_value_metadata:y,created_by:g,metadata_length:f}}function T({schema:e}){return fe(e,[])[0]}function Vt(e){return e?.field_1?{type:"STRING"}:e?.field_2?{type:"MAP"}:e?.field_3?{type:"LIST"}:e?.field_4?{type:"ENUM"}:e?.field_5?{type:"DECIMAL",scale:e.field_5.field_1,precision:e.field_5.field_2}:e?.field_6?{type:"DATE"}:e?.field_7?{type:"TIME",isAdjustedToUTC:e.field_7.field_1,unit:st(e.field_7.field_2)}:e?.field_8?{type:"TIMESTAMP",isAdjustedToUTC:e.field_8.field_1,unit:st(e.field_8.field_2)}:e?.field_10?{type:"INTEGER",bitWidth:e.field_10.field_1,isSigned:e.field_10.field_2}:e?.field_11?{type:"NULL"}:e?.field_12?{type:"JSON"}:e?.field_13?{type:"BSON"}:e?.field_14?{type:"UUID"}:e?.field_15?{type:"FLOAT16"}:e?.field_16?{type:"VARIANT",specification_version:e.field_16.field_1}:e?.field_17?{type:"GEOMETRY",crs:N(e.field_17.field_1)}:e?.field_18?{type:"GEOGRAPHY",crs:N(e.field_18.field_1),algorithm:Xe[e.field_18.field_2]}:e}function st(e){if(e.field_1)return"MILLIS";if(e.field_2)return"MICROS";if(e.field_3)return"NANOS";throw new Error("parquet time unit required")}function jt(e,t,n){return e&&{max:k(e.field_1,t,n),min:k(e.field_2,t,n),null_count:e.field_3,distinct_count:e.field_4,max_value:k(e.field_5,t,n),min_value:k(e.field_6,t,n),is_max_value_exact:e.field_7,is_min_value_exact:e.field_8}}function k(e,t,n){let{type:r,converted_type:i,logical_type:f}=t;if(e===void 0)return e;if(r==="BOOLEAN")return e[0]===1;if(r==="BYTE_ARRAY")return n.stringFromBytes(e);let s=new DataView(e.buffer,e.byteOffset,e.byteLength);return r==="FLOAT"&&s.byteLength===4?s.getFloat32(0,!0):r==="DOUBLE"&&s.byteLength===8?s.getFloat64(0,!0):r==="INT32"&&i==="DATE"?n.dateFromDays(s.getInt32(0,!0)):r==="INT64"&&i==="TIMESTAMP_MILLIS"?n.timestampFromMilliseconds(s.getBigInt64(0,!0)):r==="INT64"&&i==="TIMESTAMP_MICROS"?n.timestampFromMicroseconds(s.getBigInt64(0,!0)):r==="INT64"&&f?.type==="TIMESTAMP"&&f?.unit==="NANOS"?n.timestampFromNanoseconds(s.getBigInt64(0,!0)):r==="INT64"&&f?.type==="TIMESTAMP"&&f?.unit==="MICROS"?n.timestampFromMicroseconds(s.getBigInt64(0,!0)):r==="INT64"&&f?.type==="TIMESTAMP"?n.timestampFromMilliseconds(s.getBigInt64(0,!0)):r==="INT32"&&s.byteLength===4?s.getInt32(0,!0):r==="INT64"&&s.byteLength===8?s.getBigInt64(0,!0):i==="DECIMAL"?Te(e)*10**-(t.scale||0):f?.type==="FLOAT16"?Re(e):f?.type==="UUID"?n.uuidFromBytes(e):e}function lt(e,t,n=void 0){n={...B,...n};let r=L(e);return{null_pages:r.field_1,min_values:r.field_2.map(i=>k(i,t,n)),max_values:r.field_3.map(i=>k(i,t,n)),boundary_order:Je[r.field_4],null_counts:r.field_5,repetition_level_histograms:r.field_6,definition_level_histograms:r.field_7}}function le(e){let t=L(e);return{page_locations:t.field_1.map(n=>({offset:n.field_1,compressed_page_size:n.field_2,first_row_index:n.field_3})),unencoded_byte_array_data_bytes:t.field_2}}var I=0xffffffffffffffffn,q=0x9e3779b185ebca87n,H=0xc2b2ae3d27d4eb4fn,at=0x165667b19e3779f9n,ut=0x85ebca77c2b2ae63n,ct=0x27d4eb2f165667c5n;function C(e,t){return(e<<t|e>>64n-t)&I}function G(e,t){return e=e+t*H&I,e=C(e,31n),e*q&I}function ae(e,t){return e^=G(0n,t),e*q+ut&I}function D(e,t=0n){let n=new DataView(e.buffer,e.byteOffset,e.byteLength),r=e.byteLength,i=0,f;if(r>=32){let s=t+q+H&I,o=t+H&I,a=t,_=t-q&I;for(;i+32<=r;)s=G(s,n.getBigUint64(i,!0)),i+=8,o=G(o,n.getBigUint64(i,!0)),i+=8,a=G(a,n.getBigUint64(i,!0)),i+=8,_=G(_,n.getBigUint64(i,!0)),i+=8;f=C(s,1n)+C(o,7n)+C(a,12n)+C(_,18n)&I,f=ae(f,s),f=ae(f,o),f=ae(f,a),f=ae(f,_)}else f=t+ct&I;for(f=f+BigInt(r)&I;i+8<=r;)f^=G(0n,n.getBigUint64(i,!0)),f=C(f,27n)*q+ut&I,i+=8;for(i+4<=r&&(f^=BigInt(n.getUint32(i,!0))*q&I,f=C(f,23n)*H+at&I,i+=4);i<r;)f^=BigInt(n.getUint8(i))*ct&I,f=C(f,11n)*q&I,i+=1;return f^=f>>33n,f=f*H&I,f^=f>>29n,f=f*at&I,f^=f>>32n,f}var zt=new TextEncoder,Wt=new Uint32Array([1203114875,1150766481,2284105051,2729912477,1884591559,770785867,2667333959,1550580529]);function Ht(e,t){return Number((e>>32n)*BigInt(t)>>32n)}function Kt(e){let t=new Uint32Array(8),n=Number(e&0xffffffffn)|0;for(let r=0;r<8;r++)t[r]=1<<(Math.imul(n,Wt[r])>>>27);return t}function Ue(e,t){let n=Ht(t,e.length>>3)<<3,r=Kt(t);for(let i=0;i<8;i++)if((e[n+i]&r[i])===0)return!1;return!0}function dt(e){let t=L(e),n=t.field_1;if(typeof n!="number"||n<=0||n%32!==0||!t.field_2?.field_1||!t.field_3?.field_1||!t.field_4?.field_1)return;let{view:r,offset:i}=e;if(i+n>r.byteLength)throw new Error(`parquet bloom filter truncated: need ${n} bytes, have ${r.byteLength-i}`);let f=new Uint32Array(n>>2);for(let s=0;s<f.length;s++)f[s]=r.getUint32(i+s*4,!0);return e.offset=i+n,{numBytes:n,blocks:f}}function Me(e,t){if(e==null)return;let{type:n,converted_type:r,logical_type:i}=t;if(n==="BOOLEAN")return typeof e!="boolean"?void 0:D(new Uint8Array([e?1:0]));if(n==="FLOAT"){if(typeof e!="number")return;let f=new ArrayBuffer(4);return new DataView(f).setFloat32(0,e,!0),D(new Uint8Array(f))}if(n==="DOUBLE"){if(typeof e!="number")return;let f=new ArrayBuffer(8);return new DataView(f).setFloat64(0,e,!0),D(new Uint8Array(f))}if(n==="INT32"){if(r==="DATE"||r==="DECIMAL"||r==="TIME_MILLIS"||i?.type==="DATE"||i?.type==="TIME"||i?.type==="DECIMAL"||typeof e!="number"||!Number.isInteger(e))return;let f=new ArrayBuffer(4);return new DataView(f).setInt32(0,e|0,!0),D(new Uint8Array(f))}if(n==="INT64"){if(r==="TIMESTAMP_MILLIS"||r==="TIMESTAMP_MICROS"||r==="TIME_MICROS"||r==="DECIMAL"||i?.type==="TIMESTAMP"||i?.type==="TIME"||i?.type==="DECIMAL")return;let f;if(typeof e=="bigint")f=e;else if(typeof e=="number"&&Number.isSafeInteger(e))f=BigInt(e);else return;let s=new ArrayBuffer(8);return new DataView(s).setBigUint64(0,BigInt.asUintN(64,f),!0),D(new Uint8Array(s))}if(n==="BYTE_ARRAY")return r==="JSON"||r==="BSON"||r==="DECIMAL"||i?.type==="JSON"||i?.type==="BSON"||i?.type==="VARIANT"||i?.type==="GEOMETRY"||i?.type==="GEOGRAPHY"?void 0:typeof e=="string"?D(zt.encode(e)):e instanceof Uint8Array?D(e):void 0;if(n==="FIXED_LEN_BYTE_ARRAY")return r==="DECIMAL"||r==="INTERVAL"||i?.type==="DECIMAL"||i?.type==="UUID"||i?.type==="FLOAT16"||i?.type==="GEOMETRY"||i?.type==="GEOGRAPHY"?void 0:e instanceof Uint8Array?D(e):void 0}function _t(e){let t=new Set;return De(e,t),t}function De(e,t){if(e){if("$and"in e&&Array.isArray(e.$and)){for(let n of e.$and)De(n,t);return}if("$or"in e&&Array.isArray(e.$or)){for(let n of e.$or)De(n,t);return}if(!("$nor"in e))for(let[n,r]of Object.entries(e))n.startsWith("$")||(typeof r=="object"&&r!==null&&!Array.isArray(r)?("$eq"in r||"$in"in r)&&t.add(n):t.add(n))}}function ce(e){if(e===void 0)return null;if(typeof e=="bigint")return Number(e);if(Object.is(e,-0))return 0;if(Array.isArray(e))return e.map(ce);if(e instanceof Uint8Array)return Array.from(e);if(e instanceof Date)return e.toISOString();if(e instanceof Object){let t={};for(let n of Object.keys(e))e[n]!==void 0&&(t[n]=ce(e[n]));return t}return e}function ue(e,t){for(let r=0;r<t.length;r+=1e4)e.push(...t.slice(r,r+1e4))}function U(e,t,n=!0){if(n?e===t:e==t)return!0;if(!e||!t||typeof e!="object"||typeof t!="object")return!1;if(e instanceof Uint8Array&&t instanceof Uint8Array){if(e.length!==t.length)return!1;for(let i=0;i<e.length;i++)if(e[i]!==t[i])return!1;return!0}if(Array.isArray(e)&&Array.isArray(t)){if(e.length!==t.length)return!1;for(let i=0;i<e.length;i++)if(!U(e[i],t[i],n))return!1;return!0}let r=Object.keys(e);if(r.length!==Object.keys(t).length)return!1;for(let i of r)if(!U(e[i],t[i],n))return!1;return!0}async function mt(e,t={},n=globalThis.fetch){let r=new AbortController,i=new Headers(t.headers);i.set("Range","bytes=0-0");let f=await n(e,{...t,headers:i,signal:r.signal});if(!f.ok)throw new Error(`fetch with range failed ${f.status}`);if(f.status===206){let s=f.headers.get("Content-Range");if(!s)throw new Error("missing content-range header");let o=s.match(/bytes \d+-\d+\/(\d+)/);if(!o)throw new Error(`invalid content-range header: ${s}`);return parseInt(o[1])}if(f.status===200){let s=f.headers.get("Content-Length");if(r.abort(),s)return parseInt(s)}throw new Error("server does not support range requests and missing content-length")}async function Pe(e,t,n){let r=n??globalThis.fetch,i=await r(e,{...t,method:"HEAD"});if(i.status===403)return mt(e,t,r);if(!i.ok)throw new Error(`fetch head failed ${i.status}`);let f=i.headers.get("Content-Length");return f?parseInt(f):mt(e,t,r)}async function pt({url:e,byteLength:t,requestInit:n,fetch:r}){if(!e)throw new Error("missing url");let i=r??globalThis.fetch;t??=await Pe(e,n,i);let f,s=n||{};return{byteLength:t,async slice(o,a){if(f)return f.then(u=>u.slice(o,a));let _=new Headers(s.headers),c=a===void 0?"":a-1;_.set("Range",`bytes=${o}-${c}`);let l=await i(e,{...s,headers:_});if(!l.ok||!l.body)throw new Error(`fetch failed ${l.status}`);if(l.status===200)return f=l.arrayBuffer(),f.then(u=>u.slice(o,a));if(l.status===206)return l.arrayBuffer();throw new Error(`fetch received unexpected status code ${l.status}`)}}}function yt({byteLength:e,slice:t},{minSize:n=Oe}={}){if(e<n){let i=t(0,e);return{byteLength:e,async slice(f,s){return(await i).slice(f,s)}}}let r=new Map;return{byteLength:e,slice(i,f){let s=Zt(i,f,e),o=r.get(s);if(o)return o;let a=t(i,f);return r.set(s,a),a}}}function Zt(e,t,n){if(e<0){if(t!==void 0)throw new Error(`invalid suffix range [${e}, ${t}]`);return n===void 0?`${e},`:`${n+e},${n}`}else if(t!==void 0){if(e>t)throw new Error(`invalid empty range [${e}, ${t}]`);return`${e},${t}`}else return n===void 0?`${e},`:`${e},${n}`}function K(e){if(!e)return[];if(e.length===1)return e[0];let t=[];for(let n of e)ue(t,n);return t}function Z(e){if(!e)return[];let t=[];return"$and"in e&&Array.isArray(e.$and)?t.push(...e.$and.flatMap(Z)):"$or"in e&&Array.isArray(e.$or)?t.push(...e.$or.flatMap(Z)):"$nor"in e&&Array.isArray(e.$nor)?t.push(...e.$nor.flatMap(Z)):t.push(...Object.keys(e).map(n=>n.split(".")[0])),[...new Set(t)]}function V(e,t,n=!0){return"$and"in t&&Array.isArray(t.$and)?t.$and.every(r=>V(e,r,n)):"$or"in t&&Array.isArray(t.$or)?t.$or.some(r=>V(e,r,n)):"$nor"in t&&Array.isArray(t.$nor)?!t.$nor.some(r=>V(e,r,n)):Object.entries(t).every(([r,i])=>{let f=Qt(e,r);return typeof i!="object"||i===null||Array.isArray(i)?U(f,i,n):Object.entries(i||{}).every(([s,o])=>s==="$gt"?f>o:s==="$gte"?f>=o:s==="$lt"?f<o:s==="$lte"?f<=o:s==="$eq"?U(f,o,n):s==="$ne"?!U(f,o,n):s==="$in"?Array.isArray(o)&&o.includes(f):s==="$nin"?Array.isArray(o)&&!o.includes(f):s==="$not"?!V({[r]:f},{[r]:o},n):!0)})}function Q({rowGroup:e,physicalColumns:t,filter:n,strict:r=!0,bloomFilters:i,schemaElements:f}){if(!n)return!1;if("$and"in n&&Array.isArray(n.$and))return n.$and.some(s=>Q({rowGroup:e,physicalColumns:t,filter:s,strict:r,bloomFilters:i,schemaElements:f}));if("$or"in n&&Array.isArray(n.$or))return n.$or.every(s=>Q({rowGroup:e,physicalColumns:t,filter:s,strict:r,bloomFilters:i,schemaElements:f}));if("$nor"in n&&Array.isArray(n.$nor))return!1;for(let[s,o]of Object.entries(n)){let a=t.indexOf(s);if(a===-1)continue;let _=e.columns[a].meta_data?.statistics,{min:c,max:l,min_value:u,max_value:m}=_||{},y=u!==void 0?u:c,g=m!==void 0?m:l,p=y!==void 0&&g!==void 0,d=i?.[s],w=f?.[s];for(let[h,A]of Object.entries(o||{})){if(p&&(h==="$gt"&&g<=A||h==="$gte"&&g<A||h==="$lt"&&y>=A||h==="$lte"&&y>A||h==="$eq"&&(A<y||A>g)||h==="$ne"&&U(y,g,r)&&U(y,A,r)||h==="$in"&&Array.isArray(A)&&A.every(E=>E<y||E>g)||h==="$nin"&&Array.isArray(A)&&U(y,g,r)&&A.includes(y)))return!0;if(d&&w){if(h==="$eq"){let E=Me(A,w);if(E!==void 0&&!Ue(d.blocks,E))return!0}if(h==="$in"&&Array.isArray(A)&&A.length>0){let E=!0;for(let P of A){let R=Me(P,w);if(R===void 0||Ue(d.blocks,R)){E=!1;break}}if(E)return!0}}}}return!1}function Qt(e,t){let n=e;for(let r of t.split("."))n=n?.[r];return n}var Jt=1<<21;function gt({metadata:e,rowStart:t=0,rowEnd:n=1/0,columns:r,filter:i,filterStrict:f=!0,useOffsetIndex:s=!1,bloomFiltersByGroup:o,schemaElements:a}){if(!e)throw new Error("parquetPlan requires metadata");let _=[],c=[],l=[],u=Le(T(e)),m=0,y=0;for(let g of e.row_groups){let p=Number(g.num_rows),d=m+p,w=o?.[y];if(p>0&&d>t&&m<n&&!Q({rowGroup:g,physicalColumns:u,filter:i,strict:f,bloomFilters:w,schemaElements:a})){let h=[],A=1/0,E=-1/0;for(let x of g.columns){let b=x.meta_data;if(x.file_path)throw new Error("parquet file_path not supported");if(!b)throw new Error("parquet column metadata is undefined");if(!r||r.includes(b.path_in_schema[0])){let We=b.dictionary_page_offset||b.data_page_offset,ee=Number(We),te=Number(We+b.total_compressed_size);if(ee<A&&(A=ee),te>E&&(E=te),s&&x.offset_index_offset&&x.offset_index_length&&(t>m||n<d)){let He=Number(x.offset_index_offset);h.push({columnMetadata:b,offsetIndex:{startByte:He,endByte:He+x.offset_index_length},range:{startByte:ee,endByte:te}})}else h.push({columnMetadata:b,range:{startByte:ee,endByte:te}})}}let P=Math.max(t-m,0),R=Math.min(n-m,p);_.push({chunks:h,rowGroup:g,groupStart:m,groupRows:p,selectStart:P,selectEnd:R});let v;for(let x of h)if("offsetIndex"in x)l.push(x.offsetIndex);else{let{range:b}=x;r?c.push(b):v&&b.endByte-v.startByte<=Jt?v.endByte=b.endByte:(v&&c.push(v),v={...b})}v&&c.push(v)}m=d,y++}return isFinite(n)||(n=m),c.push(...l),{metadata:e,rowStart:t,rowEnd:n,columns:r,fetches:c,groups:_}}async function ht({file:e,metadata:t,filter:n,filterStrict:r=!0}){let i=t.row_groups.map(()=>({})),f=_t(n);if(f.size===0)return i;let s=Le(T(t)),o=[];return t.row_groups.forEach((a,_)=>{if(!Q({rowGroup:a,physicalColumns:s,filter:n,strict:r}))for(let c of f){let l=s.indexOf(c);if(l===-1)continue;let u=a.columns[l]?.meta_data;if(!u?.bloom_filter_offset||!u.bloom_filter_length)continue;let m=Number(u.bloom_filter_offset),y=m+u.bloom_filter_length;o.push((async()=>{let g=await e.slice(m,y),p=dt({view:new DataView(g),offset:0});p&&(i[_][c]=p)})())}}),o.length&&await Promise.all(o),i}function wt(e,{fetches:t}){let n=t.map(({startByte:r,endByte:i})=>e.slice(r,i));return{byteLength:e.byteLength,slice(r,i=e.byteLength){let f=t.findIndex(({startByte:s,endByte:o})=>s<=r&&i<=o);if(f<0)return e.slice(r,i);if(t[f].startByte!==r||t[f].endByte!==i){let s=r-t[f].startByte,o=i-t[f].startByte;return n[f]instanceof Promise?n[f].then(a=>a.slice(s,o)):n[f].slice(s,o)}else return n[f]}}}var Ce=new TextDecoder,At=new WeakMap;function Fe(e,t=B){if(Array.isArray(e))return e.map(n=>Fe(n,t));if(typeof e!="object")return e;if("metadata"in e){let n=Xt(e.metadata),r=e.typed_value&&de(e.typed_value,n,t),i=e.value&&J(_e(e.value),n,t);return r&&i?{...i,...r}:r??i}return e}function de(e,t,n){if(e instanceof Date)return e;if(e&&typeof e=="object"&&!Array.isArray(e)&&!(e instanceof Uint8Array)){if("typed_value"in e&&e.typed_value!==null&&e.typed_value!==void 0)return de(e.typed_value,t,n);if("value"in e&&e.value instanceof Uint8Array)return J(_e(e.value),t,n);if("typed_value"in e||"value"in e)return null;let r={};for(let[i,f]of Object.entries(e))t.dictionary.includes(i)&&(r[i]=de(f,t,n));return r}return e instanceof Uint8Array?J(_e(e),t,n):Array.isArray(e)?e.map(r=>de(r,t,n)):e}function _e(e){return{view:new DataView(e.buffer,e.byteOffset,e.byteLength),offset:0}}function Xt(e){let t=At.get(e.buffer);t||(t=new Map,At.set(e.buffer,t));let n=`${e.byteOffset}:${e.byteLength}`,r=t.get(n);if(r)return r;let i=_e(e),f=i.view.getUint8(i.offset++),s=f&15;if(s!==1)throw new Error(`parquet unsupported variant metadata version: ${s}`);let o=(f>>4&1)===1,a=(f>>6&3)+1,_=Y(i,a),c=new Array(_+1);for(let y=0;y<c.length;y++)c[y]=Y(i,a);let l=i.offset,u=new Array(_);for(let y=0;y<_;y++){let g=c[y],p=c[y+1],d=new Uint8Array(e.buffer,e.byteOffset+l+g,p-g);u[y]=Ce.decode(d)}let m={dictionary:u,sorted:o};return t.set(n,m),m}function Y(e,t){let n=0;for(let r=0;r<t;r++)n|=e.view.getUint8(e.offset+r)<<r*8;return e.offset+=t,n}function J(e,t,n){let r=e.view.getUint8(e.offset++),i=r&3,f=r>>2;if(i===0)return en(e,f,n);if(i===2)return tn(e,f,t,n);if(i===3)return nn(e,f,t,n);let s=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,f);return e.offset+=f,Ce.decode(s)}function en(e,t,n){switch(t){case 0:return null;case 1:return!0;case 2:return!1;case 3:{let r=e.view.getInt8(e.offset);return e.offset+=1,r}case 4:{let r=e.view.getInt16(e.offset,!0);return e.offset+=2,r}case 5:{let r=e.view.getInt32(e.offset,!0);return e.offset+=4,r}case 6:{let r=e.view.getBigInt64(e.offset,!0);return e.offset+=8,r}case 7:{let r=e.view.getFloat64(e.offset,!0);return e.offset+=8,r}case 8:return $e(e,4);case 9:return $e(e,8);case 10:return $e(e,16);case 11:{let r=e.view.getInt32(e.offset,!0);return e.offset+=4,n.dateFromDays(r)}case 12:case 13:{let r=e.view.getBigInt64(e.offset,!0);return e.offset+=8,n.timestampFromMicroseconds(r)}case 14:{let r=e.view.getFloat32(e.offset,!0);return e.offset+=4,r}case 15:return Et(e);case 16:{let r=Et(e);return Ce.decode(r)}case 17:{let r=e.view.getBigInt64(e.offset,!0);return e.offset+=8,r}case 18:case 19:{let r=e.view.getBigInt64(e.offset,!0);return e.offset+=8,n.timestampFromNanoseconds(r)}case 20:{let r=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,16);e.offset+=16;let i=Array.from(r,f=>f.toString(16).padStart(2,"0")).join("");return`${i.slice(0,8)}-${i.slice(8,12)}-${i.slice(12,16)}-${i.slice(16,20)}-${i.slice(20)}`}default:throw new Error(`parquet unsupported variant primitive type: ${t}`)}}function tn(e,t,n,r){let i=(t&3)+1,f=(t>>2&3)+1,o=t>>4&1?Y(e,4):e.view.getUint8(e.offset++),a=new Array(o);for(let l=0;l<o;l++)a[l]=Y(e,f);let _=new Array(o+1);for(let l=0;l<_.length;l++)_[l]=Y(e,i);let c={};for(let l=0;l<o;l++){let u=n.dictionary[a[l]],m={view:e.view,offset:e.offset+_[l]};c[u]=J(m,n,r)}return e.offset+=_[_.length-1],c}function nn(e,t,n,r){let i=t&3,f=t>>2&1,s=i+1,o=Y(e,f?4:1),a=new Array(o+1);for(let l=0;l<a.length;l++)a[l]=Y(e,s);let _=e.offset,c=new Array(o);for(let l=0;l<o;l++){let u={view:e.view,offset:_+a[l]};c[l]=J(u,n,r)}return e.offset=_+a[a.length-1],c}function $e(e,t){let n=e.view.getUint8(e.offset);e.offset+=1;let r;if(t===4)r=BigInt(e.view.getInt32(e.offset,!0)),e.offset+=4;else if(t===8)r=e.view.getBigInt64(e.offset,!0),e.offset+=8;else{let i=e.view.getBigUint64(e.offset,!0);r=e.view.getBigInt64(e.offset+8,!0)<<64n|i,e.offset+=16}return Number(r)*10**-n}function Et(e){let t=e.view.getUint32(e.offset,!0);e.offset+=4;let n=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,t);return e.offset+=t,n}function ke(e,t,n,r,i){let f=W(i);if(!t?.length&&!n.length){if(!f||!r.length)return r;t=new Array(r.length).fill(f)}let s=t?.length||n.length,o=i.map(({element:y})=>y.repetition_type),a=0,_=[e],c=e,l=0,u=0,m=0;if(n[0])for(;l<o.length-2&&m<n[0];)l++,o[l]!=="REQUIRED"&&(c=c.at(-1),_.push(c),u++),o[l]==="REPEATED"&&m++;for(let y=0;y<s;y++){let g=t?.length?t[y]:f,p=n[y];for(;l&&(p<m||o[l]!=="REPEATED");)o[l]!=="REQUIRED"&&(_.pop(),u--),o[l]==="REPEATED"&&m--,l--;for(c=_.at(-1);(l<o.length-2||o[l+1]==="REPEATED")&&(u<g||o[l+1]==="REQUIRED");){if(l++,o[l]!=="REQUIRED"){let d=[];c.push(d),c=d,_.push(d),u++}o[l]==="REPEATED"&&m++}g===f?c.push(r[a++]):l===o.length-2?c.push(null):c.push([])}if(!e.length)for(let y=0;y<f;y++){let g=[];c.push(g),c=g}return e}function j(e,t,n,r=0){let i=t.path.join("."),f=t.element.repetition_type==="OPTIONAL",s=f?r+1:r;if(rt(t)){let o=t.children[0],a=s;o.children.length===1&&(o=o.children[0],a++),j(e,o,n,a);let _=o.path.join("."),c=e.get(_);if(!c)throw new Error("parquet list column missing values");f&&me(c,r),e.set(i,c),e.delete(_);return}if(it(t)){let o=t.children[0].element.name;j(e,t.children[0].children[0],n,s+1),j(e,t.children[0].children[1],n,s+1);let a=e.get(`${i}.${o}.key`),_=e.get(`${i}.${o}.value`);if(!a)throw new Error("parquet map column missing keys");if(!_)throw new Error("parquet map column missing values");if(a.length!==_.length)throw new Error("parquet map column key/value length mismatch");let c=It(a,_,s);f&&me(c,r),e.delete(`${i}.${o}.key`),e.delete(`${i}.${o}.value`),e.set(i,c);return}if(t.children.length){let o=t.element.repetition_type==="REQUIRED"?r:r+1,a={};for(let c of t.children){j(e,c,n,o);let l=e.get(c.path.join("."));if(!l)throw new Error("parquet struct missing child data");a[c.element.name]=l}for(let c of t.children)e.delete(c.path.join("."));let _=bt(a,o);t.element.logical_type?.type==="VARIANT"&&(_=Fe(_,n)),f&&me(_,r),e.set(i,_)}}function me(e,t){for(let n=0;n<e.length;n++)t?me(e[n],t-1):e[n]=e[n][0]}function It(e,t,n){let r=[];for(let i=0;i<e.length;i++)if(n)r.push(It(e[i],t[i],n-1));else if(e[i]){let f={};for(let s=0;s<e[i].length;s++){let o=t[i][s];f[e[i][s]]=o===void 0?null:o}r.push(f)}else r.push(void 0);return r}function bt(e,t){let n=Object.keys(e),r=e[n[0]]?.length,i=[];for(let f=0;f<r;f++){let s={};for(let o of n){if(e[o].length!==r)throw new Error("parquet struct parsing error");s[o]=e[o][f]}t?i.push(bt(s,t-1)):i.push(s)}return i}function z(e,t,n){let r=n instanceof Int32Array,i=O(e),f=O(e);O(e);let s=oe(e),o=0;n[o++]=r?Number(s):s;let a=i/f;for(;o<t;){let _=oe(e),c=new Uint8Array(f);for(let l=0;l<f;l++)c[l]=e.view.getUint8(e.offset++);for(let l=0;l<f&&o<t;l++){let u=BigInt(c[l]);if(u){let m=0n,y=a,g=(1n<<u)-1n;for(;y&&o<t;){let p=BigInt(e.view.getUint8(e.offset))>>m&g;for(m+=u;m>=8;)m-=8n,e.offset++,m&&(p|=BigInt(e.view.getUint8(e.offset))<<u-m&g);let d=_+p;s+=d,n[o++]=r?Number(s):s,y--}y&&(e.offset+=Math.ceil((y*Number(u)+Number(m))/8))}else for(let m=0;m<a&&o<t;m++)s+=_,n[o++]=r?Number(s):s}}}function qe(e,t,n){let r=new Int32Array(t);z(e,t,r);for(let i=0;i<t;i++)n[i]=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,r[i]),e.offset+=r[i]}function vt(e,t,n){let r=new Int32Array(t);z(e,t,r);let i=new Int32Array(t);z(e,t,i);for(let f=0;f<t;f++){let s=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,i[f]);r[f]?(n[f]=new Uint8Array(r[f]+i[f]),n[f].set(n[f-1].subarray(0,r[f])),n[f].set(s,r[f])):n[f]=s,e.offset+=i[f]}}function M(e,t,n,r){r===void 0&&(r=e.view.getUint32(e.offset,!0),e.offset+=4);let i=e.offset,f=0;for(;f<n.length;){let s=O(e);if(s&1)f=fn(e,s,t,n,f);else{let o=s>>>1;rn(e,o,t,n,f),f+=o}}e.offset=i+r}function rn(e,t,n,r,i){let f=n+7>>3,s=0;for(let o=0;o<f;o++)s|=e.view.getUint8(e.offset++)<<(o<<3);for(let o=0;o<t;o++)r[i+o]=s}function fn(e,t,n,r,i){let f=t>>1<<3,s=(1<<n)-1,o=0;if(e.offset<e.view.byteLength)o=e.view.getUint8(e.offset++);else if(s)throw new Error(`parquet bitpack offset ${e.offset} out of range`);let a=8,_=0;for(;f;)_>8?(_-=8,a-=8,o>>>=8):a-_<n?(o|=e.view.getUint8(e.offset)<<a,e.offset++,a+=8):(i<r.length&&(r[i++]=o>>_&s),f--,_+=n);return i}function Ye(e,t,n,r){let i=on(n,r),f=new Uint8Array(t*i);for(let s=0;s<i;s++)for(let o=0;o<t;o++)f[o*i+s]=e.view.getUint8(e.offset++);if(n==="FLOAT")return new Float32Array(f.buffer);if(n==="DOUBLE")return new Float64Array(f.buffer);if(n==="INT32")return new Int32Array(f.buffer);if(n==="INT64")return new BigInt64Array(f.buffer);if(n==="FIXED_LEN_BYTE_ARRAY"){let s=new Array(t);for(let o=0;o<t;o++)s[o]=f.subarray(o*i,(o+1)*i);return s}throw new Error(`parquet byte_stream_split unsupported type: ${n}`)}function on(e,t){switch(e){case"INT32":case"FLOAT":return 4;case"INT64":case"DOUBLE":return 8;case"FIXED_LEN_BYTE_ARRAY":if(!t)throw new Error("parquet byteWidth missing type_length");return t;default:throw new Error(`parquet unsupported type: ${e}`)}}function X(e,t,n,r){if(n===0)return[];if(t==="BOOLEAN")return sn(e,n);if(t==="INT32")return ln(e,n);if(t==="INT64")return an(e,n);if(t==="INT96")return cn(e,n);if(t==="FLOAT")return un(e,n);if(t==="DOUBLE")return dn(e,n);if(t==="BYTE_ARRAY")return _n(e,n);if(t==="FIXED_LEN_BYTE_ARRAY"){if(!r)throw new Error("parquet missing fixed length");return mn(e,n,r)}else throw new Error(`parquet unhandled type: ${t}`)}function sn(e,t){let n=new Array(t);for(let r=0;r<t;r++){let i=e.offset+(r/8|0),f=r%8,s=e.view.getUint8(i);n[r]=(s&1<<f)!==0}return e.offset+=Math.ceil(t/8),n}function ln(e,t){let n=(e.view.byteOffset+e.offset)%4?new Int32Array(pe(e.view.buffer,e.view.byteOffset+e.offset,t*4)):new Int32Array(e.view.buffer,e.view.byteOffset+e.offset,t);return e.offset+=t*4,n}function an(e,t){let n=(e.view.byteOffset+e.offset)%8?new BigInt64Array(pe(e.view.buffer,e.view.byteOffset+e.offset,t*8)):new BigInt64Array(e.view.buffer,e.view.byteOffset+e.offset,t);return e.offset+=t*8,n}function cn(e,t){let n=new Array(t);for(let r=0;r<t;r++){let i=e.view.getBigInt64(e.offset+r*12,!0),f=e.view.getInt32(e.offset+r*12+8,!0);n[r]=BigInt(f)<<64n|i}return e.offset+=t*12,n}function un(e,t){let n=(e.view.byteOffset+e.offset)%4?new Float32Array(pe(e.view.buffer,e.view.byteOffset+e.offset,t*4)):new Float32Array(e.view.buffer,e.view.byteOffset+e.offset,t);return e.offset+=t*4,n}function dn(e,t){let n=(e.view.byteOffset+e.offset)%8?new Float64Array(pe(e.view.buffer,e.view.byteOffset+e.offset,t*8)):new Float64Array(e.view.buffer,e.view.byteOffset+e.offset,t);return e.offset+=t*8,n}function _n(e,t){let n=new Array(t);for(let r=0;r<t;r++){let i=e.view.getUint32(e.offset,!0);e.offset+=4,n[r]=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,i),e.offset+=i}return n}function mn(e,t,n){let r=new Array(t);for(let i=0;i<t;i++)r[i]=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,n),e.offset+=n;return r}function pe(e,t,n){let r=new ArrayBuffer(n);return new Uint8Array(r).set(new Uint8Array(e,t,n)),r}var pn=[0,255,65535,16777215,4294967295];function xt(e,t,n,r,i){for(let f=0;f<i;f++)n[r+f]=e[t+f]}function ye(e,t){let n=e.byteLength,r=t.byteLength,i=0,f=0;for(;i<n;){let s=e[i];if(i++,s<128)break}if(r&&i>=n)throw new Error("invalid snappy length header");for(;i<n;){let s=e[i],o=0;if(i++,i>=n)throw new Error("missing eof marker");if((s&3)===0){let a=(s>>>2)+1;if(a>60){if(i+3>=n)throw new Error("snappy error literal pos + 3 >= inputLength");let _=a-60;a=e[i]+(e[i+1]<<8)+(e[i+2]<<16)+(e[i+3]<<24),a=(a&pn[_])+1,i+=_}if(i+a>n)throw new Error("snappy error literal exceeds input length");xt(e,i,t,f,a),i+=a,f+=a}else{let a=0;switch(s&3){case 1:o=(s>>>2&7)+4,a=e[i]+(s>>>5<<8),i++;break;case 2:if(n<=i+1)throw new Error("snappy error end of input");o=(s>>>2)+1,a=e[i]+(e[i+1]<<8),i+=2;break;case 3:if(n<=i+3)throw new Error("snappy error end of input");o=(s>>>2)+1,a=e[i]+(e[i+1]<<8)+(e[i+2]<<16)+(e[i+3]<<24),i+=4;break;default:break}if(a===0||isNaN(a))throw new Error(`invalid offset ${a} pos ${i} inputLength ${n}`);if(a>f)throw new Error("cannot copy from before start of buffer");xt(t,f-a,t,f,o),f+=o}}if(f!==r)throw new Error("premature end of input")}function Tt(e,t,{type:n,element:r,schemaPath:i}){let f=new DataView(e.buffer,e.byteOffset,e.byteLength),s={view:f,offset:0},o,a=yn(s,t,i),{definitionLevels:_,numNulls:c}=gn(s,t,i),l=t.num_values-c;if(t.encoding==="PLAIN")o=X(s,n,l,r.type_length);else if(t.encoding==="PLAIN_DICTIONARY"||t.encoding==="RLE_DICTIONARY"||t.encoding==="RLE"){let u=n==="BOOLEAN"?1:f.getUint8(s.offset++);u?(o=new Array(l),n==="BOOLEAN"?(M(s,u,o),o=o.map(m=>!!m)):M(s,u,o,f.byteLength-s.offset)):o=new Uint8Array(l)}else if(t.encoding==="BYTE_STREAM_SPLIT")o=Ye(s,l,n,r.type_length);else if(t.encoding==="DELTA_BINARY_PACKED")o=n==="INT32"?new Int32Array(l):new BigInt64Array(l),z(s,l,o);else if(t.encoding==="DELTA_LENGTH_BYTE_ARRAY")o=new Array(l),qe(s,l,o);else throw new Error(`parquet unsupported encoding: ${t.encoding}`);return{definitionLevels:_,repetitionLevels:a,dataPage:o}}function yn(e,t,n){if(n.length>1){let r=Ne(n);if(r){let i=new Array(t.num_values);return M(e,he(r),i),i}}return[]}function gn(e,t,n){let r=W(n);if(!r)return{definitionLevels:[],numNulls:0};let i=new Array(t.num_values);M(e,he(r),i);let f=t.num_values;for(let s of i)s===r&&f--;return f===0&&(i.length=0),{definitionLevels:i,numNulls:f}}function ge(e,t,n,r){let i,f=r?.[n];if(n==="UNCOMPRESSED")i=e;else if(f)i=f(e,t);else if(n==="SNAPPY")i=new Uint8Array(t),ye(e,i);else throw new Error(`parquet unsupported compression codec: ${n}`);if(i?.length!==t)throw new Error(`parquet decompressed page length ${i?.length} does not match header ${t}`);return i}function Rt(e,t,n){let i={view:new DataView(e.buffer,e.byteOffset,e.byteLength),offset:0},{type:f,element:s,schemaPath:o,codec:a,compressors:_}=n,c=t.data_page_header_v2;if(!c)throw new Error("parquet data page header v2 is undefined");let l=hn(i,c,o);i.offset=c.repetition_levels_byte_length;let u=wn(i,c,o),m=t.uncompressed_page_size-c.definition_levels_byte_length-c.repetition_levels_byte_length,y=e.subarray(i.offset);c.is_compressed!==!1&&(y=ge(y,m,a,_));let g=new DataView(y.buffer,y.byteOffset,y.byteLength),p={view:g,offset:0},d,w=c.num_values-c.num_nulls;if(c.encoding==="PLAIN")d=X(p,f,w,s.type_length);else if(c.encoding==="RLE")d=new Array(w),M(p,1,d),d=d.map(h=>!!h);else if(c.encoding==="PLAIN_DICTIONARY"||c.encoding==="RLE_DICTIONARY"){let h=g.getUint8(p.offset++);d=new Array(w),M(p,h,d,m-1)}else if(c.encoding==="DELTA_BINARY_PACKED")d=f==="INT32"?new Int32Array(w):new BigInt64Array(w),z(p,w,d);else if(c.encoding==="DELTA_LENGTH_BYTE_ARRAY")d=new Array(w),qe(p,w,d);else if(c.encoding==="DELTA_BYTE_ARRAY")d=new Array(w),vt(p,w,d);else if(c.encoding==="BYTE_STREAM_SPLIT")d=Ye(p,w,f,s.type_length);else throw new Error(`parquet unsupported encoding: ${c.encoding}`);return{definitionLevels:u,repetitionLevels:l,dataPage:d}}function hn(e,t,n){let r=Ne(n);if(!r)return[];let i=new Array(t.num_values);return M(e,he(r),i,t.repetition_levels_byte_length),i}function wn(e,t,n){let r=W(n);if(r){let i=new Array(t.num_values);return M(e,he(r),i,t.definition_levels_byte_length),i}}function he(e){return 32-Math.clz32(e)}function Ge(e,{groupStart:t,selectStart:n,selectEnd:r},i,f){let{pathInSchema:s,schemaPath:o}=i,a=Se(o),_=[],c,l,u=0,m=0,y=f&&(()=>{l&&f({pathInSchema:s,columnData:l,rowStart:t+u-l.length,rowEnd:t+u})});for(;(a?u<r:e.offset<e.view.byteLength-1)&&!(e.offset>=e.view.byteLength-1);){let g=An(e);if(g.type==="DICTIONARY_PAGE"){let{data:p}=Lt(e,g,i,c,void 0,0);p&&(c=xe(p,i))}else{let p=l?.length||0,d=Lt(e,g,i,c,l,n-u);d.skipped?(_.length||(m+=d.skipped),u+=d.skipped):d.data&&l===d.data?u+=d.data.length-p:d.data&&d.data.length&&(y?.(),_.push(d.data),u+=d.data.length,l=d.data)}}return y?.(),{data:_,skipped:m}}function Lt(e,t,n,r,i,f){let{type:s,element:o,schemaPath:a,codec:_,compressors:c}=n,l=new Uint8Array(e.view.buffer,e.view.byteOffset+e.offset,t.compressed_page_size);if(e.offset+=t.compressed_page_size,t.type==="DATA_PAGE"){let u=t.data_page_header;if(!u)throw new Error("parquet data page header is undefined");if(f>u.num_values&&Se(a))return{skipped:u.num_values};let m=ge(l,Number(t.uncompressed_page_size),_,c),{definitionLevels:y,repetitionLevels:g,dataPage:p}=Tt(m,u,n),d=ve(p,r,u.encoding,n),w=Array.isArray(i)?i:[];return{skipped:0,data:ke(w,y,g,d,a)}}else if(t.type==="DATA_PAGE_V2"){let u=t.data_page_header_v2;if(!u)throw new Error("parquet data page header v2 is undefined");if(f>u.num_rows)return{skipped:u.num_values};let{definitionLevels:m,repetitionLevels:y,dataPage:g}=Rt(l,t,n),p=ve(g,r,u.encoding,n),d=Array.isArray(i)?i:[];return{skipped:0,data:ke(d,m,y,p,a)}}else if(t.type==="DICTIONARY_PAGE"){let u=t.dictionary_page_header;if(!u)throw new Error("parquet dictionary page header is undefined");let m=ge(l,Number(t.uncompressed_page_size),_,c),y={view:new DataView(m.buffer,m.byteOffset,m.byteLength),offset:0};return{skipped:0,data:X(y,s,u.num_values,o.type_length)}}else throw new Error(`parquet unsupported page type: ${t.type}`)}function An(e){let t=L(e),n=ne[t.field_1],r=t.field_2,i=t.field_3,f=t.field_4,s=t.field_5&&{num_values:t.field_5.field_1,encoding:S[t.field_5.field_2],definition_level_encoding:S[t.field_5.field_3],repetition_level_encoding:S[t.field_5.field_4],statistics:t.field_5.field_5&&{max:t.field_5.field_5.field_1,min:t.field_5.field_5.field_2,null_count:t.field_5.field_5.field_3,distinct_count:t.field_5.field_5.field_4,max_value:t.field_5.field_5.field_5,min_value:t.field_5.field_5.field_6}},o=t.field_6,a=t.field_7&&{num_values:t.field_7.field_1,encoding:S[t.field_7.field_2],is_sorted:t.field_7.field_3},_=t.field_8&&{num_values:t.field_8.field_1,num_nulls:t.field_8.field_2,num_rows:t.field_8.field_3,encoding:S[t.field_8.field_4],definition_levels_byte_length:t.field_8.field_5,repetition_levels_byte_length:t.field_8.field_6,is_compressed:t.field_8.field_7===void 0?!0:t.field_8.field_7,statistics:t.field_8.field_8};return{type:n,uncompressed_page_size:r,compressed_page_size:i,crc:f,data_page_header:s,index_page_header:o,dictionary_page_header:a,data_page_header_v2:_}}function Nt(e,{metadata:t},n){let r=[];for(let i of n.chunks){let{data_page_offset:f,dictionary_page_offset:s,path_in_schema:o}=i.columnMetadata,a=fe(t.schema,o),_={pathInSchema:o,element:a[a.length-1].element,schemaPath:a,parsers:{...B,...e.parsers},...e,...i.columnMetadata},{startByte:c,endByte:l}=i.range;if(!("offsetIndex"in i)){r.push({pathInSchema:o,data:Promise.resolve(e.file.slice(c,l)).then(u=>{let m={view:new DataView(u),offset:0};return Ge(m,n,_,e.onPage)})});continue}r.push({pathInSchema:o,data:Promise.resolve(e.file.slice(i.offsetIndex.startByte,i.offsetIndex.endByte)).then(async u=>{let{selectStart:m,selectEnd:y}=n,g=le({view:new DataView(u),offset:0}).page_locations,p=-1,d=s||f<g[0].offset;for(let R=0;R<g.length;R++){let v=g[R],x=Number(v.first_row_index),b=R+1<g.length?Number(g[R+1].first_row_index):n.groupRows;p<0&&!d&&b>m&&(c=Number(v.offset),p=x),x<y&&(l=Number(v.offset)+v.compressed_page_size)}p<0&&(p=0);let w=await e.file.slice(c,l),h={view:new DataView(w),offset:0},A=p?{...n,groupStart:n.groupStart+p,selectStart:n.selectStart-p,selectEnd:n.selectEnd-p}:n,{data:E,skipped:P}=Ge(h,A,_,e.onPage);return{data:E,skipped:p+P}})})}return{groupStart:n.groupStart,groupRows:n.groupRows,asyncColumns:r}}async function Ve({asyncColumns:e},t,n,r,i){let f=await Promise.all(e.map(l=>l.data.then(({skipped:u,data:m})=>({skipped:u,data:K(m)})))),s=n-t;if(i==="object"){let l=Array(s);for(let u=0;u<s;u++){let m={};for(let y=0;y<e.length;y++){let{data:g,skipped:p}=f[y];m[e[y].pathInSchema[0]]=g[t+u-p]}l[u]=m}return l}let o=e.map(l=>l.pathInSchema[0]).filter(l=>!r||r.includes(l)),a=r??o,_=a.map(l=>e.findIndex(u=>u.pathInSchema[0]===l)),c=Array(s);for(let l=0;l<s;l++){let u=Array(e.length);for(let m=0;m<a.length;m++){let y=_[m];if(y<0)throw new Error(`parquet column not found: ${a[m]}`);let{data:g,skipped:p}=f[y];u[m]=g[t+l-p]}c[l]=u}return c}function je(e,t,n){let{asyncColumns:r}=e;n={...B,...n};let i=[];for(let f of t.children)if(f.children.length){let s=r.filter(o=>o.pathInSchema[0]===f.element.name);if(!s.length)continue;i.push({pathInSchema:f.path,data:(async()=>{let o=await Promise.all(s.map(l=>l.data)),a=new Map,_=1/0;for(let l=0;l<s.length;l++){let u=K(o[l].data);a.set(s[l].pathInSchema.join("."),u),_=Math.min(_,u.length)}for(let[l,u]of a)u.length>_&&a.set(l,u.slice(0,_));j(a,f,n);let c=a.get(f.element.name);if(!c)throw new Error("parquet column data not assembled");return{data:[c],skipped:0}})()})}else{let s=r.find(o=>o.pathInSchema[0]===f.element.name);s&&i.push(s)}return{...e,asyncColumns:i}}async function ze(e){e.metadata??=await $(e.file,e);let{rowStart:t=0,rowEnd:n,columns:r,onChunk:i,onComplete:f,rowFormat:s,filter:o,filterStrict:a=!0}=e;if(o&&s!=="object")throw new Error('parquet filter requires rowFormat: "object"');let _=Z(o);if(_.length){let p=T(e.metadata).children.map(w=>w.element.name),d=_.filter(w=>!p.includes(w));if(d.length)throw new Error(`parquet filter columns not found: ${d.join(", ")}`)}let c=r,l=!1;if(r&&o){let p=_.filter(d=>!r.includes(d));p.length&&(c=[...r,...p],l=!0)}let u=c!==r?{...e,columns:c}:e;u=await Ot(u);let m=St(u);if(!f&&!i){await we(m);return}let y=T(e.metadata),g=m.map(p=>je(p,y,e.parsers));if(i)for(let p of g)for(let d of p.asyncColumns)d.data.then(({data:w,skipped:h})=>{let A=p.groupStart+h;for(let E of w)i({columnName:d.pathInSchema[0],columnData:E,rowStart:A,rowEnd:A+E.length}),A+=E.length},()=>{});if(f){await we(g);let p=[];for(let d of g){let w=Math.max(t-d.groupStart,0),h=Math.min((n??1/0)-d.groupStart,d.groupRows),A=s==="object"?await Ve(d,w,h,c,"object"):await Ve(d,w,h,r,"array");if(o){for(let E of A)if(V(E,o,a)){if(l&&r)for(let P of _)r.includes(P)||delete E[P];p.push(E)}}else ue(p,A)}f(p)}else await we(g)}async function we(e){let t=e.flatMap(i=>i.asyncColumns.map(f=>f.data)),r=(await Promise.allSettled(t)).find(i=>i.status==="rejected");if(r)throw r.reason}function St(e){if(!e.metadata)throw new Error("parquet requires metadata");let t=gt(e);return e.file=wt(e.file,t),t.groups.map(n=>Nt(e,t,n))}async function Bt(e){if(e.columns?.length!==1)throw new Error("parquetReadColumn expected columns: [columnName]");e.metadata??=await $(e.file,e);let t=St(await Ot(e)),n=T(e.metadata),r=t.map(f=>je(f,n,e.parsers));await we(r);let i=[];for(let f of r){let{data:s}=await f.asyncColumns[0].data;for(let o of s)ue(i,o)}return i}async function Ot(e){if(!e.useBloomFilters||!e.filter||!e.metadata)return e;let t=T(e.metadata),n={};for(let i of t.children)n[i.element.name]=i.element;let r=await ht({file:e.file,metadata:e.metadata,filter:e.filter,filterStrict:e.filterStrict});return{...e,bloomFiltersByGroup:r,schemaElements:n}}function F(e){return new Promise((t,n)=>{ze({...e,rowFormat:"object",onComplete:t}).catch(n)})}async function Ut(e){if(!e.file||!(e.file.byteLength>=0))throw new Error("parquet expected AsyncBuffer");e.metadata??=await $(e.file,e);let{metadata:t,rowStart:n=0,columns:r,orderBy:i,filter:f}=e;if(n<0)throw new Error("parquet rowStart must be positive");let s=e.rowEnd??Number(t.num_rows);if(i&&!T(e.metadata).children.map(a=>a.element.name).includes(i))throw new Error(`parquet orderBy column not found: ${i}`);if(f&&!i&&s<t.num_rows){let o=[],a=0;for(let _ of t.row_groups){let c=a+Number(_.num_rows),l=await F({...e,rowStart:a,rowEnd:c});if(o.push(...l),o.length>=s)break;a=c}return o.slice(n,s)}else if(f&&i){let o=r&&!r.includes(i)?[...r,i]:r,a=await F({...e,rowStart:void 0,rowEnd:void 0,columns:o});if(a.sort((_,c)=>Dt(_[i],c[i])),o!==r)for(let _ of a)delete _[i];return a.slice(n,s)}else{if(f)return(await F({...e,rowStart:void 0,rowEnd:void 0})).slice(n,s);if(typeof i=="string"){let o=await Bt({...e,rowStart:void 0,rowEnd:void 0,columns:[i]}),a=Array.from(o,(l,u)=>u).sort((l,u)=>Dt(o[l],o[u])).slice(n,s),_=await En({...e,rows:a});return a.map(l=>_[l])}else return await F(e)}}async function En(e){let{file:t,rows:n}=e;e.metadata??=await $(t,e);let{row_groups:r}=e.metadata,i=Array(r.length).fill(!1),f=0,s=r.map(c=>f+=Number(c.num_rows));for(let c of n){let l=s.findIndex(u=>c<u);i[l]=!0}let o=[],a;f=0;for(let c=0;c<i.length;c++){let l=f+Number(r[c].num_rows);i[c]?a===void 0&&(a=f):a!==void 0&&(o.push([a,l]),a=void 0),f=l}a!==void 0&&o.push([a,f]);let _=Array(Number(e.metadata.num_rows));for(let[c,l]of o){let u=await F({...e,rowStart:c,rowEnd:l});for(let m=c;m<l;m++)_[m]={__index__:m,...u[m-c]}}return _}function Dt(e,t){return e<t?-1:e>t?1:0}return kt(In);})();
@@ -852,6 +996,22 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             'Viridis': ['#440154', '#472d7b', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725'],
             'Turbo': ['#30123b', '#4458cb', '#3e9bfe', '#18d6cb', '#46f884', '#a2fc3c', '#e1dd37', '#fea130', '#ef5a11'],
             'Magma': ['#000004', '#1d1147', '#51127c', '#822681', '#b73779', '#e75263', '#fc8961', '#fec488', '#fcfdbf'],
+            // 9-stop samples of matplotlib, cmocean (Thyng et al., 2016) and Scientific
+            // colour maps (Crameri, 2018, doi:10.5281/zenodo.1243862) colormaps
+            'RdYlBu': ['#a50026', '#de402e', '#f98e52', '#fed485', '#feffc0', '#d1ecf4', '#8ec2dc', '#4f81ba', '#313695'],
+            'PuOr': ['#7f3b08', '#be630a', '#ef9e3c', '#fed7a2', '#f6f6f7', '#cecde4', '#988dbe', '#5d3790', '#2d004b'],
+            'PiYG': ['#8e0152', '#cb3289', '#e897c4', '#fad6ea', '#f7f7f6', '#d9f0bc', '#9acd61', '#589b28', '#276419'],
+            'Spectral': ['#9e0142', '#dd4a4c', '#f98e52', '#fed481', '#ffffbe', '#d6ee9b', '#86cfa5', '#3d95b8', '#5e4fa2'],
+            'Coolwarm': ['#3b4cc0', '#6282ea', '#8db0fe', '#b9d0f9', '#dddcdc', '#f5c4ac', '#f4987a', '#dd5f4b', '#b40426'],
+            'Vik': ['#001261', '#034481', '#307da6', '#94bed2', '#ece5e0', '#dbaa8d', '#c27041', '#912d06', '#590008'],
+            'Roma': ['#7e1700', '#9d5818', '#b68c32', '#d0ca72', '#c0eac3', '#76d1d7', '#389cc6', '#2269b0', '#033198'],
+            'Balance': ['#181c43', '#2548b0', '#3888ba', '#98bac5', '#f1eceb', '#d7a290', '#bf573a', '#8d1029', '#3c0912'],
+            'Plasma': ['#0d0887', '#4c02a1', '#7e03a8', '#aa2395', '#cc4778', '#e66c5c', '#f89540', '#fdc527', '#f0f921'],
+            'Inferno': ['#000004', '#210c4a', '#57106e', '#8a226a', '#bc3754', '#e45a31', '#f98e09', '#f9cb35', '#fcffa4'],
+            'Cividis': ['#00224e', '#1a386f', '#434e6c', '#61656f', '#7d7c78', '#9b9476', '#bcae6c', '#dec958', '#fee838'],
+            'Batlow': ['#011959', '#114360', '#226061', '#4d734d', '#828231', '#c09036', '#f29d6d', '#fdb4b6', '#faccfa'],
+            'Thermal': ['#042333', '#19337c', '#563b9c', '#83508f', '#b15f82', '#df7064', '#f99341', '#f9c641', '#e8fa5b'],
+            'Greys': ['#ffffff', '#f0f0f0', '#d9d9d9', '#bdbdbd', '#959595', '#727272', '#515151', '#242424', '#000000'],
         };
 
         const BASEMAPS = {
@@ -1149,6 +1309,16 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return { width: n, height: n, data };
         }
 
+        function cmapButton(name) {
+            const b = document.createElement('button');
+            b.dataset.cmap = name;
+            const bar = document.createElement('span');
+            bar.className = 'cmap-bar';
+            bar.style.background = `linear-gradient(90deg, ${COLORMAPS[name].join(',')})`;
+            b.append(name, bar);
+            return b;
+        }
+
         function drawLegend() {
             const canvas = $('legend-canvas');
             const ctx = canvas.getContext('2d');
@@ -1167,6 +1337,18 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                   (S.refMode === 'mean' ? ' rel. mean'
                       : S.refIdx >= 0 ? ` rel. ${S.dates[S.refIdx]}` : '');
             $('prop-badge').textContent = S.prop;
+            const side = $('disp-legend-canvas').getContext('2d');
+            side.fillStyle = g;
+            side.fillRect(0, 0, canvas.width, canvas.height);
+            $('disp-leg-min').textContent = fmt(S.vmin);
+            $('disp-leg-max').textContent = fmt(S.vmax);
+            for (const b of [...$('cmap-list').children, ...$('disp-cmap-list').children]) {
+                b.classList.toggle('active', b.dataset.cmap === S.cmap);
+            }
+            $('chk-leg-invert').checked = S.invert;
+            $('chk-invert').checked = S.invert;
+            $('inp-leg-min').value = fmt(S.vmin);
+            $('inp-leg-max').value = fmt(S.vmax);
         }
 
         // Percentile-stretch range from a sample of values (ref-adjusted).
@@ -1647,8 +1829,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                         $('hover-info').textContent =
                             `#${f.properties.sid}  ${f.geometry.coordinates[1].toFixed(3)}°, ` +
                             `${f.geometry.coordinates[0].toFixed(3)}°  →  ` +
-                            (Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data');
+                            (Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data') +
+                            analysisHover(f.id);
                     });
+                    wireLinkEditing();
                     map.on('mouseleave', DATA_LAYERS, () => {
                         map.getCanvas().style.cursor = '';
                         $('hover-info').textContent = '';
@@ -2355,7 +2539,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 hooks: {
                     // Band under the series (drawAxes runs before series), marker on top
                     drawAxes: [u => drawSigmaBand(u, S.sel[slot])],
-                    draw: [u => drawFit(u, slot), drawCursorLine],
+                    draw: [u => drawFit(u, slot), u => drawStepMarkers(u, slot), drawCursorLine],
                     ready: [u => {
                         // Click (without drag) jumps the map to that date
                         let downX = 0, downY = 0;
@@ -2378,15 +2562,824 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 .observe($(CHART_SLOTS[slot].wrap));
         }
 
-        // ================= UI wiring =================
-        function wireUI() {
-            const cmapSel = $('sel-cmap');
-            if (!cmapSel.options.length) {   // boot() may run again after "Open .parquet…"
-                for (const name of Object.keys(COLORMAPS)) {
-                    cmapSel.add(new Option(name, name));
+        // ================= analysis =================
+        // Network metrics over the points in view. The definitions are ports of
+        // geepers (variability.py, quality.py, steps.py, midas.py) so the viewer
+        // and the Python package agree.
+        const DAY_SEC = 86_400;
+        const AN_METRICS = {
+            rms: {
+                label: 'Spatial RMS', unit: 'field', help: 'RMS of the field differences with the linked neighbors',
+                seriesLabel: 'Neighbor relative RMS', seriesHelp: 'RMS over the linked neighbors of the relative-series RMS',
+            },
+            mad: {
+                label: 'Spatial MAD', unit: 'field', help: 'Median absolute deviation of the differences with the linked neighbors',
+                seriesLabel: 'Neighbor relative median', seriesHelp: 'Median over the linked neighbors of the relative-series RMS',
+            },
+            similarity: { label: 'Neighbor similarity', unit: 'r', help: 'Median correlation of the detrended series with the linked neighbors' },
+            ssf: { label: 'SSF score', unit: '', help: 'Median of the SSF curve over the linked neighbors (geepers ssf_per_station)' },
+            medlink: { label: 'Median link length', unit: 'km', help: 'Median length of the point\u2019s enabled links' },
+            temporal: { label: 'Temporal variability', unit: 'mm/yr', help: 'sqrt(median((v_window - v_full)^2)) of MIDAS velocities in sliding windows' },
+            gaps: { label: 'Gap %', unit: '%', help: 'Missing samples against the dates in the data' },
+            steps: { label: 'Detected steps', unit: '', help: 'AIC step detections in the analysed component' },
+        };
+        // Results of the last run: in-view point indices, links, per-point metrics
+        const A = { idx: null, links: null, metrics: {}, stepsByPoint: {}, breaklines: null, fieldUnit: '', chart: null };
+
+        const median = arr => {
+            if (!arr.length) return NaN;
+            const s = Float64Array.from(arr).sort();
+            const h = s.length >> 1;
+            return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2;
+        };
+
+        function haversineKm(lon1, lat1, lon2, lat2) {
+            const R = Math.PI / 180;
+            const a = Math.sin((lat2 - lat1) * R / 2) ** 2
+                + Math.cos(lat1 * R) * Math.cos(lat2 * R) * Math.sin((lon2 - lon1) * R / 2) ** 2;
+            return 12_742 * Math.asin(Math.min(1, Math.sqrt(a)));
+        }
+
+        // Least squares for small designs: coefficients and residual sum of squares
+        function lsq(rows, y) {
+            const m = rows[0].length;
+            const N = Array.from({ length: m }, () => new Array(m).fill(0)), b = new Array(m).fill(0);
+            rows.forEach((row, i) => {
+                for (let r = 0; r < m; r++) {
+                    b[r] += row[r] * y[i];
+                    for (let c = 0; c < m; c++) N[r][c] += row[r] * row[c];
+                }
+            });
+            const inv = invert(N);
+            if (!inv) return null;
+            const coef = inv.map(row => row.reduce((acc, v, c) => acc + v * b[c], 0));
+            let rss = 0;
+            rows.forEach((row, i) => { rss += (y[i] - row.reduce((acc, v, c) => acc + v * coef[c], 0)) ** 2; });
+            return { coef, rss };
+        }
+
+        // Finite samples of one point's component: date indices, unix seconds,
+        // years from the first sample, and values (mm)
+        function pointSeries(p, comp) {
+            const mat = S.mats[comp], ti = [], sec = [], y = [];
+            for (let t = 0; t < S.nDates; t++) {
+                const v = mat[t * S.nPoints + p];
+                if (Number.isFinite(v)) { ti.push(t); sec.push(S.dateSec[t]); y.push(v); }
+            }
+            return { ti, sec, t: sec.map(s => (s - sec[0]) / YEAR_SEC), y };
+        }
+
+        const samplingDays = () => median(S.dateSec.slice(1).map((s, i) => s - S.dateSec[i])) / DAY_SEC;
+
+        // --- MIDAS (Blewitt et al., 2016, doi:10.1002/2015JB012552), port of geepers.midas
+        function midasPairs(t, steps, tol = 0.001) {
+            const m = t.length, pairs = [];
+            let k = 0, istep = 0;
+            for (let i = 0; i < m && pairs.length < 19_999; i++) {
+                if (t[i] > t[m - 1] + tol - 1) break;
+                while (istep < steps.length && t[i] >= steps[istep] + tol) istep++;
+                if (istep < steps.length && t[i] > steps[istep] + tol - 1) continue;
+                for (let j = i + 1; j < m; j++) {
+                    if (k < j) k = j;
+                    if (istep < steps.length && t[j] > steps[istep] - tol) break;
+                    const fdt = t[j] - t[i] - 1;
+                    if (fdt < -tol) continue;
+                    let i2 = j;
+                    if (fdt >= tol) {
+                        i2 = k;
+                        if (istep < steps.length && t[i2] > steps[istep] - tol) { k = 0; continue; }
+                        if (k === m - 1) k = 0;
+                        k++;
+                    }
+                    pairs.push([i, i2]);
+                    break;
                 }
             }
-            cmapSel.value = S.cmap;
+            return pairs;
+        }
+
+        function midasVelocity(t, y, steps = []) {
+            const m = t.length;
+            const backward = midasPairs(t.map((_, i) => -t[m - 1 - i]), steps.map((_, i) => -steps[steps.length - 1 - i]))
+                .map(([a, b]) => [m - 1 - b, m - 1 - a]);
+            const v = [...midasPairs(t, steps), ...backward].map(([a, b]) => (y[b] - y[a]) / (t[b] - t[a]));
+            if (!v.length) return NaN;
+            const v50 = median(v);
+            const cut = 2 * 1.4826 * median(v.map(x => Math.abs(x - v50)));
+            const kept = v.filter(x => Math.abs(x - v50) < cut);
+            return kept.length ? median(kept) : NaN;
+        }
+
+        // --- temporal velocity variability, port of geepers.variability
+        function windowStarts(t, w) {
+            const starts = [t[0]], tEnd = t[t.length - 1];
+            let current = t[0];
+            for (;;) {
+                const next = t.find(x => x > current + w / 2);
+                if (next === undefined || tEnd - next <= w) break;
+                starts.push(next);
+                current = next;
+            }
+            return starts;
+        }
+
+        function temporalVariability(t, y, minWindow, maxFraction) {
+            if (t.length < 10) return NaN;
+            const maxWindow = (t[t.length - 1] - t[0]) * maxFraction;
+            if (maxWindow < minWindow) return NaN;
+            const full = midasVelocity(t, y);
+            const dv2 = [];
+            for (let w = minWindow; w < Math.floor(maxWindow) + 1; w++) {
+                for (const start of windowStarts(t, w)) {
+                    const sel = [];
+                    t.forEach((x, i) => { if (x >= start && x < start + w) sel.push(i); });
+                    if (sel.length < 10) continue;
+                    const vw = midasVelocity(sel.map(i => t[i]), sel.map(i => y[i]));
+                    if (Number.isFinite(vw)) dv2.push((vw - full) ** 2);
+                }
+            }
+            return dv2.length ? Math.sqrt(median(dv2)) : NaN;
+        }
+
+        // --- AIC step detection (line vs line + Heaviside), port of geepers.steps
+        function detectSteps(sec, y, windowDays, minRatio) {
+            const n = y.length;
+            if (n < 10) return [];
+            const days = sec.map(s => (s - sec[0]) / DAY_SEC), half = windowDays / 2;
+            const aic = (rss, m, k) => m * Math.log(Math.max(rss, 1e-20) / m) + 2 * k;
+            const found = [];
+            let lo = 0, hi = 0;
+            for (let i = 1; i < n; i++) {
+                const t0 = days[i];
+                while (days[lo] < t0 - half) lo++;
+                while (hi < n && days[hi] < t0 + half) hi++;
+                if (i - lo < 5 || hi - i < 5) continue;
+                const ys = y.slice(lo, hi);
+                const line = lsq(days.slice(lo, hi).map(d => [1, d - t0]), ys);
+                const step = lsq(days.slice(lo, hi).map((d, k) => [1, d - t0, lo + k >= i ? 1 : 0]), ys);
+                if (!line || !step) continue;
+                const delta = aic(line.rss, ys.length, 2) - aic(step.rss, ys.length, 3);
+                if (delta > minRatio) found.push({ sec: sec[i], day: t0, size: step.coef[2], delta });
+            }
+            // Keep the strongest detection within each cluster
+            const minSep = Math.max(30, half);
+            const kept = [];
+            for (const f of found.sort((a, b) => b.delta - a.delta)) {
+                if (kept.every(k => Math.abs(k.day - f.day) >= minSep)) kept.push(f);
+            }
+            return kept.sort((a, b) => a.sec - b.sec);
+        }
+
+        function stepParams() {
+            const typed = Number($('inp-an-stepwin').value);
+            return {
+                windowDays: typed > 0 ? typed : Math.max(60, 10 * samplingDays()),
+                minRatio: Number($('inp-an-stepaic').value) || 20,
+            };
+        }
+
+        // --- spatial structure function, port of geepers.variability (degrees, as there).
+        // `pairValue(i, j)` is the difference between points i and j: |v_i - v_j| for a
+        // field of values, or the relative-series RMS in the time-series mode.
+        const SSF_EDGES = Array.from({ length: 14 }, (_, k) => 10 ** (-2 + 0.25 * k));
+
+        function ssfCurve(lon, lat, pairValue, maxDiff) {
+            const nBins = SSF_EDGES.length - 1, perBin = Array.from({ length: nBins }, () => []);
+            for (let i = 0; i < lon.length; i++) {
+                for (let j = i + 1; j < lon.length; j++) {
+                    const dv = pairValue(i, j);
+                    if (!(dv < maxDiff)) continue;
+                    const d = Math.hypot(lon[i] - lon[j], lat[i] - lat[j]);
+                    if (d < SSF_EDGES[0] || d > SSF_EDGES[nBins]) continue;
+                    let k = Math.min(nBins - 1, Math.floor((Math.log10(d) + 2) / 0.25));
+                    while (k > 0 && d < SSF_EDGES[k]) k--;
+                    while (k < nBins - 1 && d >= SSF_EDGES[k + 1]) k++;
+                    perBin[k].push(dv);
+                }
+            }
+            const inv = perBin.map(b => { const m = median(b); return m > 0 ? 1 / m : NaN; });
+            const finite = inv.filter(Number.isFinite);
+            const maxInv = finite.length ? Math.max(...finite) : 1;
+            return [[0, 1], ...inv.map((v, k) => [Math.sqrt(SSF_EDGES[k] * SSF_EDGES[k + 1]), v / maxInv]), [180, 0]];
+        }
+
+        // RMS of the relative series x_j - x_i (mean removed) over common dates: how
+        // differently two points move through time, whatever their common datum
+        function relativeRms(x, y) {
+            let n = 0, s = 0, ss = 0;
+            for (let t = 0; t < x.length; t++) {
+                const d = y[t] - x[t];
+                if (Number.isFinite(d)) { n++; s += d; ss += d * d; }
+            }
+            return n >= 12 ? Math.sqrt(Math.max(ss / n - (s / n) ** 2, 0)) : NaN;
+        }
+
+        function pearson(x, y) {
+            let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+            for (let t = 0; t < x.length; t++) {
+                if (!Number.isFinite(x[t]) || !Number.isFinite(y[t])) continue;
+                n++; sx += x[t]; sy += y[t]; sxx += x[t] ** 2; syy += y[t] ** 2; sxy += x[t] * y[t];
+            }
+            if (n < 12) return NaN;
+            const den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+            return den > 0 ? (n * sxy - sx * sy) / den : NaN;
+        }
+
+        // Gap %: missing samples relative to the dates in the data between `first`
+        // and `last` (date indices). Counting against the file's own date axis keeps
+        // monthly data (28-31 day steps) exact, where a fixed step would not be.
+        function gapPercent(ti, first, last) {
+            const present = ti.filter(t => t >= first && t <= last).length;
+            return 100 * (1 - present / (last - first + 1));
+        }
+
+        const segIntersect = (p1, p2, p3, p4) => {
+            const d = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+            const d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+            return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+        };
+
+        function analysisMode() {
+            const mode = $('sel-an-field').value;
+            A.fieldUnit = mode === 'rate' ? 'mm/yr' : 'mm';
+            return mode;
+        }
+
+        function runAnalysis() {
+            const t0 = performance.now();
+            const mode = analysisMode(), comp = S.prop;
+            const bounds = map.getBounds();
+            const idx = [];
+            for (let p = 0; p < S.nPoints; p++) {
+                if (bounds.contains([S.points.lon[p], S.points.lat[p]])) idx.push(p);
+            }
+            if (idx.length < 3) {
+                $('an-stats').textContent = 'Fewer than 3 points in view.';
+                return;
+            }
+            if (mode === 'series' && idx.length * S.nDates > 40e6) {
+                $('an-stats').textContent =
+                    `${idx.length.toLocaleString()} points × ${S.nDates.toLocaleString()} dates is too much ` +
+                    'for the time-series field here; zoom in or use a date stride.';
+                return;
+            }
+            const lon = idx.map(p => S.points.lon[p]), lat = idx.map(p => S.points.lat[p]);
+            const series = idx.map(p => pointSeries(p, comp));
+            // Dense copies on the date axis: raw for relative series, detrended for correlation
+            const dense = series.map(s => {
+                const out = new Float64Array(S.nDates).fill(NaN);
+                s.ti.forEach((t, k) => { out[t] = s.y[k]; });
+                return out;
+            });
+            const detrended = series.map((s, i) => {
+                const out = new Float64Array(S.nDates).fill(NaN);
+                const fit = s.y.length >= 3 && lsq(s.t.map(x => [1, x]), s.y);
+                if (fit) s.ti.forEach((t, k) => { out[t] = s.y[k] - fit.coef[0] - fit.coef[1] * s.t[k]; });
+                return out;
+            });
+            const rates = mode === 'rate' ? computeRates(comp) : null;
+            const val = idx.map(p => (mode === 'rate' ? rates[p] : mode === 'date' ? valueAt(S.dateIdx, p) : NaN));
+            // Signed field difference j - i, or the relative-series RMS (no sign)
+            const pairDiff = mode === 'series'
+                ? (i, j) => relativeRms(dense[i], dense[j])
+                : (i, j) => val[j] - val[i];
+
+            // Delaunay network in lon/lat (as geepers), minus links over the length cap
+            const maxKm = Number($('inp-an-maxlink').value) || Infinity;
+            const coords = new Float64Array(idx.length * 2);
+            idx.forEach((_, k) => { coords[2 * k] = lon[k]; coords[2 * k + 1] = lat[k]; });
+            const tri = new Delaunator(coords), links = [];
+            for (let e = 0; e < tri.triangles.length; e++) {
+                if (e <= tri.halfedges[e]) continue;   // each shared edge once
+                const a = tri.triangles[e], b = tri.triangles[e % 3 === 2 ? e - 2 : e + 1];
+                const km = haversineKm(lon[a], lat[a], lon[b], lat[b]);
+                if (km > maxKm) continue;
+                links.push({ a, b, km, diff: pairDiff(a, b), corr: pearson(detrended[a], detrended[b]), on: true, cut: false });
+            }
+
+            // Per-point time-series metrics (do not depend on the network)
+            const minWin = Number($('inp-an-minwin').value) || 3, maxFrac = Number($('inp-an-maxfrac').value) || 0.75;
+            const { windowDays, minRatio } = stepParams();
+            const temporal = new Float64Array(idx.length).fill(NaN), gaps = new Float64Array(idx.length).fill(NaN);
+            const steps = new Float64Array(idx.length).fill(NaN);
+            A.stepsByPoint = {};
+            idx.forEach((p, i) => {
+                const s = series[i];
+                if (!s.y.length) return;
+                const [first, last] = $('sel-an-gapspan').value === 'record' ? S.span : [s.ti[0], s.ti[s.ti.length - 1]];
+                gaps[i] = gapPercent(s.ti, first, last);
+                temporal[i] = temporalVariability(s.t, s.y, minWin, maxFrac);
+                const byComp = Object.fromEntries(COMPONENTS.map(c => {
+                    const cs = c === comp ? s : pointSeries(p, c);
+                    return [c, detectSteps(cs.sec, cs.y, windowDays, minRatio)];
+                }));
+                A.stepsByPoint[p] = byComp;
+                steps[i] = byComp[comp].length;
+            });
+
+            // Field-level SSF over the view (all pairs, not just links; subsampled for speed)
+            const cap = mode === 'series' ? 700 : 2000;
+            let sample = idx.map((_, i) => i).filter(i => (mode === 'series' ? series[i].y.length >= 12 : Number.isFinite(val[i])));
+            const subsampled = sample.length > cap;
+            if (subsampled) {
+                let seed = 7;
+                const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+                for (let i = sample.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [sample[i], sample[j]] = [sample[j], sample[i]]; }
+                sample = sample.slice(0, cap);
+            }
+            const maxDiff = Number($('inp-an-maxdiff').value) || Infinity;
+            const ssf = ssfCurve(sample.map(i => lon[i]), sample.map(i => lat[i]),
+                (u, v) => Math.abs(pairDiff(sample[u], sample[v])), maxDiff);
+
+            Object.assign(A, { idx, lon, lat, links, pairDiff, mode, comp, maxDiff, metrics: { temporal, gaps, steps } });
+            A.summary = `${mode === 'rate' ? 'velocity' : mode === 'date' ? 'displacement at ' + S.dates[S.dateIdx] : 'time series'} of ${comp} · ` +
+                `SSF median ${median(ssf.map(r => r[1]).filter(Number.isFinite)).toFixed(2)}` +
+                (subsampled ? ` (SSF on ${cap} sampled points)` : '') +
+                ` · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+            applyBreaklines();
+            drawSsfChart(ssf);
+            redrawCharts();   // step markers
+        }
+
+        // Network metrics from the enabled links; rerun after any link edit
+        function computeSpatial() {
+            const n = A.idx.length, linksOf = A.idx.map(() => []);
+            for (const l of A.links) {
+                if (!l.on) continue;
+                linksOf[l.a].push({ j: l.b, diff: l.diff, l });
+                linksOf[l.b].push({ j: l.a, diff: A.mode === 'series' ? l.diff : -l.diff, l });
+            }
+            const m = A.metrics;
+            for (const k of ['rms', 'mad', 'similarity', 'ssf', 'medlink']) m[k] = new Float64Array(n).fill(NaN);
+            for (let i = 0; i < n; i++) {
+                const own = linksOf[i];
+                if (!own.length) continue;
+                const diffs = own.map(o => o.diff).filter(Number.isFinite);
+                if (diffs.length) {
+                    m.rms[i] = Math.sqrt(diffs.reduce((acc, d) => acc + d * d, 0) / diffs.length);
+                    const md = median(diffs);
+                    m.mad[i] = A.mode === 'series' ? md : median(diffs.map(d => Math.abs(d - md)));
+                }
+                m.similarity[i] = median(own.map(o => o.l.corr).filter(Number.isFinite));
+                m.medlink[i] = median(own.map(o => o.l.km));
+                if (own.length >= 2) {
+                    const nb = own.map(o => o.j);
+                    const curve = ssfCurve(nb.map(j => A.lon[j]), nb.map(j => A.lat[j]),
+                        (u, v) => Math.abs(A.pairDiff(nb[u], nb[v])), A.maxDiff);
+                    m.ssf[i] = median(curve.map(r => r[1]).filter(Number.isFinite));
+                }
+            }
+            const on = A.links.filter(l => l.on), kms = on.map(l => l.km);
+            const cut = A.links.filter(l => l.cut).length, off = A.links.length - on.length - cut;
+            $('an-stats').textContent =
+                `${n.toLocaleString()} points · ${on.length.toLocaleString()} links ` +
+                (kms.length ? `(median ${fmt(median(kms))} km, max ${fmt(Math.max(...kms))} km)` : '') +
+                (off ? ` · ${off} disabled` : '') + (cut ? ` · ${cut} cut by breaklines` : '') +
+                ` · ${A.summary}`;
+            drawAnalysisLayers();
+        }
+
+        function drawSsfChart(ssf) {
+            const rows = ssf.slice(1, -1);
+            const data = [rows.map(r => r[0]), rows.map(r => (Number.isFinite(r[1]) ? r[1] : null))];
+            $('an-ssf').hidden = false;
+            if (A.chart) { A.chart.setData(data); return; }
+            const css = getComputedStyle(document.documentElement);
+            const axis = { stroke: css.getPropertyValue('--muted').trim(), grid: { stroke: css.getPropertyValue('--hairline').trim() } };
+            A.chart = new uPlot({
+                width: $('an-ssf').clientWidth || 240, height: 150,
+                legend: { show: false },
+                scales: { x: { time: false, distr: 3 }, y: { range: [0, 1.05] } },
+                axes: [{ ...axis, grid: { show: false }, label: 'separation (°)', size: 34, labelSize: 14 },
+                    { ...axis, label: 'SSF', size: 36, labelSize: 14 }],
+                series: [{}, { stroke: '#4f46e5', width: 1.5, points: { show: true, size: 5, fill: '#4f46e5' } }],
+            }, data, $('an-ssf'));
+        }
+
+        // Colors of the metric layer: colormap, inversion and range (auto = p2-p98)
+        const AN_CMAP = { name: 'Viridis', invert: false, range: null };
+        const anStops = () => (AN_CMAP.invert ? [...COLORMAPS[AN_CMAP.name]].reverse() : COLORMAPS[AN_CMAP.name]);
+
+        function metricRange(key, values) {
+            if (AN_CMAP.range) return AN_CMAP.range;
+            const finite = Array.from(values).filter(Number.isFinite).sort((a, b) => a - b);
+            let lo = finite[Math.floor(finite.length * 0.02)] ?? 0, hi = finite[Math.floor(finite.length * 0.98)] ?? 1;
+            if (key === 'steps') { lo = 0; hi = Math.max(1, finite[finite.length - 1] ?? 1); }
+            return hi > lo ? [lo, hi] : [lo, lo + 1];
+        }
+
+        function metricLabel(key) {
+            const meta = AN_METRICS[key];
+            const label = A.mode === 'series' && meta.seriesLabel ? meta.seriesLabel : meta.label;
+            const unit = meta.unit === 'field' ? A.fieldUnit : meta.unit;
+            return { label, unit, help: A.mode === 'series' && meta.seriesHelp ? meta.seriesHelp : meta.help };
+        }
+
+        // Links under the points (enabled: colored by length; disabled: dashed),
+        // breaklines, and the chosen metric over the points
+        function drawAnalysisLayers() {
+            for (const id of ['analysis-points', 'analysis-link-labels', 'analysis-links-on', 'analysis-links', 'analysis-breaklines']) {
+                if (map.getLayer(id)) map.removeLayer(id);
+            }
+            for (const id of ['analysis-points', 'analysis-links', 'analysis-breaklines']) if (map.getSource(id)) map.removeSource(id);
+            $('an-legend').hidden = true;
+            $('an-cmap-pop').hidden = true;
+
+            if (A.breaklines?.length) {
+                map.addSource('analysis-breaklines', {
+                    type: 'geojson',
+                    data: { type: 'FeatureCollection', features: A.breaklines.map(line => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} })) },
+                });
+                map.addLayer({ id: 'analysis-breaklines', type: 'line', source: 'analysis-breaklines', paint: { 'line-color': '#dc2626', 'line-width': 2 } });
+            }
+            if (!A.idx) return;
+
+            if ($('chk-an-links').checked) {
+                const kms = A.links.filter(l => l.on).map(l => l.km).sort((a, b) => a - b);
+                const top = kms[Math.floor(kms.length * 0.98)] || 1;
+                map.addSource('analysis-links', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: A.links.map((l, k) => ({
+                            type: 'Feature', id: k,
+                            geometry: { type: 'LineString', coordinates: [[A.lon[l.a], A.lat[l.a]], [A.lon[l.b], A.lat[l.b]]] },
+                            properties: { km: l.km, on: l.on, label: `${fmt(l.km)} km` },
+                        })),
+                    },
+                });
+                // Disabled links dashed grey, enabled ones solid by length (dasharray
+                // cannot depend on a feature, hence two layers)
+                map.addLayer({
+                    id: 'analysis-links', type: 'line', source: 'analysis-links', filter: ['!', ['get', 'on']],
+                    paint: { 'line-color': '#9ca3af', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 4, 1.4], 'line-opacity': 0.8, 'line-dasharray': [2, 2] },
+                }, DATA_LAYERS[0]);
+                map.addLayer({
+                    id: 'analysis-link-labels', type: 'symbol', source: 'analysis-links',
+                    layout: {
+                        'symbol-placement': 'line-center', 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 10,
+                        visibility: $('chk-an-labels').checked ? 'visible' : 'none',
+                    },
+                    paint: { 'text-color': '#08306b', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.2 },
+                });
+                map.addLayer({
+                    id: 'analysis-links-on', type: 'line', source: 'analysis-links', filter: ['get', 'on'],
+                    paint: {
+                        'line-color': ['interpolate', ['linear'], ['get', 'km'], 0, '#9ecae1', top, '#08306b'],
+                        'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 4, 1.1], 'line-opacity': 0.85,
+                    },
+                }, DATA_LAYERS[0]);
+            }
+
+            const key = $('sel-an-metric').value;
+            if (!key) return;
+            const values = A.metrics[key];
+            const [lo, hi] = metricRange(key, values);
+            const stops = anStops(), interp = ['interpolate', ['linear'], ['get', 'm']];
+            stops.forEach((c, i) => interp.push(lo + (hi - lo) * i / (stops.length - 1), c));
+            map.addSource('analysis-points', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: A.idx.map((p, i) => ({
+                        type: 'Feature', id: p,
+                        geometry: { type: 'Point', coordinates: [A.lon[i], A.lat[i]] },
+                        properties: { m: Number.isFinite(values[i]) ? values[i] : null },
+                    })),
+                },
+            });
+            map.addLayer({
+                id: 'analysis-points', type: 'circle', source: 'analysis-points',
+                paint: {
+                    'circle-radius': circleSize(),
+                    'circle-color': ['case', ['==', ['typeof', ['get', 'm']], 'number'], interp, 'rgba(128,128,128,0.35)'],
+                    'circle-stroke-color': '#111', 'circle-stroke-width': 0.4,
+                },
+            });
+            const { label, unit, help } = metricLabel(key);
+            const ctx = $('an-legend-canvas').getContext('2d'), g = ctx.createLinearGradient(0, 0, 200, 0);
+            stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c));
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 200, 12);
+            $('an-legend-title').textContent = `${label}${unit ? ` (${unit})` : ''}`;
+            $('an-legend').title = `${help}. Click to change the colormap and range.`;
+            $('an-leg-min').textContent = fmt(lo);
+            $('an-leg-max').textContent = fmt(hi);
+            $('inp-an-min').value = fmt(lo);
+            $('inp-an-max').value = fmt(hi);
+            $('an-legend').hidden = false;
+        }
+
+        // Disable links crossing any breakline; earlier manual edits are kept
+        function applyBreaklines() {
+            if (!A.idx) return;
+            const lines = (A.breaklines ?? []).map(line => {
+                const xs = line.map(c => c[0]), ys = line.map(c => c[1]);
+                return { line, box: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] };
+            });
+            for (const l of A.links) {
+                const p1 = [A.lon[l.a], A.lat[l.a]], p2 = [A.lon[l.b], A.lat[l.b]];
+                const [x0, x1] = [Math.min(p1[0], p2[0]), Math.max(p1[0], p2[0])], [y0, y1] = [Math.min(p1[1], p2[1]), Math.max(p1[1], p2[1])];
+                const wasCut = l.cut;
+                l.cut = lines.some(({ line, box }) => box[0] <= x1 && box[2] >= x0 && box[1] <= y1 && box[3] >= y0 &&
+                    line.some((c, k) => k > 0 && segIntersect(p1, p2, line[k - 1], c)));
+                if (l.cut) l.on = false;
+                else if (wasCut) l.on = true;
+            }
+            computeSpatial();
+        }
+
+        // --- breaklines: GeoJSON, a .shp, or a zipped shapefile, in lon/lat
+        async function unzipEntries(buf) {
+            const view = new DataView(buf), files = {};
+            let eocd = buf.byteLength - 22;
+            while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd--;
+            if (eocd < 0) throw new Error('not a zip file');
+            let off = view.getUint32(eocd + 16, true);
+            const count = view.getUint16(eocd + 10, true);
+            for (let k = 0; k < count; k++) {
+                const method = view.getUint16(off + 10, true), size = view.getUint32(off + 20, true);
+                const nameLen = view.getUint16(off + 28, true), extraLen = view.getUint16(off + 30, true), commentLen = view.getUint16(off + 32, true);
+                const local = view.getUint32(off + 42, true);
+                const name = new TextDecoder().decode(new Uint8Array(buf, off + 46, nameLen));
+                const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+                const raw = new Uint8Array(buf, start, size);
+                files[name.toLowerCase()] = method === 0 ? raw.slice().buffer
+                    : await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+                off += 46 + nameLen + extraLen + commentLen;
+            }
+            return files;
+        }
+
+        // Polylines (and polygon rings) of an ESRI .shp
+        function parseShp(buf) {
+            const view = new DataView(buf), lines = [];
+            let off = 100;
+            while (off + 12 <= buf.byteLength) {
+                const len = view.getInt32(off + 4) * 2, type = view.getInt32(off + 8, true);
+                if ([3, 5, 13, 15, 23, 25].includes(type)) {
+                    const nParts = view.getInt32(off + 44, true), nPts = view.getInt32(off + 48, true);
+                    const parts = Array.from({ length: nParts }, (_, k) => view.getInt32(off + 52 + 4 * k, true));
+                    const ptsAt = off + 52 + 4 * nParts;
+                    parts.forEach((start, k) => {
+                        const end = k + 1 < nParts ? parts[k + 1] : nPts, line = [];
+                        for (let q = start; q < end; q++) line.push([view.getFloat64(ptsAt + 16 * q, true), view.getFloat64(ptsAt + 16 * q + 8, true)]);
+                        if (line.length > 1) lines.push(line);
+                    });
+                }
+                off += 8 + len;
+            }
+            return lines;
+        }
+
+        function geojsonLines(gj) {
+            const out = [];
+            const add = g => {
+                if (!g) return;
+                if (g.type === 'LineString') out.push(g.coordinates);
+                else if (g.type === 'MultiLineString' || g.type === 'Polygon') out.push(...g.coordinates);
+                else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => out.push(...poly));
+                else if (g.type === 'GeometryCollection') g.geometries.forEach(add);
+            };
+            (gj.type === 'FeatureCollection' ? gj.features.map(f => f.geometry) : [gj.type === 'Feature' ? gj.geometry : gj]).forEach(add);
+            return out.map(line => line.map(c => [c[0], c[1]]));
+        }
+
+        async function loadBreaklines(file) {
+            const name = file.name.toLowerCase();
+            let lines;
+            if (name.endsWith('.zip')) {
+                const files = await unzipEntries(await file.arrayBuffer());
+                const shp = Object.keys(files).find(f => f.endsWith('.shp'));
+                if (!shp) throw new Error('no .shp inside the zip');
+                const prj = files[shp.replace(/\.shp$/, '.prj')];
+                if (prj && /^\s*PROJCS/i.test(new TextDecoder().decode(prj))) {
+                    throw new Error('the shapefile is projected; reproject it to lon/lat (EPSG:4326) first');
+                }
+                lines = parseShp(files[shp]);
+            } else if (name.endsWith('.shp')) {
+                lines = parseShp(await file.arrayBuffer());
+            } else {
+                lines = geojsonLines(JSON.parse(await file.text()));
+            }
+            if (!lines.length) throw new Error('no lines found');
+            if (lines.some(line => line.some(([x, y]) => !(Math.abs(x) <= 180 && Math.abs(y) <= 90)))) {
+                throw new Error('coordinates are not lon/lat degrees; reproject to EPSG:4326 first');
+            }
+            return lines;
+        }
+
+        // Value of the shown metric at point p, for the hover line
+        function analysisHover(p) {
+            const key = $('sel-an-metric').value;
+            if (!A.idx || !key) return '';
+            const i = A.idx.indexOf(p);
+            const v = i < 0 ? NaN : A.metrics[key][i];
+            return Number.isFinite(v) ? `  ·  ${metricLabel(key).label} ${fmt(v)}` : '';
+        }
+
+        function resetAnalysis() {
+            Object.assign(A, { idx: null, links: null, metrics: {}, stepsByPoint: {} });
+            $('an-stats').textContent = '';
+            $('an-legend').hidden = true;
+            $('an-cmap-pop').hidden = true;
+            $('an-ssf').hidden = true;
+        }
+
+        // Steps of the analysis run for point p, drawn on its chart as dashed
+        // verticals in the component colors and listed under it
+        function drawStepMarkers(u, slot) {
+            const out = $(slot ? 'step-result2' : 'step-result');
+            const byComp = A.stepsByPoint?.[S.sel[slot]];
+            out.replaceChildren();
+            if (!byComp) return;
+            const ctx = u.ctx;
+            ctx.save();
+            ctx.setLineDash([2, 3]);
+            ctx.lineWidth = 1.5;
+            COMPONENTS.forEach((c, i) => {
+                if (!u.series[i + 1].show) return;
+                ctx.strokeStyle = SERIES_COLORS[i];
+                for (const st of byComp[c]) {
+                    const x = u.valToPos(st.sec, 'x', true);
+                    if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) continue;
+                    ctx.beginPath();
+                    ctx.moveTo(x, u.bbox.top);
+                    ctx.lineTo(x, u.bbox.top + u.bbox.height);
+                    ctx.stroke();
+                }
+            });
+            ctx.restore();
+            const parts = COMPONENTS.flatMap((c, i) => byComp[c].map(st => {
+                const span = document.createElement('span');
+                span.style.color = SERIES_COLORS[i];
+                span.textContent = `${c[0].toUpperCase()} ${new Date(st.sec * 1000).toISOString().slice(0, 10)} ${st.size > 0 ? '+' : ''}${st.size.toFixed(1)} mm`;
+                return span;
+            }));
+            if (!parts.length) { out.textContent = 'Detected steps: none'; return; }
+            out.append('Detected steps: ');
+            parts.forEach((s, k) => out.append(...(k ? [' · ', s] : [s])));
+        }
+
+        // Steps in any component of point p, merged like detectSteps merges one
+        function detectPointSteps(p) {
+            const { windowDays, minRatio } = stepParams();
+            const all = COMPONENTS.flatMap(comp => {
+                const s = pointSeries(p, comp);
+                return detectSteps(s.sec, s.y, windowDays, minRatio);
+            }).sort((a, b) => b.delta - a.delta);
+            const minSep = Math.max(30, windowDays / 2) * DAY_SEC, kept = [];
+            for (const f of all) if (kept.every(k => Math.abs(k.sec - f.sec) >= minSep)) kept.push(f);
+            return kept.sort((a, b) => a.sec - b.sec).map(f => new Date(f.sec * 1000).toISOString().slice(0, 10));
+        }
+
+        function wireAnalysis() {
+            $('btn-an-run').onclick = () => {
+                $('an-stats').textContent = 'Computing…';
+                setTimeout(runAnalysis, 30);   // let the message paint first
+            };
+            $('sel-an-metric').onchange = () => { AN_CMAP.range = null; drawAnalysisLayers(); };
+            $('chk-an-links').onchange = drawAnalysisLayers;
+            $('chk-an-labels').onchange = () => {
+                if (map.getLayer('analysis-link-labels')) {
+                    map.setLayoutProperty('analysis-link-labels', 'visibility', $('chk-an-labels').checked ? 'visible' : 'none');
+                }
+            };
+            $('btn-an-reset').onclick = () => {
+                if (!A.idx) return;
+                for (const l of A.links) l.on = !l.cut;
+                computeSpatial();
+            };
+            $('btn-an-breaklines').onclick = () => $('inp-an-breaklines').click();
+            $('inp-an-breaklines').onchange = async e => {
+                const file = e.target.files[0];
+                e.target.value = '';
+                if (!file) return;
+                try {
+                    A.breaklines = await loadBreaklines(file);
+                    $('an-break-info').textContent = `${file.name}: ${A.breaklines.length} lines`;
+                    $('btn-an-clearbreak').hidden = false;
+                } catch (err) {
+                    $('an-break-info').textContent = `Could not load ${file.name}: ${err.message}`;
+                    return;
+                }
+                if (A.idx) applyBreaklines();
+                else drawAnalysisLayers();
+            };
+            $('btn-an-clearbreak').onclick = () => {
+                A.breaklines = null;
+                $('an-break-info').textContent = '';
+                $('btn-an-clearbreak').hidden = true;
+                if (A.idx) applyBreaklines();
+                else drawAnalysisLayers();
+            };
+            // Colormap and range popover on the analysis colorbar
+            $('an-cmap-list').replaceChildren(...Object.keys(COLORMAPS).map(name => {
+                const b = cmapButton(name);
+                b.onclick = () => { AN_CMAP.name = name; drawAnalysisLayers(); $('an-cmap-pop').hidden = false; markCmap(); };
+                return b;
+            }));
+            const markCmap = () => {
+                for (const b of $('an-cmap-list').children) b.classList.toggle('active', b.dataset.cmap === AN_CMAP.name);
+            };
+            $('an-legend').onclick = () => { $('an-cmap-pop').hidden = !$('an-cmap-pop').hidden; markCmap(); };
+            $('chk-an-invert').onchange = e => { AN_CMAP.invert = e.target.checked; drawAnalysisLayers(); $('an-cmap-pop').hidden = false; };
+            const setRange = () => {
+                const lo = Number($('inp-an-min').value), hi = Number($('inp-an-max').value);
+                if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) AN_CMAP.range = [lo, hi];
+                drawAnalysisLayers();
+                $('an-cmap-pop').hidden = false;
+            };
+            $('inp-an-min').onchange = setRange;
+            $('inp-an-max').onchange = setRange;
+            $('btn-an-auto').onclick = () => { AN_CMAP.range = null; drawAnalysisLayers(); $('an-cmap-pop').hidden = false; };
+        }
+
+        // Click a link to disable / re-enable it; hover highlights it and shows its
+        // numbers. Links are ~1 px wide, so both pick the link nearest the cursor
+        // within LINK_PICK_PX, measured to the drawn segment.
+        const LINK_LAYERS = ['analysis-links-on', 'analysis-links'];
+        const LINK_PICK_PX = 8;
+
+        function linkAt(point) {
+            const layers = LINK_LAYERS.filter(id => map.getLayer(id));
+            if (!layers.length || !A.links) return -1;
+            // Links end at points: over a point, the point wins
+            const points = DATA_LAYERS.filter(id => map.getLayer(id));
+            if (map.queryRenderedFeatures(point, { layers: points }).length) return -1;
+            const r = LINK_PICK_PX;
+            let best = -1, bestDist = r;
+            for (const f of map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers })) {
+                const l = A.links[f.id];
+                const a = map.project([A.lon[l.a], A.lat[l.a]]), b = map.project([A.lon[l.b], A.lat[l.b]]);
+                const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+                const t = len2 ? Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / len2)) : 0;
+                const dist = Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy);
+                if (dist < bestDist) { bestDist = dist; best = f.id; }
+            }
+            return best;
+        }
+
+        function wireLinkEditing() {
+            let hovered = -1;
+            const setHover = k => {
+                if (k === hovered) return;
+                if (hovered >= 0 && map.getSource('analysis-links')) map.setFeatureState({ source: 'analysis-links', id: hovered }, { hover: false });
+                hovered = k;
+                if (k >= 0) map.setFeatureState({ source: 'analysis-links', id: k }, { hover: true });
+            };
+            map.on('click', e => {
+                const k = linkAt(e.point);
+                if (k < 0) return;
+                A.links[k].on = !A.links[k].on;
+                hovered = -1;   // the layers are rebuilt, and their feature states with them
+                computeSpatial();
+            });
+            map.on('mousemove', e => {
+                const k = linkAt(e.point);
+                if (k < 0) {
+                    if (hovered >= 0) { map.getCanvas().style.cursor = ''; $('hover-info').textContent = ''; }
+                    setHover(-1);
+                    return;
+                }
+                setHover(k);
+                map.getCanvas().style.cursor = 'pointer';
+                const l = A.links[k];
+                const d = A.mode === 'series' ? `relative RMS ${fmt(l.diff)} mm` : `Δ ${fmt(l.diff)} ${A.fieldUnit}`;
+                $('hover-info').textContent =
+                    `link ${fmt(l.km)} km · ${d} · r ${Number.isFinite(l.corr) ? l.corr.toFixed(2) : '–'} · ` +
+                    `${l.cut ? 'cut by breakline' : l.on ? 'enabled' : 'disabled'} (click to toggle)`;
+            });
+        }
+
+        // ================= UI wiring =================
+        function wireUI() {
+            // Colormap pickers (sidebar colorbar and map colorbar), kept in step by drawLegend.
+            // boot() may run again after "Open .parquet…", so build the buttons once.
+            for (const list of [$('cmap-list'), $('disp-cmap-list')]) {
+                if (!list.children.length) list.append(...Object.keys(COLORMAPS).map(cmapButton));
+                for (const b of list.children) b.onclick = () => { S.cmap = b.dataset.cmap; restyle(); };
+            }
+            $('disp-legend').onclick = () => { $('disp-cmap-pop').hidden = !$('disp-cmap-pop').hidden; };
+
+            // Map colorbar click: the same picker, plus range
+            for (const id of ['legend-title', 'legend-canvas', 'legend-labels']) {
+                $(id).onclick = () => { $('cmap-pop').hidden = !$('cmap-pop').hidden; };
+                $(id).title = 'Click to change the colormap and range';
+            }
+            $('chk-leg-invert').onchange = e => { S.invert = e.target.checked; restyle(); };
+            const setLegendRange = () => {
+                const lo = Number($('inp-leg-min').value), hi = Number($('inp-leg-max').value);
+                if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) {
+                    S.vmin = lo; S.vmax = hi;
+                    $('inp-vmin').value = fmt(lo);
+                    $('inp-vmax').value = fmt(hi);
+                }
+                restyle();
+            };
+            $('inp-leg-min').onchange = setLegendRange;
+            $('inp-leg-max').onchange = setLegendRange;
+            $('btn-leg-auto').onclick = () => { autoRange(); restyle(); };
 
             $('sel-prop').onchange = e => {
                 S.prop = e.target.value;
@@ -2403,7 +3396,6 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 if (S.showRate) applyRateToMap();
                 else applyDate(S.dateIdx);
             };
-            cmapSel.onchange = e => { S.cmap = e.target.value; restyle(); };
             $('chk-invert').onchange = e => { S.invert = e.target.checked; restyle(); };
             $('chk-sym').onchange = () => { autoRange(); restyle(); };
             $('btn-auto').onclick = () => { autoRange(); restyle(); };
@@ -2473,6 +3465,12 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('chk-autolive').onchange = e => { if (e.target.checked) applyDate(S.dateIdx); };
             $('chk-sigma').onchange = redrawCharts;
             const refit = () => { fitVersion++; redrawCharts(); };
+            $('btn-fit-detect').onclick = () => {
+                if (S.sel[0] < 0) return;
+                $('inp-fit-steps').value = detectPointSteps(S.sel[0]).join(', ');
+                refit();
+            };
+            wireAnalysis();
             $('chk-fit').onchange = e => { $('fit-controls').hidden = !e.target.checked; refit(); };
             for (const id of ['sel-fit-order', 'chk-fit-annual', 'chk-fit-semi', 'inp-fit-steps']) $(id).onchange = refit;
 
@@ -2642,6 +3640,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // Tear down the current dataset and boot another one (sidebar "Open .parquet…")
         async function reboot(load) {
             setPlaying(false);
+            resetAnalysis();
             closeChart(0);                 // takes the comparison chart with it
             map?.remove();
             map = undefined;

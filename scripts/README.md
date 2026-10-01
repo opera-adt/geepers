@@ -107,9 +107,13 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   chart. Charts are resizable (drag the corner), zoomable (drag box, mouse
   wheel, double-click resets), and clicking a sample jumps the map to that
   date.
-- Component selector, colormaps (RdBu, BrBG, Viridis, Turbo, Magma),
-  invert, symmetric/robust (p2–p98) or manual range in mm; `live` re-runs
-  the auto range on every date change while scrubbing/playing.
+- Component selector. Colors: click the colorbar (in Display, or the one
+  on the map) for the colormap (19: diverging RdBu, BrBG, RdYlBu, PuOr,
+  PiYG, Spectral, Coolwarm, Vik, Roma, Balance; sequential Viridis, Magma,
+  Plasma, Inferno, Cividis, Batlow, Thermal, Turbo, Greys),
+  invert, manual range, or Auto with a percentile stretch (p2–p98 …
+  min–max), symmetric or not; `live` re-runs the auto range on every date
+  change while scrubbing/playing. Both colorbars stay in step.
 - Velocity mode: color points by per-point linear trend (least-squares,
   mm/yr) instead of per-date displacement.
 - Vector overlay: horizontal (E+N) and/or vertical (Up, red up / blue
@@ -125,6 +129,27 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   dashed and the estimates listed under the chart. Uncertainties assume
   white noise, so they are optimistic for GPS (typically several times
   smaller than MIDAS's).
+- Analysis section (sidebar), "Run on view" for the points in the current
+  view (hover any parameter's label for what it does):
+  - Field compared between neighbors: velocity, displacement at the date,
+    or the whole time series (for two points, the RMS of their relative
+    series, mean removed, over common dates).
+  - Delaunay network: links colored by length (optional km labels), links
+    over "Max link" dropped. Click a link to disable / re-enable it, or
+    load breaklines (zipped shapefile, .shp or GeoJSON, lon/lat) to cut
+    every link that crosses one; the network metrics update.
+  - Map metrics (colorbar click: colormap, invert, range): spatial RMS /
+    MAD of neighbor differences, neighbor similarity (median correlation
+    of detrended series), SSF score, median link length, temporal velocity
+    variability (MIDAS in sliding windows), gap % (against the dates in
+    the file, over each point's span or the Record span), detected steps.
+  - A field-level spatial structure function (SSF) chart.
+  - Detected steps of the clicked point are marked on its chart and listed
+    with their sizes; the chart fit's `detect` button fills its steps.
+  The metrics are ports of `geepers.variability`, `geepers.quality`,
+  `geepers.steps` and `geepers.midas` and give the same numbers (SSF
+  distances in degrees, as there). Gap % counts against the file's own
+  dates rather than a fixed step, which matters for monthly data.
 - Each chart has a `csv` button: a `#` header (grid or GPS site, id,
   lat, lon, reference, velocity ± σ per component from the fit model if
   one is on, else a straight line, plus the fit terms), then dates + E/N/U
