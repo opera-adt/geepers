@@ -143,6 +143,10 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
     of detrended series), SSF score, median link length, temporal velocity
     variability (MIDAS in sliding windows), gap % (against the dates in
     the file, over each point's span or the Record span), detected steps.
+  - Neighbor similarity, temporal variability, gap % and detected steps
+    need a time series, so they (and their settings) are only computed
+    and offered for the "Time series" field; a velocity or single-date
+    field gets the spatial metrics only.
   - A field-level spatial structure function (SSF) chart.
   - Step detection needs both an AIC improvement and a step larger than
     "Step size" times the series' white-noise level (default 3); the AIC

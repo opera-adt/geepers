@@ -207,7 +207,7 @@
         #an-legend-title { font-size: 11px; font-weight: 650; margin: 6px 0 4px; }
         #an-legend-canvas { width: 100%; height: 10px; border-radius: 4px; display: block; }
         #an-legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-        #an-legend[hidden], #an-ssf[hidden], #an-cmap-pop[hidden] { display: none; }
+        #an-legend[hidden], #an-ssf[hidden], #an-cmap-pop[hidden], .row[hidden] { display: none; }
         #an-legend { cursor: pointer; }
         #analysis-section .row > label:first-child { cursor: help; }
         #an-break-info { display: block; margin: -2px 0 4px 69px; white-space: normal; }
@@ -653,7 +653,7 @@
 
         <details id="analysis-section">
             <summary>Analysis</summary>
-            <div class="row" title="What the spatial metrics compare between points, for the component chosen under Display. Velocity: each point's linear rate. Displacement: the value at the current date. Time series: the whole record - for two points, the RMS of their relative series (difference, mean removed) over common dates.">
+            <div class="row" title="What the analysis runs on, for the component chosen under Display. The metrics that need a time series (neighbor similarity, temporal variability, gap %, detected steps) are only computed and offered for the Time series field. Velocity: each point's linear rate. Displacement: the value at the current date. Time series: the whole record - for two points, the RMS of their relative series (difference, mean removed) over common dates.">
                 <label>Field</label>
                 <select id="sel-an-field">
                     <option value="rate" selected>Velocity (mm/yr)</option>
@@ -670,25 +670,25 @@
                 <label>SSF max Δ</label>
                 <input type="number" id="inp-an-maxdiff" value="30" min="0" step="any">
             </div>
-            <div class="row" title="Temporal variability: MIDAS velocities in half-overlapping windows, from this length (years) up to this fraction of each point's record, compared with its full-record velocity.">
+            <div class="row" data-series-only title="Temporal variability: MIDAS velocities in half-overlapping windows, from this length (years) up to this fraction of each point's record, compared with its full-record velocity.">
                 <label>Windows</label>
                 <input type="number" id="inp-an-minwin" value="3" min="1" step="any">
                 <span class="unit">yr to</span>
                 <input type="number" id="inp-an-maxfrac" value="0.75" min="0.1" max="1" step="0.05">
             </div>
-            <div class="row" title="Step detection: in a sliding window (days; empty = 10 samples, at least 60) a line and a line + step are fitted, and a step is reported where the AIC improves by more than this. Larger = fewer, more confident steps.">
+            <div class="row" data-series-only title="Step detection: in a sliding window (days; empty = 10 samples, at least 60) a line and a line + step are fitted, and a step is reported where the AIC improves by more than this. Larger = fewer, more confident steps.">
                 <label>Steps</label>
                 <input type="number" id="inp-an-stepwin" min="10" step="any" placeholder="auto">
                 <span class="unit">d, ΔAIC</span>
                 <input type="number" id="inp-an-stepaic" value="20" min="0" step="any">
             </div>
-            <div class="row" title="Step detection: a step must also be larger than this many times the series' white-noise level (from its sample-to-sample differences). The AIC test alone reports the wander of time-correlated noise as steps; 0 switches this check off.">
+            <div class="row" data-series-only title="Step detection: a step must also be larger than this many times the series' white-noise level (from its sample-to-sample differences). The AIC test alone reports the wander of time-correlated noise as steps; 0 switches this check off.">
                 <label>Step size</label>
                 <span class="unit">&gt;</span>
                 <input type="number" id="inp-an-stepsig" value="3" min="0" step="any">
                 <span class="unit">σ noise</span>
             </div>
-            <div class="row" title="Gap %: missing samples counted against the dates in the data - over each point's own first-to-last span, or over the Record start-end span (missing lead and tail time then counts as gaps).">
+            <div class="row" data-series-only title="Gap %: missing samples counted against the dates in the data - over each point's own first-to-last span, or over the Record start-end span (missing lead and tail time then counts as gaps).">
                 <label>Gaps over</label>
                 <select id="sel-an-gapspan">
                     <option value="own" selected>own span</option>
@@ -719,12 +719,12 @@
                     <option value="">None</option>
                     <option value="rms">Spatial RMS</option>
                     <option value="mad">Spatial MAD</option>
-                    <option value="similarity">Neighbor similarity</option>
+                    <option value="similarity" data-series-only>Neighbor similarity</option>
                     <option value="ssf">SSF score</option>
                     <option value="medlink">Median link length</option>
-                    <option value="temporal">Temporal variability</option>
-                    <option value="gaps">Gap %</option>
-                    <option value="steps">Detected steps</option>
+                    <option value="temporal" data-series-only>Temporal variability</option>
+                    <option value="gaps" data-series-only>Gap %</option>
+                    <option value="steps" data-series-only>Detected steps</option>
                 </select>
             </div>
             <div id="an-legend" hidden>
@@ -2840,6 +2840,17 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
         };
 
+        // Time-series settings follow the Field selector (they feed the next run); the
+        // metric list follows the last run, whose results it shows
+        function syncAnalysisControls() {
+            const next = $('sel-an-field').value === 'series';
+            const shown = (A.idx ? A.mode : $('sel-an-field').value) === 'series';
+            document.querySelectorAll('.row[data-series-only]').forEach(row => { row.hidden = !next; });
+            const sel = $('sel-an-metric');
+            sel.querySelectorAll('option[data-series-only]').forEach(o => { o.hidden = o.disabled = !shown; });
+            if (sel.selectedOptions[0]?.disabled) sel.value = '';
+        }
+
         function analysisMode() {
             const mode = $('sel-an-field').value;
             A.fieldUnit = mode === 'rate' ? 'mm/yr' : 'mm';
@@ -2865,7 +2876,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 return;
             }
             const lon = idx.map(p => S.points.lon[p]), lat = idx.map(p => S.points.lat[p]);
-            const series = idx.map(p => pointSeries(p, comp));
+            // The series, and everything derived from them, only exist in the time-series
+            // mode: a velocity or a single-date field has no record to analyse
+            const isSeries = mode === 'series';
+            const series = isSeries ? idx.map(p => pointSeries(p, comp)) : [];
             // Dense copies on the date axis: raw for relative series, detrended for correlation
             const dense = series.map(s => {
                 const out = new Float64Array(S.nDates).fill(NaN);
@@ -2881,7 +2895,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const rates = mode === 'rate' ? computeRates(comp) : null;
             const val = idx.map(p => (mode === 'rate' ? rates[p] : mode === 'date' ? valueAt(S.dateIdx, p) : NaN));
             // Signed field difference j - i, or the relative-series RMS (no sign)
-            const pairDiff = mode === 'series'
+            const pairDiff = isSeries
                 ? (i, j) => relativeRms(dense[i], dense[j])
                 : (i, j) => val[j] - val[i];
 
@@ -2895,32 +2909,36 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 const a = tri.triangles[e], b = tri.triangles[e % 3 === 2 ? e - 2 : e + 1];
                 const km = haversineKm(lon[a], lat[a], lon[b], lat[b]);
                 if (km > maxKm) continue;
-                links.push({ a, b, km, diff: pairDiff(a, b), corr: pearson(detrended[a], detrended[b]), on: true, cut: false });
+                links.push({ a, b, km, diff: pairDiff(a, b), corr: isSeries ? pearson(detrended[a], detrended[b]) : NaN, on: true, cut: false });
             }
 
             // Per-point time-series metrics (do not depend on the network)
-            const minWin = Number($('inp-an-minwin').value) || 3, maxFrac = Number($('inp-an-maxfrac').value) || 0.75;
-            const { windowDays, minRatio, minSigma } = stepParams();
-            const temporal = new Float64Array(idx.length).fill(NaN), gaps = new Float64Array(idx.length).fill(NaN);
-            const steps = new Float64Array(idx.length).fill(NaN);
+            const metrics = {};
             A.stepsByPoint = {};
-            idx.forEach((p, i) => {
-                const s = series[i];
-                if (!s.y.length) return;
-                const [first, last] = $('sel-an-gapspan').value === 'record' ? S.span : [s.ti[0], s.ti[s.ti.length - 1]];
-                gaps[i] = gapPercent(s.ti, first, last);
-                temporal[i] = temporalVariability(s.t, s.y, minWin, maxFrac);
-                const byComp = Object.fromEntries(COMPONENTS.map(c => {
-                    const cs = c === comp ? s : pointSeries(p, c);
-                    return [c, detectSteps(cs.sec, cs.y, windowDays, minRatio, minSigma)];
-                }));
-                A.stepsByPoint[p] = byComp;
-                steps[i] = byComp[comp].length;
-            });
+            if (isSeries) {
+                const minWin = Number($('inp-an-minwin').value) || 3, maxFrac = Number($('inp-an-maxfrac').value) || 0.75;
+                const { windowDays, minRatio, minSigma } = stepParams();
+                const temporal = new Float64Array(idx.length).fill(NaN), gaps = new Float64Array(idx.length).fill(NaN);
+                const steps = new Float64Array(idx.length).fill(NaN);
+                idx.forEach((p, i) => {
+                    const s = series[i];
+                    if (!s.y.length) return;
+                    const [first, last] = $('sel-an-gapspan').value === 'record' ? S.span : [s.ti[0], s.ti[s.ti.length - 1]];
+                    gaps[i] = gapPercent(s.ti, first, last);
+                    temporal[i] = temporalVariability(s.t, s.y, minWin, maxFrac);
+                    const byComp = Object.fromEntries(COMPONENTS.map(c => {
+                        const cs = c === comp ? s : pointSeries(p, c);
+                        return [c, detectSteps(cs.sec, cs.y, windowDays, minRatio, minSigma)];
+                    }));
+                    A.stepsByPoint[p] = byComp;
+                    steps[i] = byComp[comp].length;
+                });
+                Object.assign(metrics, { temporal, gaps, steps });
+            }
 
             // Field-level SSF over the view (all pairs, not just links; subsampled for speed)
-            const cap = mode === 'series' ? 700 : 2000;
-            let sample = idx.map((_, i) => i).filter(i => (mode === 'series' ? series[i].y.length >= 12 : Number.isFinite(val[i])));
+            const cap = isSeries ? 700 : 2000;
+            let sample = idx.map((_, i) => i).filter(i => (isSeries ? series[i].y.length >= 12 : Number.isFinite(val[i])));
             const subsampled = sample.length > cap;
             if (subsampled) {
                 let seed = 7;
@@ -2930,9 +2948,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             }
             const maxDiff = Number($('inp-an-maxdiff').value) || Infinity;
             const ssf = ssfCurve(sample.map(i => lon[i]), sample.map(i => lat[i]),
-                (u, v) => pairDiff(sample[u], sample[v]), maxDiff, mode !== 'series');
+                (u, v) => pairDiff(sample[u], sample[v]), maxDiff, !isSeries);
 
-            Object.assign(A, { idx, lon, lat, links, pairDiff, mode, comp, maxDiff, ssf, metrics: { temporal, gaps, steps } });
+            Object.assign(A, { idx, lon, lat, links, pairDiff, mode, comp, maxDiff, ssf, metrics });
+            syncAnalysisControls();
             A.summary = `${mode === 'rate' ? 'velocity' : mode === 'date' ? 'displacement at ' + S.dates[S.dateIdx] : 'time series'} of ${comp} · ` +
                 `SSF median ${median(ssf.map(r => r[1]).filter(Number.isFinite)).toFixed(2)}` +
                 (subsampled ? ` (SSF on ${cap} sampled points)` : '') +
@@ -2951,7 +2970,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 linksOf[l.b].push({ j: l.a, diff: A.mode === 'series' ? l.diff : -l.diff, l });
             }
             const m = A.metrics;
-            for (const k of ['rms', 'mad', 'similarity', 'ssf', 'medlink']) m[k] = new Float64Array(n).fill(NaN);
+            const spatial = ['rms', 'mad', 'ssf', 'medlink', ...(A.mode === 'series' ? ['similarity'] : [])];
+            for (const k of spatial) m[k] = new Float64Array(n).fill(NaN);
             for (let i = 0; i < n; i++) {
                 const own = linksOf[i];
                 if (!own.length) continue;
@@ -2961,7 +2981,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     const md = median(diffs);
                     m.mad[i] = A.mode === 'series' ? md : median(diffs.map(d => Math.abs(d - md)));
                 }
-                m.similarity[i] = median(own.map(o => o.l.corr).filter(Number.isFinite));
+                if (m.similarity) m.similarity[i] = median(own.map(o => o.l.corr).filter(Number.isFinite));
                 m.medlink[i] = median(own.map(o => o.l.km));
                 // Resolution index of Hammond et al. (2021, eq. 4), as geepers
                 // ssf_per_station: the field-level SSF at the neighbor separations
@@ -3218,6 +3238,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
 
         function resetAnalysis() {
             Object.assign(A, { idx: null, links: null, metrics: {}, stepsByPoint: {} });
+            syncAnalysisControls();
             $('an-stats').textContent = '';
             $('an-legend').hidden = true;
             $('an-cmap-pop').hidden = true;
@@ -3277,6 +3298,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 setTimeout(runAnalysis, 30);   // let the message paint first
             };
             $('sel-an-metric').onchange = () => { AN_CMAP.range = null; drawAnalysisLayers(); };
+            $('sel-an-field').onchange = syncAnalysisControls;
+            syncAnalysisControls();
             $('chk-an-links').onchange = drawAnalysisLayers;
             $('chk-an-labels').onchange = () => {
                 if (map.getLayer('analysis-link-labels')) {
