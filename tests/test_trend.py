@@ -143,6 +143,34 @@ class TestEstimateTrend:
         assert "intercept" in res.parameters
 
 
+class TestPowerLawOnly:
+    def test_exact_pl_has_no_white_component(self):
+        # Regression: "PL" used to run the PLWN search (white fraction
+        # free) and zero the white part afterwards, so kappa and the
+        # likelihood were those of the PLWN fit. On flicker + white data
+        # the two models must now differ, with PLWN fitting at least as well.
+        dates, y = _synthetic(n=600, velocity=3.0, sigma_white=1.0, sigma_pl=2.0)
+        pl = estimate_trend(dates, y, noise_model="PL", periods_years=())
+        plwn = estimate_trend(dates, y, noise_model="PLWN", periods_years=())
+        assert pl.sigma_white == 0.0
+        assert plwn.sigma_white > 1.0
+        assert plwn.log_likelihood > pl.log_likelihood + 1.0
+        # Absorbing the white noise flattens the PL-only spectrum
+        assert pl.kappa > plwn.kappa + 0.1
+
+    def test_exact_pl_likelihood_is_its_own(self):
+        # The reported likelihood must be that of the returned (kappa, PL-only)
+        # model: it cannot beat the best pure power-law on a kappa scan
+        dates, y = _synthetic(n=400, velocity=3.0, sigma_white=2.0, sigma_pl=1.0)
+        pl = estimate_trend(dates, y, noise_model="PL", periods_years=())
+        fast = estimate_trend(
+            dates, y, noise_model="PL", periods_years=(), method="whittle"
+        )
+        # Whittle evaluates the exact PL likelihood at its own kappa
+        assert pl.log_likelihood >= fast.log_likelihood - 1e-6
+        assert abs(pl.kappa - fast.kappa) < 0.3
+
+
 class TestWhittleMethod:
     def test_matches_exact_on_plwn(self):
         dates, y = _synthetic(n=600, velocity=5.0, sigma_white=1.0, sigma_pl=2.0)

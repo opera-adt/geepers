@@ -45,6 +45,9 @@ __all__ = ["TrendResult", "estimate_trend", "estimate_trend_many"]
 logger = logging.getLogger("geepers")
 
 DAYS_PER_YEAR = 365.25
+# Logit of the white-noise fraction that switches the white component off
+# (fraction ~ 4e-18, below double precision relative to the power-law part)
+_LOGIT_NO_WHITE = -40.0
 
 
 @dataclass
@@ -580,11 +583,39 @@ def estimate_trend(
         nll = _negative_log_likelihood(
             np.array([kappa_hat, z_hat]), C_cache, obs_idx, n_epochs, A, y0, use_rmle
         )
+    elif noise_model == "PL":
+        # Power-law only: the white fraction is pinned at zero, so the
+        # search is over kappa alone.
+        def _nll_pl(k: np.ndarray) -> float:
+            return _negative_log_likelihood(
+                np.array([k[0], _LOGIT_NO_WHITE]),
+                C_cache,
+                obs_idx,
+                n_epochs,
+                A,
+                y0,
+                use_rmle,
+            )
+
+        starts_pl = sorted((_nll_pl(np.array([k0])), k0) for k0 in (-0.4, -1.0, -1.6))
+        best = None
+        for _, k0 in starts_pl[:2]:
+            res = optimize.minimize(
+                _nll_pl,
+                x0=np.array([k0]),
+                method="Nelder-Mead",
+                options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 300},
+            )
+            if best is None or res.fun < best.fun:
+                best = res
+        kappa_hat = float(best.x[0])
+        phi_hat = 0.0
+        nll = float(best.fun)
     else:
         # Coarse grid scan for a good starting point, then one polish run.
         # The PLWN likelihood surface in (kappa, phi) is smooth; this is
         # much cheaper than multi-start Nelder-Mead.
-        z0_grid = [30.0] if noise_model == "PL" else [-2.0, 0.0, 2.0]
+        z0_grid = [-2.0, 0.0, 2.0]
         args = (C_cache, obs_idx, n_epochs, A, y0, use_rmle)
         starts = sorted(
             (
@@ -609,8 +640,6 @@ def estimate_trend(
                 best = res
         kappa_hat = float(best.x[0])
         phi_hat = float(1.0 / (1.0 + np.exp(-best.x[1])))
-        if noise_model == "PL":
-            phi_hat = 0.0
         nll = float(best.fun)
 
     # Final GLS solve at the optimum (reuse the cached covariance if the
