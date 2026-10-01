@@ -66,6 +66,22 @@ class TestFitVelocities:
         out = fit_velocities({"A": both_same}, method="midas")
         assert out.loc["A", "gps_velocity"] == out.loc["A", "insar_velocity"]
 
+    def test_steps_align_when_insar_starts_late(self):
+        # Regression: step epochs were referenced to the first table date
+        # but time to the first finite sample of each series, so a series
+        # with leading NaNs had its steps shifted
+        rng = np.random.default_rng(0)
+        dates = pd.date_range("2018-01-01", periods=1500, freq="D")
+        v_true = 0.010
+        gps = v_true * np.arange(1500) / 365.25 + rng.normal(0, 0.001, 1500)
+        gps[900:] += 0.03
+        insar = gps.copy()
+        insar[:300] = np.nan
+        df = pd.DataFrame({"los_gps": gps, "los_insar": insar}, index=dates)
+        out = fit_velocities({"A": df}, "midas", step_dates={"A": [dates[900]]})
+        assert out.loc["A", "gps_velocity"] == pytest.approx(v_true, abs=0.001)
+        assert out.loc["A", "insar_velocity"] == pytest.approx(v_true, abs=0.001)
+
 
 class TestComparisonStats:
     def test_perfect_agreement(self):

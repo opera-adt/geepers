@@ -55,11 +55,9 @@ def _fit_one(
     good = np.isfinite(values)
     if good.sum() < 2:
         return np.nan, np.nan
-    t = (
-        (dates[good] - dates[good][0]).total_seconds().to_numpy()
-        / 86400
-        / DAYS_PER_YEAR
-    )
+    # Same time origin as the step epochs built in `fit_velocities`, even
+    # when this series starts later than the table (leading NaNs)
+    t = (dates[good] - dates.min()).total_seconds().to_numpy() / 86400 / DAYS_PER_YEAR
     v = values[good]
 
     if method == "midas":
