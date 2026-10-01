@@ -28,13 +28,67 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from numpy.typing import ArrayLike
 
-__all__ = ["detect_steps", "detect_steps_enu"]
+__all__ = ["clean_step_dates", "detect_steps", "detect_steps_enu", "white_noise_sigma"]
 
 
 def _aic(rss: float, n: int, k: int) -> float:
     """AIC for a least-squares fit with `k` parameters and `n` samples."""
     return n * np.log(max(rss, 1e-20) / n) + 2 * k
+
+
+def clean_step_dates(
+    step_dates: ArrayLike,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    min_separation_days: float = 1.0,
+) -> list[pd.Timestamp]:
+    """Reduce step epochs to those a fit over one record can estimate.
+
+    Catalogued and detected steps cannot be passed to
+    `geepers.trend.estimate_trend` or `geepers.linearity.linearity_test`
+    as they come: an offset before the first epoch is indistinguishable
+    from the intercept, one after the last epoch has no data, and two
+    offsets within one sampling interval are the same column of the
+    design matrix. Each makes the fit singular.
+
+    Parameters
+    ----------
+    step_dates : array-like of datetime64
+        Candidate step epochs, in any order, duplicates allowed (e.g.
+        `detect_steps` output concatenated with `UnrSource.steps`).
+    start, end : str or pd.Timestamp
+        First and last epoch of the series the steps will be fitted to.
+    min_separation_days : float
+        Steps closer together than this are merged, keeping the
+        earliest. Use the sampling interval of the series being fitted
+        (30 for 30-day means). Default 1.
+
+    Returns
+    -------
+    list of pd.Timestamp
+        Sorted step epochs with ``start < date <= end``, at least
+        `min_separation_days` apart.
+
+    Examples
+    --------
+    >>> clean_step_dates(
+    ...     ["2019-07-06", "2010-01-01", "2019-07-04", "2021-03-01"],
+    ...     start="2014-01-01", end="2024-01-01", min_separation_days=30,
+    ... )
+    [Timestamp('2019-07-04 00:00:00'), Timestamp('2021-03-01 00:00:00')]
+
+    """
+    first, last = pd.Timestamp(start), pd.Timestamp(end)
+    candidates = pd.DatetimeIndex(pd.to_datetime(np.atleast_1d(np.asarray(step_dates))))
+    inside = sorted(set(candidates[(candidates > first) & (candidates <= last)]))
+    separation = pd.Timedelta(days=min_separation_days)
+    kept: list[pd.Timestamp] = []
+    for date in inside:
+        if not kept or date - kept[-1] >= separation:
+            kept.append(date)
+    return kept
 
 
 def white_noise_sigma(values: np.ndarray) -> float:

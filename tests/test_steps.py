@@ -2,7 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from geepers.steps import detect_steps, detect_steps_enu, white_noise_sigma
+from geepers.steps import (
+    clean_step_dates,
+    detect_steps,
+    detect_steps_enu,
+    white_noise_sigma,
+)
 from geepers.synthetic import SyntheticStep, power_law_noise, synthetic_timeseries
 
 
@@ -104,6 +109,48 @@ class TestMinimumStepSize:
         series = _series(dates, values)
         assert len(detect_steps(series, window_days=200, min_step_sigma=0)) == 1
         assert detect_steps(series, window_days=200).empty
+
+
+class TestCleanStepDates:
+    def test_drops_steps_outside_the_record(self):
+        kept = clean_step_dates(
+            ["2010-05-01", "2014-01-01", "2016-03-01", "2024-01-01", "2030-01-01"],
+            start="2014-01-01",
+            end="2024-01-01",
+        )
+        # The first epoch itself cannot carry a step; the last one can
+        assert kept == [pd.Timestamp("2016-03-01"), pd.Timestamp("2024-01-01")]
+
+    def test_merges_close_steps_keeping_the_earliest(self):
+        kept = clean_step_dates(
+            ["2019-07-06", "2019-07-04", "2019-07-06", "2019-07-30", "2019-09-01"],
+            start="2014-01-01",
+            end="2024-01-01",
+            min_separation_days=30,
+        )
+        assert kept == [pd.Timestamp("2019-07-04"), pd.Timestamp("2019-09-01")]
+
+    def test_empty(self):
+        assert clean_step_dates([], start="2014-01-01", end="2024-01-01") == []
+
+    def test_makes_catalog_steps_usable_in_a_fit(self):
+        # Regression: a catalog passed as is (a step before the record, two
+        # within one sample) made the trend fit singular
+        from geepers.trend import estimate_trend
+
+        dates = pd.date_range("2014-01-01", periods=120, freq="30D")
+        rng = np.random.default_rng(0)
+        values = rng.normal(0, 1, 120) + 15.0 * (dates >= pd.Timestamp("2019-07-04"))
+        catalog = ["2011-03-11", "2019-07-04", "2019-07-06"]
+        with pytest.raises(ValueError, match="rank deficient"):
+            estimate_trend(
+                dates, values, sampling_days=30, step_dates=catalog, noise_model="WN"
+            )
+        steps = clean_step_dates(catalog, dates[0], dates[-1], min_separation_days=30)
+        fit = estimate_trend(
+            dates, values, sampling_days=30, step_dates=steps, noise_model="WN"
+        )
+        assert fit.parameters["step_0"][0] == pytest.approx(15.0, abs=1.0)
 
 
 class TestDetectStepsEnu:

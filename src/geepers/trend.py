@@ -511,6 +511,14 @@ def estimate_trend(
         t_years, poly_deg, periods_years, step_years, log_terms, exp_terms
     )
 
+    if np.linalg.matrix_rank(A) < A.shape[1]:
+        msg = (
+            "The trajectory model is rank deficient. A step or postseismic date"
+            " outside the record, or two within one sampling interval, gives"
+            " identical columns; see `geepers.steps.clean_step_dates`."
+        )
+        raise ValueError(msg)
+
     # Remove the mean to keep the likelihood well-conditioned
     y_mean = float(np.mean(y))
     y0 = y - y_mean
