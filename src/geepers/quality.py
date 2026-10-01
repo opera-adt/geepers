@@ -68,7 +68,8 @@ class StationQuality:
     similarity : float | None
         Mean phase similarity value, or None if not available.
     rms_misfit : float
-        Root-mean-square misfit between GPS and InSAR measurements.
+        Root-mean-square misfit between GPS and InSAR measurements, after
+        removing their mean offset (the series have independent zero levels).
 
     """
 
@@ -127,6 +128,9 @@ def compute_station_quality(df: pd.DataFrame) -> StationQuality:
     common_mask = ~(df["los_gps"].isna() | df["los_insar"].isna())
     if common_mask.sum() > 0:
         diff = df.loc[common_mask, "los_insar"] - df.loc[common_mask, "los_gps"]
+        # The two series have independent zero levels (GPS mean-removed,
+        # InSAR zero at its first epoch); that constant is not misfit
+        diff = diff - diff.mean()
         rms_misfit = float(np.sqrt(np.mean(diff**2)))
     else:
         rms_misfit = np.inf

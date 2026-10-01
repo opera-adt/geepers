@@ -61,6 +61,27 @@ class TestPairwiseRMSE:
         after = pairwise_differential_rmse(shifted, coords)
         np.testing.assert_allclose(base["rmse"], after["rmse"], atol=1e-12)
 
+    def test_time_datum_offset_is_not_misfit(self):
+        # Regression: GPS is mean-removed and InSAR is zero at its first
+        # epoch; an InSAR series identical to GPS apart from that constant
+        # used to give centimeters of RMSE for stations with different rates
+        dates = pd.date_range("2017-01-01", periods=200, freq="12D")
+        t = np.arange(200) * 12 / 365.25
+        merged, coords = {}, {}
+        for k, rate in enumerate([0.0, 0.005, 0.02, -0.01]):
+            gps = rate * t
+            gps = gps - gps.mean()
+            name = f"ST{k:02d}"
+            merged[name] = pd.DataFrame(
+                {"los_gps": gps, "los_insar": gps - gps[0]}, index=dates
+            )
+            coords[name] = (-118.0 + 0.3 * k, 34.0)
+        df = pairwise_differential_rmse(merged, coords)
+        np.testing.assert_allclose(df["rmse"], 0, atol=1e-12)
+        # The removed offset is still reported
+        assert df["bias"].abs().max() > 0.01
+        np.testing.assert_allclose(epoch_rmse(merged)["rmse"], 0, atol=1e-12)
+
     def test_min_common_dates(self, merged_network):
         merged, coords = merged_network
         # Cripple one station to 2 valid epochs

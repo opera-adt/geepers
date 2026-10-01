@@ -119,7 +119,9 @@ def pairwise_differential_rmse(
     For each unique pair (A, B), forms the *relative* displacement
     series between the two stations for GPS and InSAR separately -
     which cancels any common reference/datum - and reduces the misfit
-    of the two relative series to an RMSE. Plotting `rmse` against
+    of the two relative series to an RMSE about its mean (the GPS and
+    InSAR series have independent zero levels in time, so a constant
+    offset between them is not misfit). Plotting `rmse` against
     `distance_km` gives the structure function used for OPERA DISP
     requirement verification.
 
@@ -138,8 +140,8 @@ def pairwise_differential_rmse(
     -------
     pd.DataFrame
         One row per pair: ``station1``, ``station2``, ``distance_km``,
-        ``rmse`` (same units as the series), ``bias`` (mean of the
-        differential misfit) and ``n_dates``.
+        ``rmse`` (same units as the series, mean removed), ``bias`` (the
+        removed mean of the differential misfit) and ``n_dates``.
 
     """
     names = [s for s in station_to_merged_df if s in station_coords]
@@ -164,6 +166,10 @@ def pairwise_differential_rmse(
                 - d1.loc[common, "los_insar"].to_numpy()
             )
             resid = insar_diff - gps_diff
+            # GPS and InSAR have independent zero levels in time, so the
+            # mean of the residual is a datum offset, not misfit
+            bias = float(np.mean(resid))
+            resid = resid - bias
             lon1, lat1 = station_coords[s1]
             lon2, lat2 = station_coords[s2]
             dist_km = _GEOD.inv(lon1, lat1, lon2, lat2)[2] / 1000.0
@@ -173,7 +179,7 @@ def pairwise_differential_rmse(
                     "station2": s2,
                     "distance_km": dist_km,
                     "rmse": float(np.sqrt(np.mean(resid**2))),
-                    "bias": float(np.mean(resid)),
+                    "bias": bias,
                     "n_dates": len(common),
                 }
             )
@@ -249,8 +255,9 @@ def epoch_rmse(
     """Network-wide InSAR-GPS misfit per acquisition epoch.
 
     For each date, computes the spread of the per-station residuals
-    ``los_insar - los_gps`` after removing the network median at that
-    date (which absorbs any common datum/reference shift). Spikes in
+    ``los_insar - los_gps`` after removing each station's mean residual
+    (the two series have independent zero levels) and the network median
+    at that date (which absorbs any common datum/reference shift). Spikes in
     the result flag problem epochs: ionospheric storms, unwrapping
     failures, snow cover.
 
@@ -271,7 +278,9 @@ def epoch_rmse(
     frames = []
     for station, df in station_to_merged_df.items():
         resid = (df["los_insar"] - df["los_gps"]).rename(station)
-        frames.append(resid)
+        # Per-station zero-level offset between the two series is a
+        # constant in time; the per-epoch network median cannot absorb it
+        frames.append(resid - resid.mean())
     wide = pd.concat(frames, axis=1)
 
     resid = wide.sub(wide.median(axis=1), axis=0)

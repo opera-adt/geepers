@@ -152,3 +152,11 @@ def test_compute_station_quality_empty_quality_columns():
 
     assert quality.temporal_coherence is None
     assert quality.similarity is None
+
+
+def test_rms_misfit_ignores_zero_level_offset():
+    """Regression: a constant offset between the series is not misfit."""
+    dates = pd.date_range("2023-01-01", periods=30, freq="D")
+    gps = np.linspace(0, 0.01, 30)
+    df = pd.DataFrame({"los_gps": gps, "los_insar": gps + 0.05}, index=dates)
+    assert compute_station_quality(df).rms_misfit == pytest.approx(0.0, abs=1e-12)
