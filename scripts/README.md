@@ -170,7 +170,7 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   counts against the file's own
   dates rather than a fixed step, which matters for monthly data.
 - The chart's `linearity` button runs the full linearity test on the
-  point (port of `geepers.linearity`, spectral index estimated): per
+  point (port of `geepers.linearity`, flicker + white noise): per
   component the preferred model, the rate ± σ with colored noise, the
   acceleration or rate change with its p-value, the departure from the
   line, and how long the rate stays within 10 mm. Series longer than

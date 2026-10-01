@@ -73,6 +73,24 @@ class TestNoiseCovariance:
 
 
 class TestLinearityTest:
+    def test_default_noise_does_not_absorb_an_offset(self):
+        # Regression, seen on real station series: with a free spectral index
+        # an earthquake-sized offset is explained as very steep noise and the
+        # series is called linear; the flicker default must reject one rate
+        dates, values = _monthly("linear")
+        values = values.copy()
+        values[30:] += 40.0
+        free = linearity_test(dates, values, sampling_days=MONTH, noise_model="PLWN")
+        assert free.model == "linear"
+        assert free.trend.kappa < -1.5
+        result = linearity_test(dates, values, sampling_days=MONTH)
+        assert result.model != "linear"
+        # Declared as a step, the same series is linear again
+        known = linearity_test(
+            dates, values, sampling_days=MONTH, step_dates=[dates[30]]
+        )
+        assert known.model == "linear"
+
     def test_noise_comes_from_the_quadratic_fit(self):
         # Regression for the design: with the noise estimated around a
         # straight line, curvature was absorbed into a steeper spectrum and
@@ -81,7 +99,7 @@ class TestLinearityTest:
         linear_noise = estimate_trend(dates, values, sampling_days=MONTH)
         curved_noise = estimate_trend(dates, values, sampling_days=MONTH, poly_deg=2)
         assert linear_noise.kappa < curved_noise.kappa - 0.5
-        result = linearity_test(dates, values, sampling_days=MONTH)
+        result = linearity_test(dates, values, sampling_days=MONTH, noise_model="PLWN")
         assert result.model == "quadratic"
         assert result.trend.kappa == pytest.approx(linear_noise.kappa)
 
@@ -96,7 +114,7 @@ class TestLinearityTest:
     def test_linear_fit_is_the_trend_estimate(self):
         dates, values = _monthly("linear")
         result = linearity_test(dates, values, sampling_days=MONTH)
-        trend = estimate_trend(dates, values, sampling_days=MONTH)
+        trend = estimate_trend(dates, values, sampling_days=MONTH, noise_model="FNWN")
         assert result.trend.velocity == pytest.approx(trend.velocity)
         assert result.trend.velocity == pytest.approx(
             -3.0, abs=3 * trend.velocity_uncertainty

@@ -92,9 +92,12 @@ horizon.years, horizon.driver
 ```
 
 Curvature and strongly correlated noise look alike over one record, so
-the verdict depends on the noise model: the default estimates the
-spectral index; `noise_model="FNWN"` (flicker) detects more but also
-flags more linear series when the noise is closer to a random walk.
+the verdict depends on the noise model. The default is flicker + white.
+A free spectral index (`noise_model="PLWN"`) explains real offsets and
+rate changes as very steep noise and calls everything linear; the fixed
+index instead flags about one in five linear series whose noise really
+is a random walk. Declare known offsets with `step_dates`, or they
+count as non-linearity.
 
 ## Station stability metrics (`geepers.variability`)
 

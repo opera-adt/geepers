@@ -845,7 +845,7 @@
                 <label style="font-weight:400;color:var(--muted)" title="Fit a trajectory model: polynomial, seasonal terms and steps">
                     <input type="checkbox" id="chk-fit"> fit
                 </label>
-                <button id="chart-lin" title="Linearity test of this point: is one rate enough? Compares linear, quadratic and piecewise-linear models under power-law + white noise (geepers.linearity). Takes a few seconds.">linearity</button>
+                <button id="chart-lin" title="Linearity test of this point: is one rate enough? Compares linear, quadratic and piecewise-linear models under flicker + white noise (geepers.linearity). Offsets the model does not know about count as non-linearity.">linearity</button>
                 <button id="chart-csv" title="Download this point's time series as CSV">csv</button>
                 <button id="chart-close" title="Close">✕</button>
             </span>
@@ -2963,11 +2963,13 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // data, whose samples then fall on a regular grid without collisions
         const meanSamplingDays = () => (S.dateSec[S.nDates - 1] - S.dateSec[0]) / (S.nDates - 1) / DAY_SEC;
 
-        // The linearity test of one series (seconds, values). `estimateKappa` false
-        // fixes the noise at flicker + white (fast, for the map); `simulations` sets
+        // The linearity test of one series (seconds, values). The noise is flicker +
+        // white, as geepers' default: with `estimateKappa` the spectral index runs to
+        // its steep limit on real series and explains every offset or rate change as
+        // noise, so nothing is ever flagged. `simulations` sets
         // the noise realizations behind the piecewise p-value (0 = skip); `withRate`
         // adds the linear fit with its own noise, i.e. the rate one would extrapolate.
-        function linearityTest(sec, values, { maxSamples = 160, estimateKappa = true, simulations = 2000, withRate = true, sampling = meanSamplingDays() } = {}) {
+        function linearityTest(sec, values, { maxSamples = 160, estimateKappa = false, simulations = 2000, withRate = true, sampling = meanSamplingDays() } = {}) {
             if (values.length < 30) return null;
             const { obs, y, binDays } = binSeries(sec, values, maxSamples, sampling);
             const n = y.length, nEpochs = obs[n - 1] + 1;
@@ -3255,7 +3257,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 // Linearity is a dense noise fit per point: only for a modest view
                 A.linModels = null;
                 if (idx.length <= LIN.maxPoints) {
-                    const fits = series.map(s => linearityTest(s.sec, s.y, { estimateKappa: false, simulations: 0, withRate: false }));
+                    const fits = series.map(s => linearityTest(s.sec, s.y, { simulations: 0, withRate: false }));
                     metrics.linearity = Float64Array.from(fits, f => (f ? f.departure : NaN));
                     A.linModels = fits.map(f => f?.model);
                     const code = { linear: 0, quadratic: 1, piecewise: 2 };

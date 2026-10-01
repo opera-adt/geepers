@@ -156,7 +156,7 @@ def linearity_test(
     sampling_days: float = 1.0,
     periods_years: tuple[float, ...] = (1.0, 0.5),
     step_dates: ArrayLike | None = None,
-    noise_model: Literal["PLWN", "PL", "WN", "FNWN", "RWFNWN"] = "PLWN",
+    noise_model: Literal["PLWN", "PL", "WN", "FNWN", "RWFNWN"] = "FNWN",
     method: Literal["exact", "whittle"] = "exact",
     min_segment_years: float = 1.5,
     n_breakpoints: int = 50,
@@ -172,13 +172,19 @@ def linearity_test(
     two parameters.
 
     Curvature and strongly correlated noise look alike over one record,
-    so the verdict depends on the noise model. With the spectral index
-    estimated (the default "PLWN") a linear series with random-walk
-    noise is flagged about one time in ten; fixing it at flicker
-    ("FNWN") detects more real non-linearity but flags such series
-    about twice as often. A rate change near mid-record is usually
-    reported as "quadratic": the two shapes are close, and the hinge
-    costs one more parameter.
+    so the verdict depends on the noise model. The default is flicker +
+    white ("FNWN"), the usual model of GNSS noise. Letting the spectral
+    index go free ("PLWN") is not a safer choice: on real station series
+    with obvious rate changes, offsets or accelerating subsidence the
+    index runs to its steep limit and explains all of it as noise, so
+    every series is called linear (with a correspondingly large rate
+    uncertainty). The price of the fixed index is that a linear series
+    whose noise really is a random walk is flagged about one time in
+    five. An unmodeled offset is usually reported as non-linearity
+    (one at mid-record instead biases the rate unnoticed); pass known
+    offsets as `step_dates`. A rate change near mid-record is usually reported as
+    "quadratic": the two shapes are close, and the hinge costs one more
+    parameter.
 
     Parameters
     ----------
@@ -194,7 +200,7 @@ def linearity_test(
     step_dates : array-like of datetime64, optional
         Known offsets, estimated in every model.
     noise_model : {"PLWN", "PL", "WN", "FNWN", "RWFNWN"}
-        Noise model of `estimate_trend`. Default "PLWN".
+        Noise model of `estimate_trend`. Default "FNWN".
     method : {"exact", "whittle"}
         Noise estimation method of `estimate_trend`.
     min_segment_years : float
