@@ -172,11 +172,14 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
 - **Linearity** checkbox next to Velocity (Display): colors the map by
   whether one rate describes each point's series for the shown component
   — 0 linear, 1 quadratic, 2 piecewise. Points are tested as they come
-  into view (in the background, up to 3,000 untested points at a time)
+  into view (in the background)
   and results are kept while the dataset is loaded; untested points stay
   grey, hover shows the verdict and the departure from a straight line.
-  Offsets are not estimated yet (TODO): a series with an earthquake or
-  equipment step is reported as non-linear.
+  With "with offsets" ticked (default) the steps the detector finds in
+  each series are estimated in every model, so an earthquake or
+  equipment step is not reported as non-linear; the detector's window,
+  AIC and size settings under Analysis apply. Up to 1,500 untested
+  points at a time (about 80 ms each on daily data).
 - The chart's `linearity` button runs the full linearity test on the
   point (port of `geepers.linearity`, flicker + white noise): per
   component the preferred model, the rate ± σ with colored noise, the

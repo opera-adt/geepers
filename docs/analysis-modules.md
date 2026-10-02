@@ -97,8 +97,8 @@ A free spectral index (`noise_model="PLWN"`) explains real offsets and
 rate changes as very steep noise and calls everything linear; the fixed
 index instead flags about one in five linear series whose noise really
 is a random walk. Declare known offsets with `step_dates`, or they
-count as non-linearity; the web viewer's linearity test does not
-estimate offsets yet.
+count as non-linearity. The web viewer's linearity test estimates the
+offsets its step detector finds.
 
 ## Station stability metrics (`geepers.variability`)
 

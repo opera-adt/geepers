@@ -548,8 +548,11 @@
                 <label style="min-width:0" title="Color points by linear trend (least-squares over the full record) instead of per-date displacement">
                     <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
                 </label>
-                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey. Offsets (earthquakes, equipment changes) are not estimated yet, so a series with one is reported as non-linear.">
+                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey. Tick 'with offsets' to estimate detected steps (earthquakes, equipment changes), which otherwise read as non-linear motion.">
                     <input type="checkbox" id="chk-lin"> Linearity
+                </label>
+                <label style="min-width:0" title="Estimate offsets in the linearity test, at the steps the detector finds in each series (window, AIC and size settings under Analysis), so that an earthquake or equipment step is not reported as non-linear motion. Also used by the chart's linearity button, together with the steps typed in its fit controls.">
+                    <input type="checkbox" id="chk-lin-steps" checked> with offsets
                 </label>
             </div>
             <div id="lin-status"></div>
@@ -1979,7 +1982,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         let linRun = 0;
 
         function linState(comp) {
-            return S.lin[comp] ??= {
+            return S.lin[linKey(comp)] ??= {
                 code: new Float32Array(S.nPoints).fill(NaN),
                 dep: new Float32Array(S.nPoints).fill(NaN),
                 done: new Uint8Array(S.nPoints),
@@ -1987,7 +1990,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         }
 
         function linearityHover(p) {
-            const st = S.lin[S.prop], code = st?.code[p];
+            const st = S.lin[linKey(S.prop)], code = st?.code[p];
             if (!st?.done[p]) return 'not tested yet';
             if (!Number.isFinite(code)) return 'too short for a linearity test';
             return LIN_MODELS[code] + (code ? `, ${fmt(st.dep[p])} mm off a straight line` : '');
@@ -2022,7 +2025,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 const until = performance.now() + 60;
                 while (k < todo.length && performance.now() < until) {
                     const p = todo[k++], s = pointSeries(p, comp);
-                    const r = linearityTest(s.sec, s.y, { simulations: 0, withRate: false });
+                    const r = linearityTest(s.sec, s.y, { simulations: 0, withRate: false, steps: linearitySteps(s) });
                     st.done[p] = 1;
                     if (r) { st.code[p] = LIN_MODELS.indexOf(r.model); st.dep[p] = r.departure; }
                     map.setFeatureState({ source: 'grid', id: p }, { v: r ? st.code[p] : null });
@@ -2852,15 +2855,29 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
         }
 
+        // Offsets for the linearity test of one series (unix seconds): the detected
+        // steps when 'with offsets' is ticked, plus any `extra` epochs
+        function linearitySteps(s, extra = []) {
+            if (!$('chk-lin-steps').checked) return extra;
+            const { windowDays, minRatio, minSigma } = stepParams();
+            return [...detectSteps(s.sec, s.y, windowDays, minRatio, minSigma).map(f => f.sec), ...extra];
+        }
+
+        // Cache key of the map's linearity results: component and step settings
+        function linKey(comp) {
+            if (!$('chk-lin-steps').checked) return `${comp}|none`;
+            const { windowDays, minRatio, minSigma } = stepParams();
+            return `${comp}|${windowDays}|${minRatio}|${minSigma}`;
+        }
+
         // ================= linearity =================
         // Port of geepers.linearity: is one rate enough? A linear, a quadratic and a
         // continuous piecewise-linear model (free breakpoint) are compared by BIC under
         // one power-law + white noise covariance, estimated around the quadratic model
         // (around a straight line, curvature is absorbed into a steeper noise spectrum).
-        // TODO: estimate offsets too. geepers.linearity takes `step_dates`; here none
-        // are passed, so an earthquake or equipment offset is reported as non-linearity.
-        // Feed the steps typed in the chart fit, the detected ones, or the UNR catalog.
-        const LIN = { tolerance: 10, maxPoints: 600, maxDisplay: 3000, breakpoints: 50, minSegment: 1.5 };
+        // Offsets (`steps`) are estimated in every model, as geepers.linearity's
+        // `step_dates`; the callers pass the detected steps (linearitySteps).
+        const LIN = { tolerance: 10, maxPoints: 600, maxDisplay: 1500, breakpoints: 50, minSegment: 1.5 };
 
         // In-place lower Cholesky factor of a dense n x n matrix; false if not positive definite
         function cholesky(a, n) {
@@ -3009,9 +3026,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 }
                 best = evaluate(best.x[0], best.x[1]);
             } else {
-                // One free parameter: bracket on a grid, then golden-section search
+                // One free parameter: bracket on a grid, then golden-section search. The
+                // grid reaches far out: on binned (e.g. 30-day) data the white share is
+                // often negligible, with an optimum near logit -40, as in geepers
                 const f = z => evaluate(kappaFixed, z).nll;
-                const grid = [-8, -6, -4, -2, 0, 2, 4, 6, 8], vals = grid.map(f);
+                const grid = [-40, -30, -20, -14, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 14, 20, 30, 40], vals = grid.map(f);
                 const k = vals.indexOf(Math.min(...vals));
                 let a = grid[Math.max(0, k - 1)], b = grid[Math.min(grid.length - 1, k + 1)];
                 const g = (Math.sqrt(5) - 1) / 2;
@@ -3064,7 +3083,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         // noise, so nothing is ever flagged. `simulations` sets
         // the noise realizations behind the piecewise p-value (0 = skip); `withRate`
         // adds the linear fit with its own noise, i.e. the rate one would extrapolate.
-        function linearityTest(sec, values, { maxSamples = 160, estimateKappa = false, simulations = 2000, withRate = true, sampling = meanSamplingDays() } = {}) {
+        function linearityTest(sec, values, { maxSamples = 160, estimateKappa = false, simulations = 2000, withRate = true, sampling = meanSamplingDays(), steps = [] } = {}) {
             if (values.length < 30) return null;
             const { obs, y, binDays } = binSeries(sec, values, maxSamples, sampling);
             const n = y.length, nEpochs = obs[n - 1] + 1;
@@ -3074,6 +3093,19 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const col = f => Float64Array.from(t, f), w = 2 * Math.PI;
             const lin = [col(() => 1), col(x => x), col(x => Math.cos(w * x)), col(x => Math.sin(w * x)),
                 col(x => Math.cos(2 * w * x)), col(x => Math.sin(2 * w * x))];
+            // Offsets (unix seconds), estimated in every model. Like geepers.steps.
+            // clean_step_dates: one outside the record, or in the same sample as the
+            // previous one, would duplicate a column and make the fit singular.
+            const stepUsed = [];
+            for (const s of [...steps].sort((a, b) => a - b)) {
+                const ts = (s - sec[0]) / YEAR_SEC, c = col(x => (x >= ts ? 1 : 0));
+                const ones = c.reduce((a, b) => a + b, 0);
+                const prev = stepUsed.length ? lin[lin.length - 1] : null;
+                if (ones === 0 || ones === n || (prev && c.every((v, i) => v === prev[i]))) continue;
+                lin.push(c);
+                stepUsed.push(s);
+            }
+            const nBase = 6;
             const tMean = t.reduce((a, b) => a + b, 0) / n;
             const quad = col(x => (x - tMean) ** 2);
 
@@ -3150,11 +3182,14 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             if (res.model === 'quadratic') res.departure = departure(model([...lin, quad], fitQuad.beta));
             if (res.model === 'piecewise') res.departure = departure(hingeFit);
 
+            res.steps = stepUsed;
             if (withRate) {
                 const own = fitNoise(lin, y, obs, nEpochs, kappaFixed);
                 if (!own) return null;
                 res.rate = own.fit.beta[1];
                 res.rateSigma = Math.sqrt(own.sigma2 * own.fit.cov[1][1]);
+                res.stepSizes = stepUsed.map((_, j) => own.fit.beta[nBase + j]);
+                res.stepSigmas = stepUsed.map((_, j) => Math.sqrt(own.sigma2 * own.fit.cov[nBase + j][nBase + j]));
                 // Validity horizon: when rate uncertainty plus the non-linearity found
                 // reaches the tolerance (geepers.linearity.validity_horizon)
                 const sv = res.rateSigma, tol = LIN.tolerance, a = Math.abs(res.acceleration);
@@ -3352,7 +3387,11 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 // Linearity is a dense noise fit per point: only for a modest view
                 A.linModels = null;
                 if (idx.length <= LIN.maxPoints) {
-                    const fits = series.map(s => linearityTest(s.sec, s.y, { simulations: 0, withRate: false }));
+                    const withSteps = $('chk-lin-steps').checked;
+                    const fits = series.map((s, i) => linearityTest(s.sec, s.y, {
+                        simulations: 0, withRate: false,
+                        steps: withSteps ? A.stepsByPoint[idx[i]][comp].map(f => f.sec) : [],
+                    }));
                     metrics.linearity = Float64Array.from(fits, f => (f ? f.departure : NaN));
                     A.linModels = fits.map(f => f?.model);
                     const code = { linear: 0, quadratic: 1, piecewise: 2 };
@@ -3660,7 +3699,8 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const date = sec => new Date(sec * 1000).toISOString().slice(0, 10);
             const signed = v => (v > 0 ? '+' : '') + fmt(v);
             out.replaceChildren(...COMPONENTS.map((c, i) => {
-                const s = pointSeries(p, c), r = linearityTest(s.sec, s.y);
+                const s = pointSeries(p, c);
+                const r = linearityTest(s.sec, s.y, { steps: linearitySteps(s, fitSteps().map(st => st.t)) });
                 const line = document.createElement('div'), name = document.createElement('b');
                 name.style.color = SERIES_COLORS[i];
                 name.textContent = c[0].toUpperCase();
@@ -3670,6 +3710,9 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 if (r.model === 'piecewise') parts.push(`rate ${signed(r.rateBefore)} → ${signed(r.rateAfter)} mm/yr at ${date(r.breakSec)} (p ${r.pPiecewise.toFixed(3)})`);
                 if (r.model !== 'linear') parts.push(`${fmt(r.departure)} mm off the line`);
                 parts.push(`within ${LIN.tolerance} mm for ${r.horizonYears >= 100 ? '100+' : fmt(r.horizonYears)} yr`);
+                parts.push(r.steps.length
+                    ? `offsets ${r.steps.map((st, j) => `${date(st)} ${signed(r.stepSizes[j])} ± ${fmt(r.stepSigmas[j])}`).join(', ')} mm`
+                    : 'no offsets');
                 line.append(name, parts.join(' · '));
                 return line;
             }));
@@ -3918,6 +3961,12 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             };
             $('chk-rate').onchange = e => setDisplayMode(e.target.checked, false);
             $('chk-lin').onchange = e => setDisplayMode(false, e.target.checked);
+            for (const id of ['chk-lin-steps', 'inp-an-stepwin', 'inp-an-stepaic', 'inp-an-stepsig']) {
+                $(id).addEventListener('change', () => {
+                    if (S.showLin) { linRun++; applyLinToMap(); }
+                    if ($('lin-result').childElementCount) showLinearity();
+                });
+            }
             $('chk-invert').onchange = e => { S.invert = e.target.checked; restyle(); };
             $('chk-sym').onchange = () => { autoRange(); restyle(); };
             $('btn-auto').onclick = () => { autoRange(); restyle(); };
