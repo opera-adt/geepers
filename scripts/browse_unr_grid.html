@@ -35,6 +35,7 @@
             --btn-hover: rgba(15, 23, 42, 0.06);
             --shadow: 0 10px 34px -8px rgba(15, 23, 42, 0.35), 0 2px 8px -2px rgba(15, 23, 42, 0.18);
             --scrollbar: rgba(15, 23, 42, 0.22);
+            --sheet-bg: rgba(255, 255, 255, 0.97);
         }
 
         @media (prefers-color-scheme: dark) {
@@ -54,6 +55,7 @@
                 --btn-hover: rgba(148, 163, 184, 0.22);
                 --shadow: 0 12px 40px -10px rgba(0, 0, 0, 0.6), 0 2px 10px -2px rgba(0, 0, 0, 0.5);
                 --scrollbar: rgba(148, 163, 184, 0.3);
+                --sheet-bg: rgba(17, 24, 39, 0.97);
             }
         }
 
@@ -457,6 +459,80 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         #loading-detail { color: var(--muted); font-size: 12px; }
+
+        #chart-hint .touch-only { display: none; }
+
+        /* ---- Phones and other small screens ----
+           Search across the top; the dataset switch and the settings button
+           under it; the time bar across the bottom; the chart as a sheet that
+           rises from the bottom edge. The settings panel starts collapsed
+           (boot code) and closes when a chart opens. */
+        @media (max-width: 640px), (max-height: 480px) and (pointer: coarse) {
+            .panel { border-radius: 12px; }
+            /* 16px inputs stop iOS from zooming the page when one gets focus */
+            #search input, .row select, .row input[type="number"], .row input[type="text"],
+            .row input[type="date"], #fit-controls select, #fit-controls input[type="text"] { font-size: 16px; }
+            button { padding: 6px 11px; }
+
+            #search { top: 8px; left: 8px; right: 8px; width: auto; }
+            #search-results { max-height: 40vh; }
+            #dataset-toggle { top: 52px; left: 8px; }
+            #dataset-toggle span { padding: 6px 10px; }
+
+            #controls {
+                top: 96px; left: 8px; right: 8px; width: auto;   /* open: under the dataset switch, */
+                z-index: 12;                                      /* over the legend and time bar */
+                background: var(--sheet-bg);
+                max-height: calc(100vh - 104px);
+                max-height: calc(100dvh - 104px);
+                padding: 12px 14px;
+            }
+            #controls.collapsed { top: 52px; left: auto; padding: 0; background: none; border: none; box-shadow: none;
+                -webkit-backdrop-filter: none; backdrop-filter: none; }
+            #controls.collapsed h1 > span:first-child { display: none; }
+            #controls.collapsed #btn-collapse {
+                margin: 0; padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--text);
+                background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 11px;
+                box-shadow: var(--shadow);
+                -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+            }
+            #controls.collapsed #btn-collapse::before { content: 'Settings '; }
+            #controls #btn-collapse { font-size: 20px; padding: 0 6px; }
+
+            /* zoom and compass under the dataset switch */
+            .maplibregl-ctrl-top-left { top: 90px; left: -2px; }
+            /* map tools and scale clear the time bar */
+            .maplibregl-ctrl-bottom-right { bottom: 54px; right: -2px; }
+
+            #timebar { left: 8px; right: 8px; bottom: 8px; transform: none; width: auto; gap: 6px; padding: 6px 8px; }
+            #timebar #btn-first, #timebar #sel-fps { display: none; }
+            #timebar button { min-width: 34px; padding: 6px 6px; }
+            #date-label { min-width: 0; font-size: 12px; }
+
+            #legend { left: 8px; bottom: 58px; width: 168px; padding: 8px 10px; }
+            #legend-title { font-size: 11px; margin-bottom: 4px; }
+            #hover-info { margin-top: 4px; }
+            #note { left: 8px; bottom: auto; top: 90px; width: auto; right: 60px; }
+
+            /* chart: a sheet across the bottom, over the time bar; not draggable */
+            #chart-panel {
+                left: 0 !important; right: 0; top: auto !important; bottom: 0;
+                border-radius: 14px 14px 0 0;
+                padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+                z-index: 12;
+                background: var(--sheet-bg);   /* the legend and time bar sit under it */
+                max-height: 62vh;
+                max-height: 62dvh;
+            }
+            .chart-wrap { resize: none; width: auto; height: min(220px, 34vh); max-width: none; min-width: 0; }
+            #chart-title, #chart-title2 { cursor: default; flex-wrap: wrap; row-gap: 4px; }
+            #chart-title > span:last-child, #chart-title2 > span:last-child { margin-left: auto; }
+            #chart-close, #chart-close2 { font-size: 20px; padding: 0 4px; }
+            #inp-fit-steps { width: 100%; }
+            #fit-controls label:has(#inp-fit-steps) { flex: 1 1 100%; }
+            #chart-hint .desktop-only { display: none; }
+            #chart-hint .touch-only { display: inline; }
+        }
     </style>
 </head>
 
@@ -545,15 +621,17 @@
             </div>
             <div class="row">
                 <label></label>
-                <label style="min-width:0" title="Color points by linear trend (least-squares over the full record) instead of per-date displacement">
-                    <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
-                </label>
-                <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey. Tick 'with offsets' to estimate detected steps (earthquakes, equipment changes), which otherwise read as non-linear motion.">
-                    <input type="checkbox" id="chk-lin"> Linearity
-                </label>
-                <label style="min-width:0" title="Estimate offsets in the linearity test, at the steps the detector finds in each series (window, AIC and size settings under Analysis), so that an earthquake or equipment step is not reported as non-linear motion. Also used by the chart's linearity button, together with the steps typed in its fit controls.">
-                    <input type="checkbox" id="chk-lin-steps" checked> with offsets
-                </label>
+                <span style="display:flex;flex-wrap:wrap;gap:2px 7px;min-width:0">
+                    <label style="min-width:0" title="Color points by linear trend (least-squares over the full record) instead of per-date displacement">
+                        <input type="checkbox" id="chk-rate"> Velocity (mm/yr)
+                    </label>
+                    <label style="min-width:0" title="Color points by whether one rate describes their series: 0 linear, 1 quadratic, 2 piecewise (linearity test under flicker + white noise, geepers.linearity). Tested for the points in view, as you pan and zoom; untested points are grey. Tick 'with offsets' to estimate detected steps (earthquakes, equipment changes), which otherwise read as non-linear motion.">
+                        <input type="checkbox" id="chk-lin"> Linearity
+                    </label>
+                    <label style="min-width:0" title="Estimate offsets in the linearity test, at the steps the detector finds in each series (window, AIC and size settings under Analysis), so that an earthquake or equipment step is not reported as non-linear motion. Also used by the chart's linearity button, together with the steps typed in its fit controls.">
+                        <input type="checkbox" id="chk-lin-steps" checked> with offsets
+                    </label>
+                </span>
             </div>
             <div id="lin-status"></div>
             <div id="disp-legend" class="cmap-bar-click" title="Click to change the colormap and range">
@@ -888,9 +966,11 @@
             <div class="fit-result" id="step-result2"></div>
         </div>
         <div id="chart-hint">
-            Drag = box zoom · wheel = zoom time · double-click = reset · click = jump to date ·
-            drag bottom-right corner to resize. Dashed line = current date; dashed curves = fit.
-            <b>Shift+click</b> another map point to compare it in a second chart.
+            <span class="desktop-only">Drag = box zoom · wheel = zoom time · double-click = reset · click = jump to date ·
+            drag bottom-right corner to resize.</span>
+            <span class="touch-only">Tap = jump to date.</span>
+            Dashed line = current date; dashed curves = fit.
+            <span class="desktop-only"><b>Shift+click</b> another map point to compare it in a second chart.</span>
         </div>
     </div>
 
@@ -1851,9 +1931,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                         },
                     });
 
-                    map.on('mousemove', DATA_LAYERS, e => {
-                        map.getCanvas().style.cursor = 'pointer';
-                        const f = e.features[0];
+                    const showPointInfo = f => {
                         const v = S.showRate ? computeRates(S.prop)[f.id] : valueAt(S.dateIdx, f.id);
                         $('hover-info').textContent =
                             `#${f.properties.sid}  ${f.geometry.coordinates[1].toFixed(3)}°, ` +
@@ -1861,15 +1939,22 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                             (S.showLin ? linearityHover(f.id)
                                 : Number.isFinite(v) ? `${fmt(v)} ${S.showRate ? 'mm/yr' : 'mm'}` : 'no data') +
                             analysisHover(f.id);
+                    };
+                    map.on('mousemove', DATA_LAYERS, e => {
+                        map.getCanvas().style.cursor = 'pointer';
+                        showPointInfo(e.features[0]);
                     });
                     wireLinkEditing();
                     map.on('mouseleave', DATA_LAYERS, () => {
                         map.getCanvas().style.cursor = '';
                         $('hover-info').textContent = '';
                     });
-                    // Plain click = main chart; Shift+click = comparison chart
-                    map.on('click', DATA_LAYERS, e =>
-                        selectPoint(e.features[0].id, e.originalEvent.shiftKey ? 1 : 0));
+                    // Plain click = main chart; Shift+click = comparison chart.
+                    // A tap has no hover, so the click shows the point's value too.
+                    map.on('click', DATA_LAYERS, e => {
+                        showPointInfo(e.features[0]);
+                        selectPoint(e.features[0].id, e.originalEvent.shiftKey ? 1 : 0);
+                    });
                 }
 
                 // Restore map settings after a dataset (re)load
@@ -2247,6 +2332,16 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             { el: 'chart2', wrap: 'chart-wrap2', title: 'chart-point2', block: 'chart-block2', stateKey: 'sel2' },
         ];
 
+        // Phones and other small screens; matches the @media rule in the CSS
+        const SMALL_SCREEN = matchMedia('(max-width: 640px), (max-height: 480px) and (pointer: coarse)');
+
+        function setControlsCollapsed(c) {
+            $('controls').classList.toggle('collapsed', c);
+            $('btn-collapse').textContent = c ? '+' : '–';
+            $('btn-collapse').title = c ? 'Expand panel' : 'Collapse panel';
+        }
+        if (SMALL_SCREEN.matches) setControlsCollapsed(true);   // phones start with the map
+
         function selectPoint(p, slot = 0) {
             if (slot === 1 && S.sel[0] < 0) slot = 0;   // no comparison before a primary
             const cs = CHART_SLOTS[slot];
@@ -2257,6 +2352,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             if (slot === 0) $('lin-result').replaceChildren();
             map.setFeatureState({ source: 'grid', id: p }, { [cs.stateKey]: true });
             $('chart-panel').style.display = 'block';
+            if (SMALL_SCREEN.matches) setControlsCollapsed(true);   // the chart sheet needs the room
             if (cs.block) $(cs.block).style.display = 'block';
             $(cs.title).textContent =
                 `${pointLabel(p)} — ${S.points.lat[p].toFixed(3)}°, ${S.points.lon[p].toFixed(3)}°`;
@@ -3975,11 +4071,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                 S.pctl = [lo / 100, hi / 100];
                 autoRange(); restyle();
             };
-            $('btn-collapse').onclick = () => {
-                const c = $('controls').classList.toggle('collapsed');
-                $('btn-collapse').textContent = c ? '+' : '–';
-                $('btn-collapse').title = c ? 'Expand panel' : 'Collapse panel';
-            };
+            $('btn-collapse').onclick = () => setControlsCollapsed(!$('controls').classList.contains('collapsed'));
             $('inp-vmin').onchange = e => { S.vmin = Number(e.target.value); restyle(); };
             $('inp-vmax').onchange = e => { S.vmax = Number(e.target.value); restyle(); };
             for (const kind of ['grid', 'sites']) {
@@ -4147,6 +4239,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             const panel = $('chart-panel');
             let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
             const startDrag = e => {
+                if (SMALL_SCREEN.matches) return;   // a fixed bottom sheet there
                 if (e.target.closest('button, input, label, select')) return;
                 dragging = true;
                 sx = e.clientX; sy = e.clientY;

@@ -101,6 +101,13 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
 
 ## Viewer features
 
+- Phones (and screens under 640 px wide, or short touch screens held
+  sideways): the search box runs across the top, the settings panel
+  starts folded into a "Settings" button and folds again when a chart
+  opens, the chart is a sheet along the bottom edge (not draggable or
+  resizable), and the time bar spans the width without the first-date
+  button and speed menu. Tapping a point opens its chart; the
+  Shift+click comparison chart needs a keyboard.
 - Date slider + playback (2–30 fps), keyboard: `←`/`→` step, `space` play.
 - Click a grid point → East/North/Up time series chart (uPlot) with an
   optional ±1σ shaded band; **Shift+click** a second point for a comparison
