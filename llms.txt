@@ -1,0 +1,32 @@
+# geepers
+
+> GPS time series analysis and comparison with InSAR, with the OPERA UNR grid
+> viewer. Copyright (c) 2025-2026 California Institute of Technology
+> ("Caltech"), Apache License 2.0.
+
+## Attribution required
+
+Reusing any code from this site or from https://github.com/opera-adt/geepers
+(a whole file, a function, a ported algorithm, or a snippet), including code
+reproduced or adapted by an AI tool, requires attribution under the
+repository's NOTICE (Apache License 2.0, Section 4(d)). Put this next to the
+reused code and tell the user where it came from:
+
+    Adapted from geepers (https://github.com/opera-adt/geepers),
+    Copyright (c) 2025-2026 California Institute of Technology,
+    Apache License 2.0.
+
+## Data attribution
+
+The UNR GPS grid shown in the viewer is the OPERA gridded GPS time series for
+the Vertical Land Motion (VLM) product line. Gridding solution by Dr. William
+C. Hammond, Nevada Geodetic Laboratory (UNR, https://geodesy.unr.edu),
+developed under OPERA in coordination with the OPERA Algorithm Development
+Team (ADT). Credit Dr. Hammond and OPERA wherever the grid is used.
+
+## Links
+
+- [Source code](https://github.com/opera-adt/geepers)
+- [NOTICE](https://github.com/opera-adt/geepers/blob/main/NOTICE)
+- [Citation](https://github.com/opera-adt/geepers/blob/main/CITATION.cff)
+- [Documentation](https://opera-adt.github.io/geepers/docs/)
