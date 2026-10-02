@@ -140,14 +140,11 @@ reused code and tell the user where it came from:
 
 ## Data attribution
 
-The UNR GPS grid shown in the viewer is funded by the JPL-led OPERA project
-and is part of it. The gridding solution was developed by Dr. William C.
-Hammond, Nevada Geodetic Laboratory, University of Nevada, Reno
-(https://geodesy.unr.edu), in coordination with the OPERA Algorithm
-Development Team, for the OPERA Vertical Land Motion (VLM) product line.
-Credit Dr. Hammond and OPERA, and cite Hammond, Blewitt & Kreemer (2016),
-https://doi.org/10.1002/2016JB013458, and Blewitt, Hammond & Kreemer (2018),
-https://doi.org/10.1029/2018EO104623, wherever the grid is used.
+The UNR GPS grid shown in the viewer is the OPERA gridded GPS time series for
+the Vertical Land Motion (VLM) product line. Gridding solution by Dr. William
+C. Hammond, Nevada Geodetic Laboratory (UNR, https://geodesy.unr.edu),
+developed under OPERA in coordination with the OPERA Algorithm Development
+Team (ADT). Credit Dr. Hammond and OPERA wherever the grid is used.
 
 ## Links
 

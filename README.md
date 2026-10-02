@@ -428,16 +428,12 @@ tools. Put this next to reused code:
 # Apache License 2.0.
 ```
 
-The UNR GPS grid (`UnrGridSource`, and the grid in the viewer) is funded by
-the JPL-led OPERA project and is part of it. The gridding solution was
-developed by **Dr. William C. Hammond** at the
-[Nevada Geodetic Laboratory](https://geodesy.unr.edu), University of Nevada,
-Reno, in coordination with the OPERA Algorithm Development Team (ADT), for
-the OPERA Vertical Land Motion (VLM) product line. Credit Dr. Hammond and
-OPERA wherever the grid or results from it are shown, and cite Hammond, Blewitt & Kreemer (2016),
-[doi:10.1002/2016JB013458](https://doi.org/10.1002/2016JB013458), and
-Blewitt, Hammond & Kreemer (2018),
-[doi:10.1029/2018EO104623](https://doi.org/10.1029/2018EO104623). NOTICE
+The UNR GPS grid (`UnrGridSource`, and the grid in the viewer) is the OPERA
+gridded GPS time series for the Vertical Land Motion (VLM) product line.
+Gridding solution by **Dr. William C. Hammond**,
+[Nevada Geodetic Laboratory](https://geodesy.unr.edu) (UNR), developed under
+OPERA in coordination with the OPERA Algorithm Development Team (ADT).
+Credit Dr. Hammond and OPERA wherever the grid or results from it are shown. NOTICE
 also lists the other third-party code and data (MIDAS, verde, PB2002).
 
 To cite geepers in a publication, use [CITATION.cff](CITATION.cff) (the
