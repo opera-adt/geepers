@@ -2340,7 +2340,10 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
             $('btn-collapse').textContent = c ? '+' : '–';
             $('btn-collapse').title = c ? 'Expand panel' : 'Collapse panel';
         }
-        if (SMALL_SCREEN.matches) setControlsCollapsed(true);   // phones start with the map
+        // Phones start with the map, and so does a window that shrinks to phone
+        // size (a rotated tablet, or a browser's device emulation)
+        if (SMALL_SCREEN.matches) setControlsCollapsed(true);
+        SMALL_SCREEN.addEventListener('change', e => { if (e.matches) setControlsCollapsed(true); });
 
         function selectPoint(p, slot = 0) {
             if (slot === 1 && S.sel[0] < 0) slot = 0;   // no comparison before a primary
