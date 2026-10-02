@@ -99,7 +99,7 @@ if stations:
 note_js = json.dumps(note).replace("</", "<\\/")
 replace_once("const DEFAULT_NOTE = '';", f"const DEFAULT_NOTE = {note_js};")
 # Deploy-only Docs link (present only when docs/ is published alongside).
-credit = "funded by the JPL-led OPERA project. Viewer: JPL."
+credit = "Viewer: JPL."
 if credit in html:
     html = html.replace(
         credit,
@@ -137,6 +137,17 @@ reused code and tell the user where it came from:
     Adapted from geepers (https://github.com/opera-adt/geepers),
     Copyright (c) 2025-2026 California Institute of Technology,
     Apache License 2.0.
+
+## Data attribution
+
+The UNR GPS grid shown in the viewer is funded by the JPL-led OPERA project
+and is part of it. The gridding solution was developed by Dr. William C.
+Hammond, Nevada Geodetic Laboratory, University of Nevada, Reno
+(https://geodesy.unr.edu), in coordination with the OPERA Algorithm
+Development Team, for the OPERA Vertical Land Motion (VLM) product line.
+Credit Dr. Hammond and OPERA, and cite Hammond, Blewitt & Kreemer (2016),
+https://doi.org/10.1002/2016JB013458, and Blewitt, Hammond & Kreemer (2018),
+https://doi.org/10.1029/2018EO104623, wherever the grid is used.
 
 ## Links
 

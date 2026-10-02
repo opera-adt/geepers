@@ -6,11 +6,11 @@ message: >-
 title: "geepers: GPS time series analysis and comparison with InSAR"
 type: software
 authors:
-  - family-names: Staniewicz
-    given-names: Scott
-    affiliation: "Jet Propulsion Laboratory, California Institute of Technology"
   - family-names: Govorcin
     given-names: Marin
+    affiliation: "Jet Propulsion Laboratory, California Institute of Technology"
+  - family-names: Staniewicz
+    given-names: Scott
     affiliation: "Jet Propulsion Laboratory, California Institute of Technology"
 repository-code: "https://github.com/opera-adt/geepers"
 url: "https://opera-adt.github.io/geepers/"
@@ -21,3 +21,35 @@ keywords:
   - InSAR
   - geodesy
   - OPERA
+references:
+  - type: article
+    title: >-
+      GPS Imaging of vertical land motion in California and Nevada:
+      Implications for Sierra Nevada uplift
+    authors:
+      - family-names: Hammond
+        given-names: William C.
+        affiliation: "Nevada Geodetic Laboratory, University of Nevada, Reno"
+      - family-names: Blewitt
+        given-names: Geoffrey
+      - family-names: Kreemer
+        given-names: Corné
+    journal: "Journal of Geophysical Research: Solid Earth"
+    volume: 121
+    start: 7681
+    end: 7703
+    year: 2016
+    doi: 10.1002/2016JB013458
+  - type: article
+    title: Harnessing the GPS data explosion for interdisciplinary science
+    authors:
+      - family-names: Blewitt
+        given-names: Geoffrey
+      - family-names: Hammond
+        given-names: William C.
+      - family-names: Kreemer
+        given-names: Corné
+    journal: Eos
+    volume: 99
+    year: 2018
+    doi: 10.1029/2018EO104623

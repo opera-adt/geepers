@@ -3,6 +3,10 @@
   SPDX-FileCopyrightText: 2025-2026 California Institute of Technology ("Caltech")
   SPDX-License-Identifier: Apache-2.0
   OPERA UNR grid viewer, part of geepers, https://github.com/opera-adt/geepers.
+  The UNR GPS grid it shows is funded by and part of OPERA; its gridding
+  solution was developed by Dr. William C. Hammond, Nevada Geodetic Laboratory,
+  University of Nevada, Reno, with the OPERA ADT for the OPERA VLM product line
+  (see NOTICE for citations).
   If you copy or adapt any of this code, keep this notice and cite the
   repository (see NOTICE). Inlined third-party libraries keep their own licenses.
 -->
@@ -612,8 +616,11 @@
     <div id="controls" class="panel">
         <h1><span>OPERA UNR Grid Viewer <span id="prop-badge" style="color:var(--accent)"></span></span><button id="btn-collapse" title="Collapse panel" aria-label="Collapse panel">–</button></h1>
         <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px;line-height:1.4">
-            Gridded GPS time series by the Nevada Geodetic Laboratory (UNR),
-            funded by the JPL-led OPERA project. Viewer: JPL.
+            OPERA gridded GPS time series for the Vertical Land Motion (VLM)
+            product line. Gridding solution by Dr. William C. Hammond,
+            <a href="https://geodesy.unr.edu" target="_blank" rel="noopener" style="color:inherit">Nevada Geodetic Laboratory (UNR)</a>,
+            in coordination with the OPERA ADT. Cite <a href="https://doi.org/10.1002/2016JB013458" target="_blank" rel="noopener" style="color:inherit">Hammond et al. (2016)</a>.
+            Viewer: JPL.
         </div>
 
         <details open>
