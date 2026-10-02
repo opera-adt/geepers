@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-2026 California Institute of Technology ("Caltech")
+# SPDX-License-Identifier: Apache-2.0
+# Part of geepers, https://github.com/opera-adt/geepers. If you copy or adapt
+# any of this code, keep this notice and cite the repository (see NOTICE).
 """Export UNR gridded time series to a browser-optimized Parquet file.
 
 The output file is consumed by `browse_unr_grid.html` (MapLibre GL viewer),

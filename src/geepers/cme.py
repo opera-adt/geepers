@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-2026 California Institute of Technology ("Caltech")
+# SPDX-License-Identifier: Apache-2.0
+# Part of geepers, https://github.com/opera-adt/geepers. If you copy or adapt
+# any of this code, keep this notice and cite the repository (see NOTICE).
 """Common-mode error (CME) estimation for station networks.
 
 Regional GNSS networks share a coherent noise component (reference-frame

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-2026 California Institute of Technology ("Caltech")
+# SPDX-License-Identifier: Apache-2.0
+# Part of geepers, https://github.com/opera-adt/geepers. If you copy or adapt
+# any of this code, keep this notice and cite the repository (see NOTICE).
 r"""Elastically coupled spline interpolation of horizontal velocities.
 
 Interpolates scattered east/north GNSS velocities *jointly*: the field is

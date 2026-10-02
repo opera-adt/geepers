@@ -60,3 +60,10 @@ f = open(filename)
 - Provide tutorial notebooks covering common workflows.
 - Include examples in docstrings.
 - Add high-level guides for key functionality.
+
+## Attribution
+
+- Every Python file in `src/` and `scripts/` starts with the SPDX header
+  (see any module); add it to new files.
+- When code from this repository is reused elsewhere, follow
+  [AGENTS.md](AGENTS.md): attribution comment next to the code, per NOTICE.

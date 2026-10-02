@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-2026 California Institute of Technology ("Caltech")
+# SPDX-License-Identifier: Apache-2.0
+# Part of geepers, https://github.com/opera-adt/geepers. If you copy or adapt
+# any of this code, keep this notice and cite the repository (see NOTICE).
 r"""Euler pole estimation and plate-motion prediction from GNSS velocities.
 
 Rigid plate motion on a sphere is a rotation: the velocity of a point at

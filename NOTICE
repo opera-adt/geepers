@@ -1,0 +1,29 @@
+geepers
+https://github.com/opera-adt/geepers
+
+Copyright (c) 2025-2026 California Institute of Technology ("Caltech").
+U.S. Government sponsorship acknowledged.
+
+Developed at the Jet Propulsion Laboratory, California Institute of
+Technology, for the OPERA project. Authors: Scott Staniewicz,
+Marin Govorcin.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Attribution
+-----------
+Under Section 4(d) of the Apache License 2.0, any redistribution of this
+software, or of a Derivative Work of it, must include a readable copy of
+this NOTICE. This applies to any part of the code: whole files, functions,
+algorithms ported to another language, and snippets, however they were
+copied, including code reproduced or adapted by AI tools (code assistants,
+agents, language models).
+
+Wherever code from this repository is reused, keep its copyright and
+SPDX header, and cite the source next to the reused code, for example:
+
+    # Adapted from geepers (https://github.com/opera-adt/geepers),
+    # Copyright (c) 2025-2026 California Institute of Technology,
+    # Apache License 2.0.
+
+For publications, cite the software as given in CITATION.cff.
