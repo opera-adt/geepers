@@ -1407,6 +1407,13 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
         const circleSize = () => sizeExpression(circleKind() === 'sites' ? S.siteSizeMult : S.sizeMult);
         // squareSdf() is 20 px across, so icon-size 0.1 is a half-width of 1 px
         const squareSize = () => sizeExpression(S.sizeMult / 10);
+        // Analysis markers are all circles, so they follow the Grid size and Site
+        // size sliders per point (feature property `site`) instead of circleSize()
+        function analysisSize() {
+            const g = sizeExpression(S.sizeMult), s = sizeExpression(S.siteSizeMult);
+            return [...g.slice(0, 3), ...g.slice(3).flatMap((v, i) =>
+                i % 2 ? [['case', ['get', 'site'], s[3 + i], v]] : [v])];
+        }
 
         // Square marker as a signed distance field, so it stays sharp at any size
         // and takes a color and an outline like the circles do.
@@ -3680,14 +3687,14 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     features: A.idx.map((p, i) => ({
                         type: 'Feature', id: p,
                         geometry: { type: 'Point', coordinates: [A.lon[i], A.lat[i]] },
-                        properties: { m: Number.isFinite(values[i]) ? values[i] : null },
+                        properties: { m: Number.isFinite(values[i]) ? values[i] : null, site: p >= S.nGrid },
                     })),
                 },
             });
             map.addLayer({
                 id: 'analysis-points', type: 'circle', source: 'analysis-points',
                 paint: {
-                    'circle-radius': circleSize(),
+                    'circle-radius': analysisSize(),
                     'circle-color': ['case', ['==', ['typeof', ['get', 'm']], 'number'], interp, 'rgba(128,128,128,0.35)'],
                     'circle-stroke-color': '#111', 'circle-stroke-width': 0.4,
                 },
@@ -4102,6 +4109,7 @@ var hyparquet=(()=>{var Ae=Object.defineProperty;var Mt=Object.getOwnPropertyDes
                     map.setPaintProperty('grid-circles', 'circle-radius', circleSize());
                     map.setLayoutProperty('grid-squares', 'icon-size', squareSize());
                 }
+                if (map.getLayer('analysis-points')) map.setPaintProperty('analysis-points', 'circle-radius', analysisSize());
             };
             $('inp-size').oninput = e => { S.sizeMult = Number(e.target.value); resize(); };
             $('inp-size-sites').oninput = e => { S.siteSizeMult = Number(e.target.value); resize(); };
