@@ -33,27 +33,18 @@ Third-party data and code
 UNR GPS grid
     The gridded GPS time series and velocities shown in the OPERA UNR grid
     viewer, and read by geepers.gps_sources.UnrGridSource, are funded by the
-    JPL-led OPERA project and are part of it. The gridding solution was
+    JPL-led OPERA project. The gridding solution was
     developed by Dr. William C. Hammond at the Nevada Geodetic Laboratory
     (NGL), University of Nevada, Reno (https://geodesy.unr.edu), in
     coordination with the OPERA Algorithm Development Team (ADT), for the
-    OPERA Vertical Land Motion (VLM) product line. Credit Dr. Hammond and
-    OPERA wherever the grid or results from it are shown or published, and
-    cite:
-
-    Hammond, W. C., Blewitt, G., & Kreemer, C. (2016). GPS Imaging of
-    vertical land motion in California and Nevada: Implications for Sierra
-    Nevada uplift. Journal of Geophysical Research: Solid Earth, 121,
-    7681-7703. https://doi.org/10.1002/2016JB013458
-
-    Blewitt, G., Hammond, W. C., & Kreemer, C. (2018). Harnessing the GPS
-    data explosion for interdisciplinary science. Eos, 99.
-    https://doi.org/10.1029/2018EO104623
+    OPERA Vertical Land Motion (VLM) product.
 
 UNR station time series
     GPS station positions and velocities read by geepers.gps_sources come
     from the Nevada Geodetic Laboratory, University of Nevada, Reno
-    (https://geodesy.unr.edu); cite Blewitt et al. (2018) above.
+    (https://geodesy.unr.edu); cite Blewitt, G., Hammond, W. C., &
+    Kreemer, C. (2018). Harnessing the GPS data explosion for
+    interdisciplinary science. Eos, 99. https://doi.org/10.1029/2018EO104623
 
 MIDAS (src/geepers/midas.py)
     A Python conversion of the MIDAS velocity estimator. Original code:
