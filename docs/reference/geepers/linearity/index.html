@@ -1,0 +1,3249 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../io/">
+      
+      
+        <link rel="next" href="../masks/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>linearity - Documentation for geepers</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="cyan" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#geepers.linearity" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Documentation for geepers" class="md-header__button md-logo" aria-label="Documentation for geepers" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Documentation for geepers
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              linearity
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Documentation for geepers" class="md-nav__button md-logo" aria-label="Documentation for geepers" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Documentation for geepers
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    geepers Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to-guides/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../analysis-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/geepers_tour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A tour of the geepers analysis modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/gnss_insar_validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validating an InSAR displacement product against GNSS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/steps_and_linearity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detecting steps and testing linearity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    geepers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    geepers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cme/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cme
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../collocation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    collocation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../constants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    constants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../euler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    euler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_imaging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps_imaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1_11" id="__nav_7_1_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gps_sources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_1_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    gps_sources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_sources/base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_sources/sideshow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sideshow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_sources/unr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    unr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gps_sources/unr_grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    unr_grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    linearity
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    linearity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        linearity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.LinearityResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LinearityResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.ValidityHorizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidityHorizon
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.linearity_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        linearity_test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.validity_horizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validity_horizon
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../midas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    midas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    rates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schemas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    schemas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../surface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    surface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../synthetic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    synthetic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../variability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    variability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background theory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        linearity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.LinearityResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LinearityResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.ValidityHorizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidityHorizon
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.linearity_test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        linearity_test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geepers.linearity.validity_horizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validity_horizon
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>linearity</h1>
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="geepers.linearity"></a>
+    <div class="doc doc-contents first">
+
+        <p>Test whether a single rate describes a time series, and for how long.</p>
+<p>A velocity is only worth extrapolating if the series is linear. This
+module compares a linear model against a quadratic and a continuous
+piecewise-linear one (a hinge with a free breakpoint) under the <em>same</em>
+noise covariance, so that no model wins by absorbing a different share
+of the temporally correlated noise. That covariance is the one
+<code>geepers.trend.estimate_trend</code> estimates around the quadratic model:
+around a straight line, real curvature is indistinguishable from - and
+gets absorbed into - a steeper noise spectrum. <code>validity_horizon</code> then bounds how
+far the rate can be carried before the extrapolation is off by a stated
+tolerance.</p>
+<p>The comparison uses the Bayesian information criterion (Schwarz, G.,
+1978, Estimating the dimension of a model, Ann. Statist., 6(2), 461-464,
+https://doi.org/10.1214/aos/1176344136). Because the breakpoint is
+searched for, the piecewise test statistic is the supremum over the
+candidate breakpoints, which does not follow a chi-square distribution
+(Davies, R. B., 1987, Hypothesis testing when a nuisance parameter is
+present only under the alternative, Biometrika, 74(1), 33-43,
+https://doi.org/10.1093/biomet/74.1.33); its p-value is therefore
+obtained by simulating the statistic under the fitted noise model.</p>
+
+
+<details class="example:" open>
+  <summary>Example:</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>result = linearity_test(dates, up_mm, sampling_days=12)   # doctest: +SKIP
+result.model, result.departure                            # doctest: +SKIP
+validity_horizon(result, tolerance=10.0).years            # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="geepers.linearity.LinearityResult" class="doc doc-heading">
+            <code>LinearityResult</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Outcome of the linearity test.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.model">model</span></code></td>
+            <td>
+                  <code>{&#39;linear&#39;, &#39;quadratic&#39;, &#39;piecewise&#39;}</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Model with the lowest BIC.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.trend">trend</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TrendResult
+
+
+  
+      dataclass
+   (geepers.trend.TrendResult)" href="../trend/#geepers.trend.TrendResult">TrendResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The linear fit and its own noise model (<code>trend.velocity</code>,
+<code>trend.velocity_uncertainty</code>): the rate one would extrapolate.
+Where the series is not linear its uncertainty is inflated,
+because the non-linearity counts as noise.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.bic">bic</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>BIC of each model, up to a common constant.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.p_values">p_values</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>p-value of each alternative against the linear model. The
+piecewise one accounts for the search over breakpoints.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.acceleration, acceleration_sigma">acceleration, acceleration_sigma</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Acceleration of the quadratic model and its 1-sigma, in input
+units per year squared (reported whichever model is preferred).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.breakpoint">breakpoint</span></code></td>
+            <td>
+                  <code><span title="pandas.Timestamp">Timestamp</span> or None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Best-fitting breakpoint of the piecewise model (None if the
+series is too short for one).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.rate_before, rate_after">rate_before, rate_after</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rates on either side of <code>breakpoint</code>, input units per year.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.rate_change_sigma">rate_change_sigma</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1-sigma of <code>rate_after - rate_before</code> at the fitted breakpoint.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.LinearityResult.departure">departure</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Largest separation between the preferred model and the straight
+line over the observed span, in input units (0 for "linear").</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/geepers/linearity.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LinearityResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Outcome of the linearity test.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    model : {&quot;linear&quot;, &quot;quadratic&quot;, &quot;piecewise&quot;}</span>
+<span class="sd">        Model with the lowest BIC.</span>
+<span class="sd">    trend : TrendResult</span>
+<span class="sd">        The linear fit and its own noise model (`trend.velocity`,</span>
+<span class="sd">        `trend.velocity_uncertainty`): the rate one would extrapolate.</span>
+<span class="sd">        Where the series is not linear its uncertainty is inflated,</span>
+<span class="sd">        because the non-linearity counts as noise.</span>
+<span class="sd">    bic : dict[str, float]</span>
+<span class="sd">        BIC of each model, up to a common constant.</span>
+<span class="sd">    p_values : dict[str, float]</span>
+<span class="sd">        p-value of each alternative against the linear model. The</span>
+<span class="sd">        piecewise one accounts for the search over breakpoints.</span>
+<span class="sd">    acceleration, acceleration_sigma : float</span>
+<span class="sd">        Acceleration of the quadratic model and its 1-sigma, in input</span>
+<span class="sd">        units per year squared (reported whichever model is preferred).</span>
+<span class="sd">    breakpoint : pd.Timestamp or None</span>
+<span class="sd">        Best-fitting breakpoint of the piecewise model (None if the</span>
+<span class="sd">        series is too short for one).</span>
+<span class="sd">    rate_before, rate_after : float</span>
+<span class="sd">        Rates on either side of `breakpoint`, input units per year.</span>
+<span class="sd">    rate_change_sigma : float</span>
+<span class="sd">        1-sigma of ``rate_after - rate_before`` at the fitted breakpoint.</span>
+<span class="sd">    departure : float</span>
+<span class="sd">        Largest separation between the preferred model and the straight</span>
+<span class="sd">        line over the observed span, in input units (0 for &quot;linear&quot;).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model</span><span class="p">:</span> <span class="n">Model</span>
+    <span class="n">trend</span><span class="p">:</span> <span class="n">TrendResult</span>
+    <span class="n">bic</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">p_values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">acceleration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="n">acceleration_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="nb">breakpoint</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timestamp</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">rate_before</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="n">rate_after</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="n">rate_change_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="n">departure</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="geepers.linearity.ValidityHorizon" class="doc doc-heading">
+            <code>ValidityHorizon</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>How far a rate can be extrapolated within a tolerance.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.ValidityHorizon.years">years</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time until the expected extrapolation error reaches the tolerance.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.ValidityHorizon.from_rate">from_rate</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The same horizon if only the rate uncertainty counted.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.ValidityHorizon.driver">driver</span></code></td>
+            <td>
+                  <code>{&#39;rate uncertainty&#39;, &#39;non-linearity&#39;, &#39;capped&#39;}</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>What sets <code>years</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="geepers.linearity.ValidityHorizon.tolerance">tolerance</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The tolerance used, in input units.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/geepers/linearity.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ValidityHorizon</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;How far a rate can be extrapolated within a tolerance.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    years : float</span>
+<span class="sd">        Time until the expected extrapolation error reaches the tolerance.</span>
+<span class="sd">    from_rate : float</span>
+<span class="sd">        The same horizon if only the rate uncertainty counted.</span>
+<span class="sd">    driver : {&quot;rate uncertainty&quot;, &quot;non-linearity&quot;, &quot;capped&quot;}</span>
+<span class="sd">        What sets `years`.</span>
+<span class="sd">    tolerance : float</span>
+<span class="sd">        The tolerance used, in input units.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">years</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">from_rate</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">driver</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geepers.linearity.linearity_test" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">linearity_test</span><span class="p">(</span><span class="n">dates</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">sampling_days</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">periods_years</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> <span class="n">step_dates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">noise_model</span><span class="o">=</span><span class="s1">&#39;FNWN&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;exact&#39;</span><span class="p">,</span> <span class="n">min_segment_years</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">n_breakpoints</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">n_simulations</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Decide whether a single rate describes a time series.</p>
+<p>Estimates the noise around a quadratic model with
+<code>geepers.trend.estimate_trend</code>, holds that covariance fixed, and
+compares a linear, a quadratic and a continuous piecewise-linear
+model, preferring the lowest BIC. A free breakpoint is charged as
+two parameters.</p>
+<p>Curvature and strongly correlated noise look alike over one record,
+so the verdict depends on the noise model. The default is flicker +
+white ("FNWN"), the usual model of GNSS noise. Letting the spectral
+index go free ("PLWN") is not a safer choice: on real station series
+with obvious rate changes, offsets or accelerating subsidence the
+index runs to its steep limit and explains all of it as noise, so
+every series is called linear (with a correspondingly large rate
+uncertainty). The price of the fixed index is that a linear series
+whose noise really is a random walk is flagged about one time in
+five. An unmodeled offset is usually reported as non-linearity
+(one at mid-record instead biases the rate unnoticed); pass known
+offsets as <code>step_dates</code>. A rate change near mid-record is usually reported as
+"quadratic": the two shapes are close, and the hinge costs one more
+parameter.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dates</code>
+            </td>
+            <td>
+                  <code>array-like of datetime64</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observation epochs; gaps are allowed.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>values</code>
+            </td>
+            <td>
+                  <code>array-like of float</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Observations (any unit); NaNs are dropped.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sampling_days</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Nominal sampling interval in days. Default 1.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>periods_years</code>
+            </td>
+            <td>
+                  <code>tuple of float</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Periodic terms included in every model. Default annual and
+semi-annual.</p>
+              </div>
+            </td>
+            <td>
+                  <code>(1.0, 0.5)</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>step_dates</code>
+            </td>
+            <td>
+                  <code>array-like of datetime64</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Known offsets, estimated in every model.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>noise_model</code>
+            </td>
+            <td>
+                  <code>(&#39;PLWN&#39;, &#39;PL&#39;, &#39;WN&#39;, &#39;FNWN&#39;, &#39;RWFNWN&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Noise model of <code>estimate_trend</code>. Default "FNWN".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;PLWN&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code>(&#39;exact&#39;, &#39;whittle&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Noise estimation method of <code>estimate_trend</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;exact&#34;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>min_segment_years</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Shortest segment allowed on either side of a breakpoint; a hinge
+near the ends just fits the last few epochs. Default 1.5.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1.5</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_breakpoints</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of candidate breakpoints, evenly spaced. Default 50.</p>
+              </div>
+            </td>
+            <td>
+                  <code>50</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_simulations</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Noise realizations for the piecewise p-value. Default 2000.</p>
+              </div>
+            </td>
+            <td>
+                  <code>2000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> or <span title="numpy.random.Generator">Generator</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed for those realizations. Default 0 (reproducible).</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LinearityResult
+
+
+  
+      dataclass
+   (geepers.linearity.LinearityResult)" href="#geepers.linearity.LinearityResult">LinearityResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/geepers/linearity.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">linearity_test</span><span class="p">(</span>
+    <span class="n">dates</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">sampling_days</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">periods_years</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+    <span class="n">step_dates</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">noise_model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;PLWN&quot;</span><span class="p">,</span> <span class="s2">&quot;PL&quot;</span><span class="p">,</span> <span class="s2">&quot;WN&quot;</span><span class="p">,</span> <span class="s2">&quot;FNWN&quot;</span><span class="p">,</span> <span class="s2">&quot;RWFNWN&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;FNWN&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span> <span class="s2">&quot;whittle&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;exact&quot;</span><span class="p">,</span>
+    <span class="n">min_segment_years</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span><span class="p">,</span>
+    <span class="n">n_breakpoints</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">n_simulations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2000</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LinearityResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decide whether a single rate describes a time series.</span>
+
+<span class="sd">    Estimates the noise around a quadratic model with</span>
+<span class="sd">    `geepers.trend.estimate_trend`, holds that covariance fixed, and</span>
+<span class="sd">    compares a linear, a quadratic and a continuous piecewise-linear</span>
+<span class="sd">    model, preferring the lowest BIC. A free breakpoint is charged as</span>
+<span class="sd">    two parameters.</span>
+
+<span class="sd">    Curvature and strongly correlated noise look alike over one record,</span>
+<span class="sd">    so the verdict depends on the noise model. The default is flicker +</span>
+<span class="sd">    white (&quot;FNWN&quot;), the usual model of GNSS noise. Letting the spectral</span>
+<span class="sd">    index go free (&quot;PLWN&quot;) is not a safer choice: on real station series</span>
+<span class="sd">    with obvious rate changes, offsets or accelerating subsidence the</span>
+<span class="sd">    index runs to its steep limit and explains all of it as noise, so</span>
+<span class="sd">    every series is called linear (with a correspondingly large rate</span>
+<span class="sd">    uncertainty). The price of the fixed index is that a linear series</span>
+<span class="sd">    whose noise really is a random walk is flagged about one time in</span>
+<span class="sd">    five. An unmodeled offset is usually reported as non-linearity</span>
+<span class="sd">    (one at mid-record instead biases the rate unnoticed); pass known</span>
+<span class="sd">    offsets as `step_dates`. A rate change near mid-record is usually reported as</span>
+<span class="sd">    &quot;quadratic&quot;: the two shapes are close, and the hinge costs one more</span>
+<span class="sd">    parameter.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dates : array-like of datetime64</span>
+<span class="sd">        Observation epochs; gaps are allowed.</span>
+<span class="sd">    values : array-like of float</span>
+<span class="sd">        Observations (any unit); NaNs are dropped.</span>
+<span class="sd">    sampling_days : float</span>
+<span class="sd">        Nominal sampling interval in days. Default 1.</span>
+<span class="sd">    periods_years : tuple of float</span>
+<span class="sd">        Periodic terms included in every model. Default annual and</span>
+<span class="sd">        semi-annual.</span>
+<span class="sd">    step_dates : array-like of datetime64, optional</span>
+<span class="sd">        Known offsets, estimated in every model.</span>
+<span class="sd">    noise_model : {&quot;PLWN&quot;, &quot;PL&quot;, &quot;WN&quot;, &quot;FNWN&quot;, &quot;RWFNWN&quot;}</span>
+<span class="sd">        Noise model of `estimate_trend`. Default &quot;FNWN&quot;.</span>
+<span class="sd">    method : {&quot;exact&quot;, &quot;whittle&quot;}</span>
+<span class="sd">        Noise estimation method of `estimate_trend`.</span>
+<span class="sd">    min_segment_years : float</span>
+<span class="sd">        Shortest segment allowed on either side of a breakpoint; a hinge</span>
+<span class="sd">        near the ends just fits the last few epochs. Default 1.5.</span>
+<span class="sd">    n_breakpoints : int</span>
+<span class="sd">        Number of candidate breakpoints, evenly spaced. Default 50.</span>
+<span class="sd">    n_simulations : int</span>
+<span class="sd">        Noise realizations for the piecewise p-value. Default 2000.</span>
+<span class="sd">    seed : int or np.random.Generator, optional</span>
+<span class="sd">        Seed for those realizations. Default 0 (reproducible).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    LinearityResult</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">epochs</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DatetimeIndex</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dates</span><span class="p">)))</span>
+    <span class="n">y_all</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">good</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">y_all</span><span class="p">)</span>
+    <span class="n">epochs</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">epochs</span><span class="p">[</span><span class="n">good</span><span class="p">],</span> <span class="n">y_all</span><span class="p">[</span><span class="n">good</span><span class="p">]</span>
+
+    <span class="n">fit</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+        <span class="n">estimate_trend</span><span class="p">,</span>
+        <span class="n">epochs</span><span class="p">,</span>
+        <span class="n">y</span><span class="p">,</span>
+        <span class="n">sampling_days</span><span class="o">=</span><span class="n">sampling_days</span><span class="p">,</span>
+        <span class="n">periods_years</span><span class="o">=</span><span class="n">periods_years</span><span class="p">,</span>
+        <span class="n">step_dates</span><span class="o">=</span><span class="n">step_dates</span><span class="p">,</span>
+        <span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">,</span>
+        <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">trend</span> <span class="o">=</span> <span class="n">fit</span><span class="p">(</span><span class="n">poly_deg</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Noise for the comparison comes from the quadratic fit: estimated around</span>
+    <span class="c1"># a straight line, real curvature would be absorbed into the noise as a</span>
+    <span class="c1"># steeper spectrum and the test would have little power</span>
+    <span class="n">noise</span> <span class="o">=</span> <span class="n">fit</span><span class="p">(</span><span class="n">poly_deg</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Same epoch grid and time axis as `estimate_trend`</span>
+    <span class="n">t_days</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">((</span><span class="n">epochs</span> <span class="o">-</span> <span class="n">epochs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">())</span> <span class="o">/</span> <span class="mf">86400.0</span>
+    <span class="n">obs_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">t_days</span> <span class="o">/</span> <span class="n">sampling_days</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">obs_idx</span> <span class="o">*</span> <span class="n">sampling_days</span> <span class="o">/</span> <span class="n">DAYS_PER_YEAR</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DatetimeIndex</span><span class="p">(</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([]</span> <span class="k">if</span> <span class="n">step_dates</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">step_dates</span><span class="p">))</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">step_years</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">((</span><span class="n">steps</span> <span class="o">-</span> <span class="n">epochs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">())</span> <span class="o">/</span> <span class="mf">86400.0</span> <span class="o">/</span> <span class="n">DAYS_PER_YEAR</span>
+    <span class="p">)</span>
+    <span class="n">A_lin</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="n">_design_matrix</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">periods_years</span><span class="p">,</span> <span class="n">step_years</span><span class="p">,</span> <span class="p">[],</span> <span class="p">[])</span>
+    <span class="n">itrend</span> <span class="o">=</span> <span class="n">names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;trend&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Whiten with that one noise covariance: every model below is then an</span>
+    <span class="c1"># ordinary least-squares problem with unit-variance residuals</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="n">_noise_covariance</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">obs_idx</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">obs_idx</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">chol</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check_finite</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">whiten</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">linalg</span><span class="o">.</span><span class="n">solve_triangular</span><span class="p">(</span><span class="n">chol</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check_finite</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">k_lin</span> <span class="o">=</span> <span class="n">A_lin</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">yw</span><span class="p">,</span> <span class="n">Aw</span> <span class="o">=</span> <span class="n">whiten</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">whiten</span><span class="p">(</span><span class="n">A_lin</span><span class="p">)</span>
+    <span class="n">beta_lin</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">chi2_lin</span> <span class="o">=</span> <span class="n">_fit</span><span class="p">(</span><span class="n">Aw</span><span class="p">,</span> <span class="n">yw</span><span class="p">)</span>
+    <span class="n">linear_fit</span> <span class="o">=</span> <span class="n">A_lin</span> <span class="o">@</span> <span class="n">beta_lin</span>
+
+    <span class="c1"># --- quadratic, centered so the trend term stays the mid-span rate</span>
+    <span class="n">quad</span> <span class="o">=</span> <span class="p">(</span><span class="n">t</span> <span class="o">-</span> <span class="n">t</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">A_quad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">A_lin</span><span class="p">,</span> <span class="n">quad</span><span class="p">])</span>
+    <span class="n">beta_q</span><span class="p">,</span> <span class="n">cov_q</span><span class="p">,</span> <span class="n">chi2_q</span> <span class="o">=</span> <span class="n">_fit</span><span class="p">(</span><span class="n">whiten</span><span class="p">(</span><span class="n">A_quad</span><span class="p">),</span> <span class="n">yw</span><span class="p">)</span>
+
+    <span class="n">bic</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;linear&quot;</span><span class="p">:</span> <span class="n">k_lin</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">+</span> <span class="n">chi2_lin</span><span class="p">}</span>
+    <span class="n">bic</span><span class="p">[</span><span class="s2">&quot;quadratic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">k_lin</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">+</span> <span class="n">chi2_q</span>
+    <span class="n">p_values</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;quadratic&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">chi2</span><span class="o">.</span><span class="n">sf</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">chi2_lin</span> <span class="o">-</span> <span class="n">chi2_q</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="mi">1</span><span class="p">))}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">LinearityResult</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span>
+        <span class="n">trend</span><span class="o">=</span><span class="n">trend</span><span class="p">,</span>
+        <span class="n">acceleration</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">beta_q</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+        <span class="n">acceleration_sigma</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">cov_q</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">])),</span>
+    <span class="p">)</span>
+
+    <span class="c1"># --- continuous piecewise linear: + c * max(0, t - t_break)</span>
+    <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">min_segment_years</span><span class="p">,</span> <span class="n">t</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">min_segment_years</span>
+    <span class="n">hinge_fit</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">hi</span> <span class="o">&gt;</span> <span class="n">lo</span><span class="p">:</span>
+        <span class="n">breaks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">n_breakpoints</span><span class="p">)</span>
+        <span class="n">hinges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">breaks</span><span class="p">)</span>
+        <span class="c1"># Part of each whitened hinge the linear model cannot explain</span>
+        <span class="n">q</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">qr</span><span class="p">(</span><span class="n">Aw</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;economic&quot;</span><span class="p">,</span> <span class="n">check_finite</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">hw</span> <span class="o">=</span> <span class="n">whiten</span><span class="p">(</span><span class="n">hinges</span><span class="p">)</span>
+        <span class="n">hw</span> <span class="o">-=</span> <span class="n">q</span> <span class="o">@</span> <span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">hw</span><span class="p">)</span>
+        <span class="n">norms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">hw</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">usable</span> <span class="o">=</span> <span class="n">norms</span> <span class="o">&gt;</span> <span class="mf">1e-10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">whiten</span><span class="p">(</span><span class="n">hinges</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">unit</span> <span class="o">=</span> <span class="n">hw</span><span class="p">[:,</span> <span class="n">usable</span><span class="p">]</span> <span class="o">/</span> <span class="n">norms</span><span class="p">[</span><span class="n">usable</span><span class="p">]</span>
+        <span class="n">gain</span> <span class="o">=</span> <span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="p">(</span><span class="n">yw</span> <span class="o">-</span> <span class="n">q</span> <span class="o">@</span> <span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">yw</span><span class="p">)))</span> <span class="o">**</span> <span class="mi">2</span>  <span class="c1"># chi-square drop per break</span>
+        <span class="n">best</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">gain</span><span class="p">))</span>
+        <span class="n">t_break</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">breaks</span><span class="p">[</span><span class="n">usable</span><span class="p">][</span><span class="n">best</span><span class="p">])</span>
+
+        <span class="n">A_hinge</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">A_lin</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span> <span class="o">-</span> <span class="n">t_break</span><span class="p">)])</span>
+        <span class="n">beta_h</span><span class="p">,</span> <span class="n">cov_h</span><span class="p">,</span> <span class="n">chi2_h</span> <span class="o">=</span> <span class="n">_fit</span><span class="p">(</span><span class="n">whiten</span><span class="p">(</span><span class="n">A_hinge</span><span class="p">),</span> <span class="n">yw</span><span class="p">)</span>
+        <span class="n">bic</span><span class="p">[</span><span class="s2">&quot;piecewise&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">k_lin</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">+</span> <span class="n">chi2_h</span>
+        <span class="n">hinge_fit</span> <span class="o">=</span> <span class="n">A_hinge</span> <span class="o">@</span> <span class="n">beta_h</span>
+
+        <span class="c1"># Null distribution of the best gain over all breakpoints: the same</span>
+        <span class="c1"># statistic on pure whitened noise</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="n">null</span> <span class="o">=</span> <span class="p">((</span><span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">((</span><span class="n">n_simulations</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span> <span class="o">@</span> <span class="n">unit</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">p_values</span><span class="p">[</span><span class="s2">&quot;piecewise&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+            <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">null</span> <span class="o">&gt;=</span> <span class="n">gain</span><span class="p">[</span><span class="n">best</span><span class="p">]))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">n_simulations</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">result</span><span class="o">.</span><span class="n">breakpoint</span> <span class="o">=</span> <span class="n">epochs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">t_break</span> <span class="o">*</span> <span class="n">DAYS_PER_YEAR</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">rate_before</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">beta_h</span><span class="p">[</span><span class="n">itrend</span><span class="p">])</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">rate_after</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">beta_h</span><span class="p">[</span><span class="n">itrend</span><span class="p">]</span> <span class="o">+</span> <span class="n">beta_h</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">rate_change_sigma</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">cov_h</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">bic</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">bic</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">p_values</span> <span class="o">=</span> <span class="n">p_values</span>
+    <span class="n">models</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Model</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span> <span class="s2">&quot;quadratic&quot;</span><span class="p">,</span> <span class="s2">&quot;piecewise&quot;</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="nb">min</span><span class="p">((</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">models</span> <span class="k">if</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">bic</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">bic</span><span class="p">[</span><span class="n">m</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;quadratic&quot;</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">departure</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">A_quad</span> <span class="o">@</span> <span class="n">beta_q</span> <span class="o">-</span> <span class="n">linear_fit</span><span class="p">)))</span>
+    <span class="k">elif</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;piecewise&quot;</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">hinge_fit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">departure</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">hinge_fit</span> <span class="o">-</span> <span class="n">linear_fit</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geepers.linearity.validity_horizon" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validity_horizon</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cap_years</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Bound how far the rate can be extrapolated within <code>tolerance</code>.</p>
+<p>The expected extrapolation error after <code>T</code> years is the rate
+uncertainty, <code>sigma_v * T</code>, plus the non-linearity the test found:</p>
+<ul>
+<li>"quadratic": <code>0.5 * |a| * T**2</code> when the acceleration is resolved
+  at 2 sigma;</li>
+<li>"piecewise": <code>|rate_after - rate_before| * T</code> - a rate that has
+  changed once can change again, so the observed change is taken as
+  the scale of what may happen next.</li>
+</ul>
+<p>The horizon is the <code>T</code> at which the sum reaches <code>tolerance</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>result</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LinearityResult
+
+
+  
+      dataclass
+   (geepers.linearity.LinearityResult)" href="#geepers.linearity.LinearityResult">LinearityResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output of <code>linearity_test</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>tolerance</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Acceptable extrapolation error, in the units of the series.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cap_years</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper limit on the reported horizon. Default no limit.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="numpy.inf">inf</span></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ValidityHorizon
+
+
+  
+      dataclass
+   (geepers.linearity.ValidityHorizon)" href="#geepers.linearity.ValidityHorizon">ValidityHorizon</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/geepers/linearity.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validity_horizon</span><span class="p">(</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">LinearityResult</span><span class="p">,</span>
+    <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">cap_years</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ValidityHorizon</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Bound how far the rate can be extrapolated within `tolerance`.</span>
+
+<span class="sd">    The expected extrapolation error after ``T`` years is the rate</span>
+<span class="sd">    uncertainty, ``sigma_v * T``, plus the non-linearity the test found:</span>
+
+<span class="sd">    - &quot;quadratic&quot;: ``0.5 * |a| * T**2`` when the acceleration is resolved</span>
+<span class="sd">      at 2 sigma;</span>
+<span class="sd">    - &quot;piecewise&quot;: ``|rate_after - rate_before| * T`` - a rate that has</span>
+<span class="sd">      changed once can change again, so the observed change is taken as</span>
+<span class="sd">      the scale of what may happen next.</span>
+
+<span class="sd">    The horizon is the ``T`` at which the sum reaches `tolerance`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    result : LinearityResult</span>
+<span class="sd">        Output of `linearity_test`.</span>
+<span class="sd">    tolerance : float</span>
+<span class="sd">        Acceptable extrapolation error, in the units of the series.</span>
+<span class="sd">    cap_years : float</span>
+<span class="sd">        Upper limit on the reported horizon. Default no limit.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ValidityHorizon</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">trend</span><span class="o">.</span><span class="n">velocity_uncertainty</span>
+    <span class="n">from_rate</span> <span class="o">=</span> <span class="n">tolerance</span> <span class="o">/</span> <span class="n">sigma</span> <span class="k">if</span> <span class="n">sigma</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+
+    <span class="n">years</span> <span class="o">=</span> <span class="n">from_rate</span>
+    <span class="n">accel</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">acceleration</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;quadratic&quot;</span> <span class="ow">and</span> <span class="n">accel</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">result</span><span class="o">.</span><span class="n">acceleration_sigma</span><span class="p">:</span>
+        <span class="c1"># Positive root of 0.5 |a| T^2 + sigma T - tolerance = 0</span>
+        <span class="n">years</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">sigma</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sigma</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">accel</span> <span class="o">*</span> <span class="n">tolerance</span><span class="p">))</span> <span class="o">/</span> <span class="n">accel</span>
+    <span class="k">elif</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;piecewise&quot;</span><span class="p">:</span>
+        <span class="n">years</span> <span class="o">=</span> <span class="n">tolerance</span> <span class="o">/</span> <span class="p">(</span><span class="n">sigma</span> <span class="o">+</span> <span class="nb">abs</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">rate_after</span> <span class="o">-</span> <span class="n">result</span><span class="o">.</span><span class="n">rate_before</span><span class="p">))</span>
+
+    <span class="n">driver</span> <span class="o">=</span> <span class="s2">&quot;non-linearity&quot;</span> <span class="k">if</span> <span class="n">years</span> <span class="o">&lt;</span> <span class="n">from_rate</span> <span class="k">else</span> <span class="s2">&quot;rate uncertainty&quot;</span>
+    <span class="k">if</span> <span class="n">years</span> <span class="o">&gt;=</span> <span class="n">cap_years</span><span class="p">:</span>
+        <span class="n">years</span><span class="p">,</span> <span class="n">driver</span> <span class="o">=</span> <span class="n">cap_years</span><span class="p">,</span> <span class="s2">&quot;capped&quot;</span>
+    <span class="k">return</span> <span class="n">ValidityHorizon</span><span class="p">(</span>
+        <span class="n">years</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">years</span><span class="p">),</span>
+        <span class="n">from_rate</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">from_rate</span><span class="p">),</span>
+        <span class="n">driver</span><span class="o">=</span><span class="n">driver</span><span class="p">,</span>
+        <span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
