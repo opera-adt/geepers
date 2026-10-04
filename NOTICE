@@ -66,6 +66,18 @@ Plate boundaries (viewer)
     boundaries. Geochemistry, Geophysics, Geosystems, 4(3), 1027.
     https://doi.org/10.1029/2001GC000252
 
+Earthquakes and volcanoes (viewer)
+    Earthquakes from the U.S. Geological Survey ANSS Comprehensive
+    Earthquake Catalog (ComCat), FDSN event service
+    (https://earthquake.usgs.gov/fdsnws/event/1/). Volcanoes from the
+    Smithsonian Institution Global Volcanism Program, Volcanoes of the
+    World, Holocene list (https://volcano.si.edu), read from the trimmed
+    snapshot in opera-adt/nisar_db; current US alert levels from the USGS
+    Volcano Hazards Program (https://volcanoes.usgs.gov). The viewer code
+    for both is adapted from the nisar_db frame viewer
+    (https://github.com/opera-adt/nisar_db), Copyright (c) 2025-2026
+    California Institute of Technology, Apache License 2.0.
+
 Libraries inlined in scripts/browse_unr_grid.html
     MapLibre GL JS (BSD-3-Clause), uPlot (MIT) and hyparquet (MIT), each
     under its own license, kept with its code in that file.
