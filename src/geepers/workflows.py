@@ -69,8 +69,16 @@ def merge_gps_insar(
 
     """
     insar_times = pd.DatetimeIndex(df_insar.index)
+    gps_times = pd.DatetimeIndex(df_gps.index)
+    # Daily solutions are stamped at midnight but cover the whole UTC day: by
+    # nearest timestamp an acquisition after 12:00 would take the next day's.
+    lookup = (
+        insar_times.normalize()
+        if len(gps_times) and (gps_times == gps_times.normalize()).all()
+        else insar_times
+    )
     pos = df_gps.index.get_indexer(
-        insar_times, method="nearest", tolerance=pd.Timedelta(tolerance)
+        lookup, method="nearest", tolerance=pd.Timedelta(tolerance)
     )
     matched = pos >= 0
     insar_on_gps = pd.DataFrame(
