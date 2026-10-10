@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from geepers.quality import StationQuality, compute_station_quality
+from geepers.quality import StationQuality, compute_station_quality, drop_relocations
 
 
 def test_station_quality_dataclass():
@@ -160,3 +160,29 @@ def test_rms_misfit_ignores_zero_level_offset():
     gps = np.linspace(0, 0.01, 30)
     df = pd.DataFrame({"los_gps": gps, "los_insar": gps + 0.05}, index=dates)
     assert compute_station_quality(df).rms_misfit == pytest.approx(0.0, abs=1e-12)
+
+
+class TestDropRelocations:
+    """A monument moved under the same id (UNR GINN, about 1 km in 2019-2020)."""
+
+    @staticmethod
+    def _station(step_east: float) -> pd.DataFrame:
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        east = np.arange(10.0) * 1e-3
+        east[6:] += step_east
+        return pd.DataFrame({"date": dates, "east": east, "north": 0.0, "up": 0.0})
+
+    def test_keeps_the_longest_segment(self):
+        kept, relocated = drop_relocations(self._station(-349.0))
+        assert relocated
+        assert kept["date"].tolist() == list(pd.date_range("2020-01-01", periods=6))
+
+    def test_coseismic_step_stays(self):
+        df = self._station(5.0)
+        kept, relocated = drop_relocations(df)
+        assert not relocated
+        pd.testing.assert_frame_equal(kept, df)
+
+    def test_kept_rows_are_a_copy(self):
+        kept, _ = drop_relocations(self._station(-349.0))
+        kept["los_gps"] = 0.0  # what the workflow does next; must not warn
