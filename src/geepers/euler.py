@@ -327,19 +327,20 @@ def predict_plate_motion(
     Returns
     -------
     ve, vn : np.ndarray
-        East and north velocities in mm/yr.
+        East and north velocities in mm/yr, in the broadcast shape of
+        `lon`, `lat` (and `height`); a scalar point gives shape ``(1,)``.
 
     """
-    lon = np.atleast_1d(np.asarray(lon, float))
-    lat = np.atleast_1d(np.asarray(lat, float))
-    hgt = (
-        np.zeros_like(lon)
-        if height is None
-        else np.atleast_1d(np.asarray(height, float))
-    )
-    A = _design_matrix(lon, lat, hgt)
+    lon_a, lat_a = np.broadcast_arrays(np.asarray(lon, float), np.asarray(lat, float))
+    shape = lon_a.shape or (1,)
+    hgt = np.zeros(shape) if height is None else np.asarray(height, float)
+    # the design matrix interleaves east/north rows per point: work on flat points
+    lon_f = np.broadcast_to(lon_a, shape).ravel()
+    lat_f = np.broadcast_to(lat_a, shape).ravel()
+    hgt_f = np.broadcast_to(hgt, shape).ravel()
+    A = _design_matrix(lon_f, lat_f, hgt_f)
     v = A @ (pole.rotation_vector * 1e6)  # micro-rad/yr pairs with mm/yr
-    return v[::2], v[1::2]
+    return v[::2].reshape(shape), v[1::2].reshape(shape)
 
 
 # --------------------------------------------------------------------------
