@@ -29,8 +29,9 @@ class DownloadError(RuntimeError):
 
 
 def _looks_like_html(head: bytes) -> bool:
-    start = head.lstrip()[:15].lower()
-    return start.startswith((b"<!doctype html", b"<html"))
+    # as cal-disp's staging: error pages may start at <head> or <body>
+    start = head.lstrip()[:32].lower()
+    return start.startswith((b"<!doctype html", b"<html", b"<head", b"<body"))
 
 
 def _expected_length(response: requests.Response) -> int | None:

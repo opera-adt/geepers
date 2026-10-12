@@ -65,12 +65,15 @@ def test_writes_the_whole_body_atomically(tmp_path):
             "HTML page",
         ),
         (FakeResponse([b"  <!DOCTYPE html><p>moved</p>"]), "HTML page"),
+        # error pages that start at <head> / <body>, as cal-disp's staging caught
+        (FakeResponse([b"\n<head><title>404</title></head>"]), "HTML page"),
+        (FakeResponse([b"<BODY>Not Found</BODY>"]), "HTML page"),
         (
             FakeResponse([BODY[:50]], {"Content-Length": str(len(BODY))}),
             "Content-Length",
         ),
     ],
-    ids=["html-content-type", "html-body", "short-body"],
+    ids=["html-content-type", "html-body", "html-head", "html-bare-body", "short-body"],
 )
 def test_bad_bodies_raise_and_leave_nothing(tmp_path, response, match):
     dest = tmp_path / "f.tenv8"
