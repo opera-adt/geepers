@@ -34,6 +34,11 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.forecast`: `forecast_trend` extrapolates the change-point model
+  with intervals from the parameters, the predicted colored noise and
+  simulated future rate changes (Prophet's trend uncertainty); `backtest`
+  scores it at past cutoffs (RMSE, MAE, interval coverage by lead time).
+- `TrendResult.covariance`: the full parameter covariance.
 - `geepers.changepoints`: an unknown number of offsets and rate changes
   with the trend, periodic terms and colored noise (the DiscoTimeS model,
   Oelsmann et al. 2022, without PyMC). `detect_changepoints` selects them
