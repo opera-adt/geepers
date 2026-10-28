@@ -100,6 +100,47 @@ is a random walk. Declare known offsets with `step_dates`, or they
 count as non-linearity. The web viewer's linearity test estimates the
 offsets its step detector finds.
 
+## Offsets and rate changes at unknown epochs (`geepers.changepoints`)
+
+`estimate_trend` needs the offset epochs; `detect_steps` finds offsets
+only and `linearity_test` one hinge. `geepers.changepoints` estimates up
+to `max_changepoints` change points at once, each an offset, a rate
+change, or both, together with the trend, periodic terms, known steps
+and colored noise. The rate after the last change point is the
+present-day rate. The model follows DiscoTimeS (Oelsmann et al., 2022,
+J. Geod., https://doi.org/10.1007/s00190-022-01645-6), without PyMC:
+
+```python
+from geepers.changepoints import detect_changepoints, sample_changepoints
+
+found = detect_changepoints(dates, up_mm, sampling_days=30)
+found.changepoints            # date, kind, offset, rate_change (+ sigmas)
+found.segments                # rate per segment
+found.rate, found.rate_sigma  # present-day rate
+
+post = sample_changepoints(dates, up_mm, sampling_days=30, detection=found)
+post.n_probability            # P(number of change points)
+post.probability              # P(change point at each candidate epoch)
+post.changepoints             # summary, with 95 % epoch intervals
+post.rate, post.rate_sigma    # averaged over all configurations
+post.rhat                     # chain convergence
+```
+
+- `detect_changepoints` is stepwise BIC selection under the
+  `estimate_trend` noise covariance, re-estimated with the change points
+  in. On long daily series `log(n)` overcounts correlated samples and
+  the selection is conservative; `penalty=2` gives the AIC.
+- `sample_changepoints` is reversible-jump MCMC over the number, epochs
+  and kinds of change points, with Gaussian priors on their sizes
+  (`offset_scale`, `rate_scale`) integrated out analytically and the
+  noise held at the `detect_changepoints` estimate. A few seconds for a
+  ten-year series. The prior scales act like any Bayes factor: wider
+  priors demand larger changes.
+- Change points sit on `n_candidates` (default 300) epochs at least
+  `min_segment_years` apart and from the ends. Pass known offsets as
+  `step_dates`. The flicker + white default matters for the same reason
+  as in `linearity_test`.
+
 ## Station stability metrics (`geepers.variability`)
 
 Quality metrics extracted from the AUS GNSS screening workflow:
