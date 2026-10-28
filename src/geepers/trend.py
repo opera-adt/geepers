@@ -144,6 +144,30 @@ def _powerlaw_covariance(kappa: float, n: int) -> np.ndarray:
     return C
 
 
+def _step_years(
+    dates: pd.DatetimeIndex, t_years: np.ndarray, step_dates: ArrayLike | None
+) -> np.ndarray:
+    """Step times on the sampling-grid time axis `t_years` of `dates`.
+
+    A step inside the record starts at the first epoch on or after its
+    date. Converting the raw date instead misplaces it whenever rounding
+    to the sampling grid moves that epoch earlier than the date (a step
+    dated on a monthly epoch would start one epoch late). Steps at or
+    before the first epoch, or after the last, keep their raw time, so
+    the fit still reports them as outside the record.
+    """
+    steps = pd.DatetimeIndex(
+        pd.to_datetime(
+            np.atleast_1d(np.asarray([] if step_dates is None else step_dates))
+        )
+    )
+    years = np.asarray((steps - dates[0]).total_seconds()) / 86400.0 / DAYS_PER_YEAR
+    first = dates.searchsorted(steps, side="left")
+    inside = (first > 0) & (first < len(dates))
+    years[inside] = t_years[first[inside]]
+    return years
+
+
 def _design_matrix(
     t_years: np.ndarray,
     poly_deg: int,
@@ -511,9 +535,7 @@ def estimate_trend(
     def _to_years(d) -> float:
         return (pd.Timestamp(d) - dates[0]).total_seconds() / 86400.0 / DAYS_PER_YEAR
 
-    step_years = np.array(
-        [_to_years(d) for d in (step_dates if step_dates is not None else [])]
-    )
+    step_years = _step_years(dates, t_years, step_dates)
     log_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_log or [])]
     exp_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_exp or [])]
 

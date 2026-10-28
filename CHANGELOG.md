@@ -48,6 +48,10 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Fixed
 
+- `estimate_trend` and `linearity_test` started a step dated on an
+  observation one epoch late when rounding to the sampling grid moved that
+  epoch earlier than its timestamp (e.g. monthly data). Steps now start at
+  the first epoch on or after their date.
 - A freshly solved environment failed 13 tests on the `affine` 3
   PendingDeprecationWarning raised through rasterio ≤ 1.5.1; it is now
   filtered (as in Venti).

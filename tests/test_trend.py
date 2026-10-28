@@ -118,6 +118,28 @@ class TestEstimateTrend:
         # trend must not absorb the step
         assert res.velocity == pytest.approx(0.0, abs=3 * res.velocity_uncertainty)
 
+    def test_step_on_an_observation_date(self):
+        """A step dated on an epoch starts at that epoch. Regression: step times
+        came from the raw timestamp but epochs from the rounded sampling grid,
+        so on monthly data the step started one epoch late."""
+        month = 365.25 / 12
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(96) * month), unit="D"
+        )
+        y = np.random.default_rng(0).normal(0, 0.5, 96)
+        y[36:] += 20.0
+        res = estimate_trend(
+            dates,
+            y,
+            sampling_days=month,
+            noise_model="WN",
+            periods_years=(),
+            step_dates=[dates[36]],
+        )
+        value, sigma = res.parameters["step_0"]
+        assert value == pytest.approx(20.0, abs=3 * sigma)
+        assert abs(res.residuals[36]) < 2.5
+
     def test_annual_amplitude(self):
         rng = np.random.default_rng(3)
         n = 730
