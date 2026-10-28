@@ -188,3 +188,53 @@ class TestBacktest:
         dates, values = _monthly(n=60)
         with pytest.raises(ValueError, match="do not fit in the record"):
             backtest(dates, values, 3, sampling_days=MONTH)
+
+
+def _rows(table: pd.DataFrame, positions: list[int]) -> list[dict]:
+    picked = table.iloc[positions]
+    return [
+        {"date": str(date.date()), **row}
+        for date, row in zip(
+            picked.index, picked.to_dict(orient="records"), strict=True
+        )
+    ]
+
+
+class TestForecastRegression:
+    """Golden-value regression for `forecast_trend` and `backtest`."""
+
+    def test_noise_free_extrapolates_exactly(self):
+        n = 96
+        t = np.arange(n) / 12
+        truth = 2.0 - 3.0 * t + 3.0 * np.sin(2 * np.pi * t)
+        values = truth + np.random.default_rng(0).normal(0, 0.01, n)
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(n) * MONTH), unit="D"
+        )
+        fc = forecast_trend(dates, values, 2, sampling_days=MONTH, noise_model="WN")
+        t_future = np.arange(n, n + 24) / 12  # the next 24 monthly epochs
+        expected = 2.0 - 3.0 * t_future + 3.0 * np.sin(2 * np.pi * t_future)
+        np.testing.assert_allclose(fc.table["model"], expected, atol=0.02)
+        assert fc.change_rates == {"offset": 0.0, "rate": 0.0}
+
+    def test_forecast_golden(self, golden):
+        dates, values = _monthly(rate_change=-4.0)
+        fc = forecast_trend(dates, values, 3, sampling_days=MONTH, n_simulations=500)
+        golden(
+            "forecast.json",
+            {
+                "table": _rows(fc.table, [0, 11, 23, 35]),
+                "change_rates": fc.change_rates,
+                "change_scales": fc.change_scales,
+            },
+        )
+
+    def test_backtest_golden(self, result, golden):
+        metrics = result.metrics.astype({"n": int})
+        golden(
+            "backtest.json",
+            {
+                "metrics": metrics.to_dict(orient="records"),
+                "coverage": result.coverage,
+            },
+        )
