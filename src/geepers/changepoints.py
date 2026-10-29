@@ -606,13 +606,14 @@ def detect_changepoints(
     )
 
 
-def _profiled(normal: _Normal) -> tuple[np.ndarray, np.ndarray]:
-    """Profile the base terms out of the candidate normal equations."""
-    p = normal.n_base
-    G, b = normal.gram, normal.proj
-    cho = linalg.cho_factor(G[:p, :p], lower=True, check_finite=False)
-    X = linalg.cho_solve(cho, G[:p, p:], check_finite=False)
-    return G[p:, p:] - G[:p, p:].T @ X, b[p:] - X.T @ b[:p]
+def _profiled(gram: np.ndarray, b: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
+    """Profile the first `p` (base) terms out of the normal equations.
+
+    `b` may hold one right-hand side per column.
+    """
+    cho = linalg.cho_factor(gram[:p, :p], lower=True, check_finite=False)
+    x = linalg.cho_solve(cho, gram[:p, p:], check_finite=False)
+    return gram[p:, p:] - gram[:p, p:].T @ x, b[p:] - x.T @ b[:p]
 
 
 def _lasso_path(
@@ -620,18 +621,24 @@ def _lasso_path(
     proj: np.ndarray,
     usable: np.ndarray,
     n_lambdas: int,
+    alive: np.ndarray | None = None,
     min_ratio: float = 1e-3,
     tol: float = 1e-5,
     max_iter: int = 2000,
 ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-    """Lasso solutions ``min 1/2 b'Gb - p'b + lambda |D b|_1`` on a decreasing path.
+    """Lasso solutions ``min 1/2 b'Gb - p'b + lambda |D b|_1`` on decreasing paths.
 
-    Columns are standardized (``D`` = column norms), so offsets and rate
-    changes are penalized on the same scale. Solved by FISTA (Beck &
-    Teboulle, 2009) with warm starts. Returns ``(coefficients,
-    standardized magnitudes)`` per lambda, lazily, so the caller can
-    stop before the small penalties, where convergence is slowest.
+    `proj` holds one right-hand side per column, all sharing `gram`; each
+    gets its own path, from the penalty that selects nothing down to
+    `min_ratio` of it. Columns are standardized (``D`` = column norms),
+    so offsets and rate changes are penalized on the same scale. Solved
+    by FISTA (Beck & Teboulle, 2009) with warm starts, every right-hand
+    side at once. Yields ``(coefficients, standardized magnitudes)`` per
+    penalty, lazily; the caller stops a right-hand side early by clearing
+    its entry in `alive`, since small penalties converge slowest.
     """
+    n_rhs = proj.shape[1]
+    alive = np.ones(n_rhs, bool) if alive is None else alive
     norms = np.sqrt(np.clip(np.diag(gram), 0.0, None))
     usable = usable & (norms > 1e-8 * max(float(norms.max(initial=0.0)), 1e-300))
     idx = np.flatnonzero(usable)
@@ -639,30 +646,36 @@ def _lasso_path(
         return
     d = norms[idx]
     G = gram[np.ix_(idx, idx)] / np.outer(d, d)
-    b = proj[idx] / d
+    b = proj[idx] / d[:, None]
     lipschitz = float(np.linalg.eigvalsh(G)[-1])
-    lam_max = float(np.max(np.abs(b)))
-    gamma = np.zeros(len(idx))
-    for lam in lam_max * np.geomspace(1.0, min_ratio, n_lambdas):
-        z, t = gamma.copy(), 1.0
+    lam_max = np.max(np.abs(b), axis=0)
+    gamma = np.zeros((len(idx), n_rhs))
+    for ratio in np.geomspace(1.0, min_ratio, n_lambdas):
+        threshold = ratio * lam_max / lipschitz
+        z, t = gamma.copy(), np.ones(n_rhs)
+        running = alive.copy()
         for _ in range(max_iter):
-            step = z - (G @ z - b) / lipschitz
-            new = np.sign(step) * np.maximum(np.abs(step) - lam / lipschitz, 0.0)
-            change = new - gamma
-            if np.max(np.abs(change)) <= tol * max(1.0, float(np.max(np.abs(new)))):
-                gamma = new
+            cols = np.flatnonzero(running)
+            if len(cols) == 0:
                 break
+            zc = z[:, cols]
+            step = zc - (G @ zc - b[:, cols]) / lipschitz
+            new = np.sign(step) * np.maximum(np.abs(step) - threshold[cols], 0.0)
+            change = new - gamma[:, cols]
+            scale = np.maximum(1.0, np.max(np.abs(new), axis=0))
+            done = np.max(np.abs(change), axis=0) <= tol * scale
             # Adaptive restart (O'Donoghue & Candes, 2015): drop the momentum
             # when it points uphill, which the nearly collinear hinge columns
             # otherwise make oscillate for thousands of iterations
-            if float((z - new) @ change) > 0.0:
-                t = 1.0
-            t_next = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * t * t))
-            z = new + (t - 1.0) / t_next * change
-            gamma, t = new, t_next
-        coef = np.zeros(len(proj))
-        magnitude = np.zeros(len(proj))
-        coef[idx] = gamma / d
+            tc = np.where(np.sum((zc - new) * change, axis=0) > 0.0, 1.0, t[cols])
+            t_next = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * tc * tc))
+            z[:, cols] = new + (tc - 1.0) / t_next * change
+            gamma[:, cols] = new
+            t[cols] = t_next
+            running[cols[done]] = False
+        coef = np.zeros(proj.shape)
+        magnitude = np.zeros(proj.shape)
+        coef[idx] = gamma / d[:, None]
         magnitude[idx] = np.abs(gamma)
         yield coef, magnitude
 
@@ -708,6 +721,56 @@ def _cluster(
     return tuple(sorted((j, kind) for _, j, kind in strongest)), len(found)
 
 
+class _PathScore:
+    """Lowest-BIC change-point set of one series along its lasso path."""
+
+    def __init__(
+        self,
+        normal: _Normal,
+        series: _Series,
+        kinds: tuple[str, ...],
+        max_changepoints: int,
+        min_segment_years: float,
+    ) -> None:
+        self.normal, self.series, self.kinds = normal, series, kinds
+        self.max_changepoints = max_changepoints
+        self.min_segment_years = min_segment_years
+        self.best: tuple[float, Config] = (normal.bic(()), ())
+        self.seen: set[Config] = {()}
+
+    def update(self, coef: np.ndarray, magnitude: np.ndarray) -> bool:
+        """Score one solution; False once smaller penalties cannot help."""
+        config, n_found = _cluster(
+            self.series,
+            coef,
+            magnitude,
+            self.kinds,
+            self.max_changepoints,
+            self.min_segment_years,
+        )
+        if n_found > self.max_changepoints:
+            # Smaller penalties only add candidates
+            return False
+        if config not in self.seen:
+            self.seen.add(config)
+            # Scored after an unpenalized refit, as in `detect_changepoints`
+            value = self.normal.bic(config)
+            if value < self.best[0]:
+                self.best = (value, config)
+        return True
+
+    def result(self) -> Config:
+        return _polish(self.normal, self.series, self.best[1], self.min_segment_years)
+
+
+def _usable(n_cand: int, kinds: tuple[str, ...]) -> np.ndarray:
+    """Candidate columns (offsets, then rate changes) that `kinds` allows."""
+    return np.r_[
+        np.full(n_cand, any("offset" in _PARTS[k] for k in kinds)),
+        np.full(n_cand, any("rate" in _PARTS[k] for k in kinds)),
+    ]
+
+
 def _sparse(
     normal: _Normal,
     series: _Series,
@@ -717,29 +780,16 @@ def _sparse(
     n_lambdas: int,
 ) -> Config:
     """Lowest-BIC change-point set along the lasso path."""
-    gram, proj = _profiled(normal)
-    n = normal.n_cand
-    usable = np.r_[
-        np.full(n, any("offset" in _PARTS[k] for k in kinds)),
-        np.full(n, any("rate" in _PARTS[k] for k in kinds)),
-    ]
-    best: tuple[float, Config] = (normal.bic(()), ())
-    seen: set[Config] = {()}
-    for coef, magnitude in _lasso_path(gram, proj, usable, n_lambdas):
-        config, n_found = _cluster(
-            series, coef, magnitude, kinds, max_changepoints, min_segment_years
-        )
-        if n_found > max_changepoints:
-            # Smaller penalties only add candidates
+    gram, proj = _profiled(normal.gram, normal.proj[:, None], normal.n_base)
+    score = _PathScore(normal, series, kinds, max_changepoints, min_segment_years)
+    alive = np.ones(1, bool)
+    for coef, magnitude in _lasso_path(
+        gram, proj, _usable(normal.n_cand, kinds), n_lambdas, alive
+    ):
+        alive[0] = score.update(coef[:, 0], magnitude[:, 0])
+        if not alive[0]:
             break
-        if config in seen:
-            continue
-        seen.add(config)
-        # Scored after an unpenalized refit, as in `detect_changepoints`
-        value = normal.bic(config)
-        if value < best[0]:
-            best = (value, config)
-    return _polish(normal, series, best[1], min_segment_years)
+    return score.result()
 
 
 def _polish(
