@@ -27,6 +27,8 @@ Three estimators share one model:
   candidate epoch and selects them with an L1 (lasso) penalty, the sparse
   trend prior of Prophet: a convex search whose result does not depend
   on the order change points are added.
+  `fit_sparse_changepoints_many` does the same for many series on one
+  time grid (InSAR pixels), solving all their lasso paths together.
 - `sample_changepoints` samples the posterior distribution of the number,
   epochs and kinds of change points by reversible-jump Markov chain Monte
   Carlo (Green, P. J., 1995, Reversible jump Markov chain Monte Carlo
@@ -76,8 +78,10 @@ from geepers.trend import DAYS_PER_YEAR, TrendResult, _design_matrix, estimate_t
 __all__ = [
     "ChangepointPosterior",
     "ChangepointResult",
+    "ManyChangepoints",
     "detect_changepoints",
     "fit_sparse_changepoints",
+    "fit_sparse_changepoints_many",
     "sample_changepoints",
 ]
 
@@ -267,6 +271,24 @@ class _Normal:
         self.penalty = np.log(self.n_obs) if penalty is None else penalty
         self.n_base = series.base.shape[1]
         self.n_cand = n_cand
+
+    @classmethod
+    def from_parts(
+        cls,
+        gram: np.ndarray,
+        proj: np.ndarray,
+        yty: float,
+        n_obs: int,
+        n_base: int,
+        penalty: float | None = None,
+    ) -> _Normal:
+        """Wrap normal equations whitened elsewhere (e.g. shared by many series)."""
+        self = cls.__new__(cls)
+        self.gram, self.proj, self.yty = gram, proj, yty
+        self.n_obs, self.n_base = n_obs, n_base
+        self.n_cand = (gram.shape[0] - n_base) // 2
+        self.penalty = np.log(n_obs) if penalty is None else penalty
+        return self
 
     def columns(self, config: Config) -> tuple[np.ndarray, list[tuple[int, str]]]:
         """Column indices of a configuration and the (change point, part) of each."""
@@ -904,6 +926,231 @@ max_iterations, penalty
         penalty,
         max_iterations,
     )
+
+
+@dataclass
+class ManyChangepoints:
+    """Output of `fit_sparse_changepoints_many`.
+
+    Attributes
+    ----------
+    summary : pd.DataFrame
+        One row per series (index: the series names): ``n_changepoints``,
+        ``rate`` and ``rate_sigma`` (present-day rate, input units per
+        year), ``noise_scale`` (the series' noise amplitude relative to
+        `noise`), ``bic`` and ``bic_none``. NaN for series that were not
+        fitted (any NaN value).
+    changepoints : pd.DataFrame
+        One row per change point: ``series`` plus the columns of
+        `ChangepointResult.changepoints`.
+    noise : TrendResult
+        The shared noise model, whose shape every series is fitted with.
+
+    """
+
+    summary: pd.DataFrame
+    changepoints: pd.DataFrame
+    noise: TrendResult
+
+
+def fit_sparse_changepoints_many(
+    dates: ArrayLike,
+    values: ArrayLike | pd.DataFrame,
+    *,
+    noise: TrendResult | None = None,
+    sampling_days: float = 1.0,
+    periods_years: tuple[float, ...] = (1.0, 0.5),
+    step_dates: ArrayLike | None = None,
+    kinds: tuple[Kind, ...] = ("offset", "rate", "both"),
+    max_changepoints: int = 5,
+    min_segment_years: float = 1.0,
+    n_candidates: int = 300,
+    n_lambdas: int = 40,
+    noise_model: NoiseModel = "FNWN",
+    method: Literal["exact", "whittle"] = "whittle",
+    n_noise_series: int = 50,
+    penalty: float | None = None,
+    seed: int | np.random.Generator | None = 0,
+) -> ManyChangepoints:
+    """Run `fit_sparse_changepoints` on many series sharing their epochs.
+
+    Meant for InSAR pixels or a network of stations on one time grid. The
+    noise *shape* (spectral index, white fraction, ...) is shared: it is
+    `noise`, or the median of `estimate_trend` fits to `n_noise_series`
+    randomly chosen series. Each series keeps its own noise *amplitude*,
+    estimated from its residuals around the model without change points.
+    The whitened normal equations are then built once, and the lasso
+    paths of all series are solved together, one matrix product per
+    iteration. Selection, BIC and the epoch polish are per series, as in
+    `fit_sparse_changepoints`, but the noise is not re-estimated with the
+    change points in: where change points inflate the residuals the noise
+    amplitude is overestimated and the selection is conservative.
+
+    Parameters
+    ----------
+    dates : array-like of datetime64
+        Epochs shared by all series. Ignored if `values` is a DataFrame
+        with a DatetimeIndex.
+    values : array-like or pd.DataFrame
+        Shape ``(n_series, n_epochs)``, or a DataFrame with one column per
+        series. Series with any NaN are not fitted.
+    noise : TrendResult, optional
+        Noise model to share, e.g. `estimate_trend` on a reference series.
+    sampling_days, periods_years, step_dates, kinds, max_changepoints, \
+min_segment_years, n_candidates, n_lambdas, penalty
+        As in `fit_sparse_changepoints`.
+    noise_model, method
+        Passed to `estimate_trend` for the shared noise. Default "FNWN"
+        and "whittle".
+    n_noise_series : int
+        Series the shared noise is estimated from. Default 50.
+    seed : int or np.random.Generator, optional
+        Seed for choosing those series. Default 0.
+
+    Returns
+    -------
+    ManyChangepoints
+
+    Raises
+    ------
+    ValueError
+        If `kinds` names an unknown kind or no series is complete.
+
+    """
+    kinds = _check_kinds(kinds)
+    if isinstance(values, pd.DataFrame):
+        names = [str(c) for c in values.columns]
+        if isinstance(values.index, pd.DatetimeIndex):
+            dates = values.index
+        matrix = values.to_numpy(dtype=float).T
+    else:
+        matrix = np.atleast_2d(np.asarray(values, dtype=float))
+        names = [str(i) for i in range(matrix.shape[0])]
+    complete = np.flatnonzero(np.all(np.isfinite(matrix), axis=1))
+    if len(complete) == 0:
+        msg = "No series without NaNs to fit"
+        raise ValueError(msg)
+
+    series = _prepare(
+        dates,
+        matrix[complete[0]],
+        sampling_days,
+        periods_years,
+        step_dates,
+        min_segment_years,
+        n_candidates,
+    )
+    if noise is None:
+        rng = np.random.default_rng(seed)
+        pick = rng.choice(complete, min(n_noise_series, len(complete)), replace=False)
+        fits = [
+            _fit_trend(
+                _Series(**{**vars(series), "y": matrix[i]}),
+                (),
+                sampling_days,
+                periods_years,
+                noise_model,
+                method,
+            )
+            for i in pick
+        ]
+
+        def median_of(name: str) -> float:
+            # A component the noise model does not have is NaN in every fit
+            values = np.array([getattr(f, name) for f in fits], dtype=float)
+            finite = values[np.isfinite(values)]
+            return float(np.median(finite)) if len(finite) else np.nan
+
+        noise = TrendResult(
+            velocity=np.nan,
+            velocity_uncertainty=np.nan,
+            kappa=median_of("kappa"),
+            sigma_powerlaw=median_of("sigma_powerlaw"),
+            sigma_white=median_of("sigma_white"),
+            sigma_flicker=median_of("sigma_flicker"),
+            sigma_randomwalk=median_of("sigma_randomwalk"),
+        )
+
+    n_epochs = int(series.obs_idx[-1]) + 1
+    chol = linalg.cholesky(
+        _noise_covariance(noise, series.obs_idx, n_epochs),
+        lower=True,
+        check_finite=False,
+    )
+    n_cand = len(series.candidates)
+    extra = [series.column(j, "offset") for j in range(n_cand)] + [
+        series.column(j, "rate") for j in range(n_cand)
+    ]
+    X = np.column_stack([series.base, *extra]) if extra else series.base
+    Xw = linalg.solve_triangular(chol, X, lower=True, check_finite=False)
+    Yw = linalg.solve_triangular(
+        chol, matrix[complete].T, lower=True, check_finite=False
+    )
+    gram = Xw.T @ Xw
+    proj = Xw.T @ Yw
+    yty = np.sum(Yw * Yw, axis=0)
+
+    # Each series' noise amplitude, from its residuals without change points
+    p = series.base.shape[1]
+    base_fit = linalg.solve(gram[:p, :p], proj[:p], assume_a="pos")
+    chi2 = yty - np.sum(proj[:p] * base_fit, axis=0)
+    scale2 = chi2 / (len(series.y) - p)
+
+    normals = [
+        _Normal.from_parts(
+            gram / s2, proj[:, k] / s2, float(yty[k] / s2), len(series.y), p, penalty
+        )
+        for k, s2 in enumerate(scale2)
+    ]
+    scores = [
+        _PathScore(normal, series, kinds, max_changepoints, min_segment_years)
+        for normal in normals
+    ]
+    # The lasso path is invariant to each series' scale, so all share the
+    # unscaled profiled Gram matrix
+    gram_p, proj_p = _profiled(gram, proj, p)
+    alive = np.ones(len(complete), bool)
+    for coef, magnitude in _lasso_path(
+        gram_p, proj_p, _usable(n_cand, kinds), n_lambdas, alive
+    ):
+        for k in np.flatnonzero(alive):
+            alive[k] = scores[k].update(coef[:, k], magnitude[:, k])
+        if not alive.any():
+            break
+
+    rows: list[dict] = []
+    tables = []
+    for k, (score, normal) in enumerate(zip(scores, normals, strict=True)):
+        config = score.result()
+        cols, labels = normal.columns(config)
+        beta, cov, *_ = normal.solve(cols)
+        c = _rate_vector(series, labels)
+        rows.append(
+            {
+                "series": names[complete[k]],
+                "n_changepoints": len(config),
+                "rate": float(c @ beta),
+                "rate_sigma": float(np.sqrt(c @ cov @ c)),
+                "noise_scale": float(np.sqrt(scale2[k])),
+                "bic": float(normal.bic(config)),
+                "bic_none": float(normal.bic(())),
+            }
+        )
+        table = _amplitudes(series, labels, beta, cov, config)
+        table.insert(0, "series", names[complete[k]])
+        tables.append(table)
+    summary = (
+        pd.DataFrame(rows).set_index("series").reindex(pd.Index(names, name="series"))
+    )
+    nonempty = [t for t in tables if not t.empty]
+    changepoints = (
+        pd.concat(nonempty, ignore_index=True)
+        if nonempty
+        else pd.DataFrame(
+            columns=["series", *_amplitudes(series, [], [], [], ()).columns]
+        )
+    )
+    return ManyChangepoints(summary=summary, changepoints=changepoints, noise=noise)
 
 
 def _gelman_rubin(chains: np.ndarray) -> float:

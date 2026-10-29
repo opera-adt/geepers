@@ -140,6 +140,14 @@ post.rhat                     # chain convergence
   stepwise search; about as fast. On ten synthetic series it matched the
   stepwise selection on six, avoided a spurious "both" on two and added
   one spurious change point on two.
+- `fit_sparse_changepoints_many` runs the sparse fit on many series that
+  share their epochs (InSAR pixels, a station network on one grid): one
+  shared noise shape (median of `estimate_trend` on a sample of series,
+  or `noise=`) with a per-series amplitude, whitened once, and all lasso
+  paths solved together. About 50 ms per series against 0.7 s for
+  `fit_sparse_changepoints`; the noise is not re-estimated with the
+  change points in, so the selection is slightly conservative. Series
+  with any NaN are skipped.
 - `sample_changepoints` is reversible-jump MCMC over the number, epochs
   and kinds of change points, with Gaussian priors on their sizes
   (`offset_scale`, `rate_scale`) integrated out analytically and the

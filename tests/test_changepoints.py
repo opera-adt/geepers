@@ -11,11 +11,12 @@ from geepers.changepoints import (
     ChangepointResult,
     detect_changepoints,
     fit_sparse_changepoints,
+    fit_sparse_changepoints_many,
     sample_changepoints,
 )
 from geepers.linearity import _noise_covariance
 from geepers.synthetic import power_law_noise
-from geepers.trend import DAYS_PER_YEAR, estimate_trend
+from geepers.trend import DAYS_PER_YEAR, TrendResult, estimate_trend
 
 MONTH = 365.25 / 12
 OFFSET_AT, RATE_AT = 3.0, 6.5  # years after the first epoch
@@ -437,5 +438,130 @@ class TestFitSparseChangepointsRegression:
                 "rate_sigma": found.rate_sigma,
                 "bic": found.bic,
                 "bic_none": found.bic_none,
+            },
+        )
+
+
+def _batch(n_each: int = 4):
+    """Series of three kinds: linear, offset at year 3, rate change at 6.5."""
+    rng = np.random.default_rng(1)
+    rows, kinds = [], []
+    for i in range(3 * n_each):
+        kind = i % 3
+        _, v = _monthly(
+            offset=8.0 if kind == 1 else 0.0,
+            rate_change=-4.0 if kind == 2 else 0.0,
+            seed=100 + i,
+        )
+        rows.append(v * rng.uniform(0.8, 1.2))
+        kinds.append(kind)
+    dates, _ = _monthly()
+    return dates, np.array(rows), np.array(kinds)
+
+
+FNWN = TrendResult(
+    velocity=np.nan, velocity_uncertainty=np.nan, sigma_white=1.0, sigma_flicker=0.7
+)
+
+
+@pytest.fixture(scope="module")
+def batch():
+    dates, rows, kinds = _batch()
+    return (
+        dates,
+        rows,
+        kinds,
+        fit_sparse_changepoints_many(dates, rows, sampling_days=MONTH),
+    )
+
+
+class TestFitSparseChangepointsMany:
+    def test_finds_the_change_points_of_each_series(self, batch):
+        _, _, kinds, result = batch
+        n = result.summary["n_changepoints"].to_numpy()
+        assert (n[kinds == 0] == 0).all()
+        assert (n[kinds != 0] >= 1).all()
+        cps = result.changepoints
+        found = cps.groupby("series")["kind"].apply(set)
+        for name, kind in zip(result.summary.index, kinds, strict=True):
+            if kind == 1:
+                assert "offset" in found[name]
+            elif kind == 2:
+                assert found[name] & {"rate", "both"}
+
+    def test_a_series_alone_matches_the_batch(self):
+        # With the noise given, nothing couples the series: each must come
+        # out as it does on its own
+        dates, rows, _ = _batch(n_each=2)
+        together = fit_sparse_changepoints_many(
+            dates, rows, noise=FNWN, sampling_days=MONTH
+        )
+        for k in (0, 2, 4):
+            alone = fit_sparse_changepoints_many(
+                dates, rows[[k]], noise=FNWN, sampling_days=MONTH
+            )
+            a = alone.summary.iloc[0]
+            b = together.summary.iloc[k]
+            assert a["n_changepoints"] == b["n_changepoints"]
+            assert a["rate"] == pytest.approx(b["rate"], rel=1e-9)
+            mine = together.changepoints[together.changepoints["series"] == str(k)]
+            assert list(alone.changepoints["date"]) == list(mine["date"])
+            assert list(alone.changepoints["kind"]) == list(mine["kind"])
+            np.testing.assert_allclose(
+                alone.changepoints[["offset", "rate_change"]].to_numpy(float),
+                mine[["offset", "rate_change"]].to_numpy(float),
+                rtol=1e-9,
+            )
+
+    def test_noise_scale_tracks_the_amplitude(self):
+        dates, rows, _ = _batch(n_each=1)
+        doubled = np.vstack([rows[0], 2.0 * rows[0]])
+        result = fit_sparse_changepoints_many(
+            dates, doubled, noise=FNWN, sampling_days=MONTH
+        )
+        scale = result.summary["noise_scale"].to_numpy()
+        assert scale[1] == pytest.approx(2.0 * scale[0], rel=1e-9)
+        # Scaling a series scales its rate and leaves the selection alone
+        assert result.summary["rate"].iloc[1] == pytest.approx(
+            2.0 * result.summary["rate"].iloc[0], rel=1e-6
+        )
+
+    def test_dataframe_input_and_incomplete_series(self):
+        dates, rows, _ = _batch(n_each=1)
+        frame = pd.DataFrame(rows.T, index=dates, columns=["a", "b", "c"])
+        frame.iloc[5, 1] = np.nan
+        result = fit_sparse_changepoints_many(None, frame, sampling_days=MONTH)
+        assert list(result.summary.index) == ["a", "b", "c"]
+        assert result.summary.loc["b"].isna().all()
+        assert "b" not in set(result.changepoints["series"])
+
+    def test_given_noise_is_used(self):
+        dates, rows, _ = _batch(n_each=1)
+        result = fit_sparse_changepoints_many(
+            dates, rows, noise=FNWN, sampling_days=MONTH
+        )
+        assert result.noise is FNWN
+
+    def test_no_complete_series_raises(self):
+        dates, rows, _ = _batch(n_each=1)
+        rows[:, 3] = np.nan
+        with pytest.raises(ValueError, match="No series without NaNs"):
+            fit_sparse_changepoints_many(dates, rows, sampling_days=MONTH)
+
+
+class TestFitSparseChangepointsManyRegression:
+    """Golden-value regression for `fit_sparse_changepoints_many`."""
+
+    def test_golden(self, batch, golden):
+        *_, result = batch
+        golden(
+            "changepoints_many.json",
+            {
+                "summary": _records(result.summary.reset_index()),
+                "changepoints": _records(result.changepoints),
+                "noise": {
+                    "sigma_white": result.noise.sigma_white,
+                    "sigma_flicker": result.noise.sigma_flicker,
+                },
             },
         )

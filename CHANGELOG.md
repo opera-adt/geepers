@@ -34,6 +34,10 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.changepoints.fit_sparse_changepoints_many`: the sparse fit for
+  many series on one time grid (shared noise shape, per-series amplitude,
+  all lasso paths solved together), returning a summary and a long table
+  of change points.
 - `geepers.changepoints.fit_sparse_changepoints`: change points selected
   with an L1 (lasso) penalty along a path (FISTA with adaptive restart),
   scored by BIC; returns a `ChangepointResult` like `detect_changepoints`.
