@@ -10,6 +10,7 @@ from scipy import stats
 from geepers.changepoints import (
     ChangepointResult,
     detect_changepoints,
+    fit_sparse_changepoints,
     sample_changepoints,
 )
 from geepers.linearity import _noise_covariance
@@ -343,5 +344,98 @@ class TestSampleChangepointsRegression:
                 "rate_sigma": post.rate_sigma,
                 "acceptance_rate": post.acceptance_rate,
                 "rate_samples_head": post.rate_samples[:5].tolist(),
+            },
+        )
+
+
+@pytest.fixture(scope="module")
+def sparse():
+    dates, values = _monthly()
+    return dates, fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+
+
+class TestFitSparseChangepoints:
+    def test_finds_the_offset_and_the_rate_change(self, sparse):
+        dates, found = sparse
+        cps = found.changepoints
+        assert list(cps["kind"]) == ["offset", "rate"]
+        assert _years(dates, cps["date"].iloc[0]) == pytest.approx(OFFSET_AT, abs=0.2)
+        assert _years(dates, cps["date"].iloc[1]) == pytest.approx(RATE_AT, abs=0.5)
+        assert found.rate == pytest.approx(-7.0, abs=3 * found.rate_sigma)
+
+    def test_agrees_with_the_stepwise_search(self, sparse, offset_and_rate_change):
+        _, found = sparse
+        _, _, stepwise = offset_and_rate_change
+        pd.testing.assert_frame_equal(found.changepoints, stepwise.changepoints)
+
+    def test_no_changepoints_in_a_linear_series(self):
+        dates, values = _monthly(offset=0.0, rate_change=0.0)
+        found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+        assert found.changepoints.empty
+
+    def test_kinds_restricts_the_search(self):
+        dates, values = _monthly()
+        found = fit_sparse_changepoints(
+            dates, values, sampling_days=MONTH, kinds=("offset",)
+        )
+        assert set(found.changepoints["kind"]) <= {"offset"}
+
+    def test_max_changepoints(self):
+        dates, values = _monthly()
+        found = fit_sparse_changepoints(
+            dates, values, sampling_days=MONTH, max_changepoints=1
+        )
+        assert len(found.changepoints) <= 1
+
+    def test_min_segment_years(self):
+        dates, values = _monthly()
+        found = fit_sparse_changepoints(
+            dates, values, sampling_days=MONTH, min_segment_years=2.0
+        )
+        t = [_years(dates, d) for d in found.changepoints["date"]]
+        assert np.all(np.diff(t) >= 2.0)
+
+    def test_unknown_kind_raises(self):
+        dates, values = _monthly()
+        with pytest.raises(ValueError, match="kinds must be a non-empty subset"):
+            fit_sparse_changepoints(dates, values, kinds=("jump",))  # type: ignore[arg-type]
+
+
+class TestFitSparseChangepointsRegression:
+    """Golden-value regression for `fit_sparse_changepoints`."""
+
+    def test_recovers_exact_parameters(self):
+        n = 120
+        t = np.arange(n) / 12
+        values = (
+            -3.0 * t
+            + 3.0 * np.sin(2 * np.pi * t)
+            + 8.0 * (t >= OFFSET_AT)
+            - 4.0 * np.maximum(0.0, t - RATE_AT)
+            + np.random.default_rng(0).normal(0, 0.05, n)
+        )
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(n) * MONTH), unit="D"
+        )
+        found = fit_sparse_changepoints(
+            dates, values, sampling_days=MONTH, noise_model="WN"
+        )
+        cps = found.changepoints
+        assert list(cps["kind"]) == ["offset", "rate"]
+        assert list(cps["date"]) == [dates[36], dates[78]]
+        assert found.rate == pytest.approx(-7.0, abs=0.02)
+
+    def test_golden(self, golden):
+        dates, values = _monthly(seed=6)
+        found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+        golden(
+            "changepoints_sparse.json",
+            {
+                "changepoints": _records(found.changepoints),
+                "segments": _records(found.segments),
+                "rate": found.rate,
+                "rate_sigma": found.rate_sigma,
+                "bic": found.bic,
+                "bic_none": found.bic_none,
             },
         )
