@@ -57,6 +57,7 @@ Example:
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -438,6 +439,65 @@ def _check_kinds(kinds: tuple[str, ...]) -> tuple[Kind, ...]:
     return tuple(dict.fromkeys(kinds))  # type: ignore[arg-type]
 
 
+def _select(
+    series: _Series,
+    search: Callable[[_Normal], Config],
+    sampling_days: float,
+    periods_years: tuple[float, ...],
+    noise_model: NoiseModel,
+    method: Literal["exact", "whittle"],
+    penalty: float | None,
+    max_iterations: int,
+) -> ChangepointResult:
+    """Alternate `search` with re-estimating the noise, then summarize the fit."""
+    n_epochs = int(series.obs_idx[-1]) + 1
+
+    def refit(config: Config) -> tuple[TrendResult, _Normal]:
+        trend = _fit_trend(
+            series, config, sampling_days, periods_years, noise_model, method
+        )
+        C = _noise_covariance(trend, series.obs_idx, n_epochs)
+        return trend, _Normal(series, C, penalty)
+
+    config: Config = ()
+    trend, normal = refit(config)
+    for _ in range(max_iterations):
+        selected = search(normal)
+        if selected == config:
+            break
+        config = selected
+        trend, normal = refit(config)
+
+    cols, labels = normal.columns(config)
+    beta, cov, *_ = normal.solve(cols)
+    design = np.column_stack(
+        [series.base, *(series.column(j, part) for j, part in labels)]
+    )
+
+    bounds = [series.epochs[0], *(series.date(j) for j, _ in config), series.epochs[-1]]
+    segments = []
+    for k in range(len(config) + 1):
+        c = _rate_vector(series, labels, until=k)
+        segments.append(
+            {
+                "start": bounds[k],
+                "end": bounds[k + 1],
+                "rate": float(c @ beta),
+                "rate_sigma": float(np.sqrt(c @ cov @ c)),
+            }
+        )
+    return ChangepointResult(
+        changepoints=_amplitudes(series, labels, beta, cov, config),
+        segments=pd.DataFrame(segments),
+        rate=segments[-1]["rate"],
+        rate_sigma=segments[-1]["rate_sigma"],
+        trend=trend,
+        bic=float(normal.bic(config)),
+        bic_none=float(normal.bic(())),
+        model=design @ beta,
+    )
+
+
 def detect_changepoints(
     dates: ArrayLike,
     values: ArrayLike,
@@ -527,51 +587,17 @@ def detect_changepoints(
         min_segment_years,
         n_candidates,
     )
-    n_epochs = int(series.obs_idx[-1]) + 1
-
-    def refit(config: Config) -> tuple[TrendResult, _Normal]:
-        trend = _fit_trend(
-            series, config, sampling_days, periods_years, noise_model, method
-        )
-        C = _noise_covariance(trend, series.obs_idx, n_epochs)
-        return trend, _Normal(series, C, penalty)
-
-    config: Config = ()
-    trend, normal = refit(config)
-    for _ in range(max_iterations):
-        selected = _stepwise(normal, series, kinds, max_changepoints, min_segment_years)
-        if selected == config:
-            break
-        config = selected
-        trend, normal = refit(config)
-
-    cols, labels = normal.columns(config)
-    beta, cov, *_ = normal.solve(cols)
-    design = np.column_stack(
-        [series.base, *(series.column(j, part) for j, part in labels)]
-    )
-
-    bounds = [series.epochs[0], *(series.date(j) for j, _ in config), series.epochs[-1]]
-    segments = []
-    for k in range(len(config) + 1):
-        c = _rate_vector(series, labels, until=k)
-        segments.append(
-            {
-                "start": bounds[k],
-                "end": bounds[k + 1],
-                "rate": float(c @ beta),
-                "rate_sigma": float(np.sqrt(c @ cov @ c)),
-            }
-        )
-    return ChangepointResult(
-        changepoints=_amplitudes(series, labels, beta, cov, config),
-        segments=pd.DataFrame(segments),
-        rate=segments[-1]["rate"],
-        rate_sigma=segments[-1]["rate_sigma"],
-        trend=trend,
-        bic=float(normal.bic(config)),
-        bic_none=float(normal.bic(())),
-        model=design @ beta,
+    return _select(
+        series,
+        lambda normal: _stepwise(
+            normal, series, kinds, max_changepoints, min_segment_years
+        ),
+        sampling_days,
+        periods_years,
+        noise_model,
+        method,
+        penalty,
+        max_iterations,
     )
 
 
