@@ -159,6 +159,61 @@ post.rhat                     # chain convergence
   `step_dates`. The flicker + white default matters for the same reason
   as in `linearity_test`.
 
+## Smooth, time-varying rates (`geepers.smooth`)
+
+Decays, droughts, accelerating subsidence and multi-year cycles are not
+piecewise linear. `fit_smooth_trend` estimates the rate as a random walk
+(a penalized linear spline) with its smoothness and the noise estimated
+together by REML, and needs no shape in advance. A smooth trend is used
+only with evidence for one; otherwise the result is the
+`detect_changepoints` model, a straight line if that finds nothing:
+
+```python
+from geepers.forecast import backtest
+from geepers.smooth import fit_smooth_trend, forecast_smooth
+
+fit = fit_smooth_trend(dates, up_mm, sampling_days=30, step_dates=known_steps)
+fit.shape                     # "linear" | "piecewise" | "smooth"
+fit.evidence                  # likelihood gain over the line; smooth from 6
+fit.rate, fit.rate_sigma      # present-day rate
+fit.rates, fit.rates_sigma    # rate at every epoch
+
+fc = forecast_smooth(dates, up_mm, 3, sampling_days=30, fit=fit)
+fc.table[["mean", "lower", "upper"]]
+
+backtest(dates, up_mm, 3, forecaster=forecast_smooth, sampling_days=30)
+```
+
+A forecast continues the last rate with the periodic terms and the
+persisting noise. It never predicts a turning point: future slope changes
+only widen the interval, which grows faster than linearly with lead time.
+
+Relative to `detect_changepoints`, on 30 synthetic series per shape, the
+3-year forecast error is 0.48-0.77 on sigmoids, decays, acceleration and
+multi-year cycles, and 1.00-1.03 on lines and hinges, with coverage of
+the 95 % interval rising from 0.60-0.75 to 0.94 where a signal keeps
+changing. On 13 real stations it is better by over 10 % on 11 % of 55
+cutoffs and worse on another 11 %: identical on most stable, glacial
+rebound and tectonic records, mostly better on subsidence and volcanoes
+(0.55-1.00), worst at COSO (1.33).
+
+Limits:
+
+- The evidence threshold assumes flicker + white noise, where about 1 %
+  of linear series pass it. On a linear series whose noise is redder and
+  not small, the smooth trend is chosen far too often and follows the
+  noise: 27-85 % of series at spectral index -1.5, 65-100 % for a random
+  walk.
+- Knots default to one per year, so the rate is a yearly staircase and
+  cannot follow an annual cycle of varying amplitude; denser knots let the
+  present-day rate depend on the month the record ends.
+- The rate is less precise than a line's where a line or hinge is the
+  truth (0.53 against 0.20 mm/yr on a hinge), and on strongly unsteady
+  records the methods disagree on the present-day rate: at LEMA -112 ± 15
+  against -62 ± 5 mm/yr. Read such a rate with its uncertainty.
+- Each fit factorizes an n x n matrix about 150 times, so average daily
+  series to weekly or monthly first.
+
 ## Forecasts and backtests (`geepers.forecast`)
 
 `forecast_trend` extrapolates the `detect_changepoints` model (present-day

@@ -34,6 +34,11 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.smooth`: `fit_smooth_trend` estimates a time-varying rate
+  without assuming its shape (penalized linear spline, smoothness and noise
+  by REML), used only with evidence over the piecewise-linear model;
+  `forecast_smooth` extrapolates it.
+- `geepers.forecast.backtest(forecaster=...)` scores any forecaster.
 - `geepers.changepoints.fit_sparse_changepoints_many`: the sparse fit for
   many series on one time grid (shared noise shape, per-series amplitude,
   all lasso paths solved together), returning a summary and a long table
