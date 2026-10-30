@@ -643,7 +643,6 @@ def _lasso_path(
     proj: np.ndarray,
     usable: np.ndarray,
     n_lambdas: int,
-    alive: np.ndarray | None = None,
     min_ratio: float = 1e-3,
     tol: float = 1e-5,
     max_iter: int = 2000,
@@ -656,11 +655,11 @@ def _lasso_path(
     so offsets and rate changes are penalized on the same scale. Solved
     by FISTA (Beck & Teboulle, 2009) with warm starts, every right-hand
     side at once. Yields ``(coefficients, standardized magnitudes)`` per
-    penalty, lazily; the caller stops a right-hand side early by clearing
-    its entry in `alive`, since small penalties converge slowest.
+    penalty. The whole path is always followed: stopping once it holds
+    more than `max_changepoints` clusters missed large changes on busy
+    series, where small clusters appear before the large ones resolve.
     """
     n_rhs = proj.shape[1]
-    alive = np.ones(n_rhs, bool) if alive is None else alive
     norms = np.sqrt(np.clip(np.diag(gram), 0.0, None))
     usable = usable & (norms > 1e-8 * max(float(norms.max(initial=0.0)), 1e-300))
     idx = np.flatnonzero(usable)
@@ -675,7 +674,7 @@ def _lasso_path(
     for ratio in np.geomspace(1.0, min_ratio, n_lambdas):
         threshold = ratio * lam_max / lipschitz
         z, t = gamma.copy(), np.ones(n_rhs)
-        running = alive.copy()
+        running = np.ones(n_rhs, bool)
         for _ in range(max_iter):
             cols = np.flatnonzero(running)
             if len(cols) == 0:
@@ -709,20 +708,20 @@ def _cluster(
     kinds: tuple[str, ...],
     max_changepoints: int,
     min_segment_years: float,
-) -> tuple[Config, int]:
+) -> Config:
     """Merge the nonzero candidates of a lasso solution into change points.
 
     The lasso spreads one change over neighboring candidates, whose
     columns are nearly collinear. Candidates closer than
     `min_segment_years` form one change point at their magnitude-weighted
     mean epoch, with the parts (offset, rate change) any of them has.
-    Returns the strongest `max_changepoints` and the number found.
+    The strongest `max_changepoints` are kept.
     """
     n = len(series.candidates)
     off, rate = magnitude[:n], magnitude[n:]
     active = np.flatnonzero((coef[:n] != 0) | (coef[n:] != 0))
     if len(active) == 0:
-        return (), 0
+        return ()
     t = series.t[series.candidates]
     groups = np.split(
         active, np.flatnonzero(np.diff(t[active]) >= min_segment_years) + 1
@@ -740,7 +739,7 @@ def _cluster(
             kind = next((p for p in ranked if p in kinds), "both")
         found.append((float(weight.sum()), j, kind))
     strongest = sorted(found, reverse=True)[:max_changepoints]
-    return tuple(sorted((j, kind) for _, j, kind in strongest)), len(found)
+    return tuple(sorted((j, kind) for _, j, kind in strongest))
 
 
 class _PathScore:
@@ -760,9 +759,9 @@ class _PathScore:
         self.best: tuple[float, Config] = (normal.bic(()), ())
         self.seen: set[Config] = {()}
 
-    def update(self, coef: np.ndarray, magnitude: np.ndarray) -> bool:
-        """Score one solution; False once smaller penalties cannot help."""
-        config, n_found = _cluster(
+    def update(self, coef: np.ndarray, magnitude: np.ndarray) -> None:
+        """Score one solution of the path."""
+        config = _cluster(
             self.series,
             coef,
             magnitude,
@@ -770,16 +769,12 @@ class _PathScore:
             self.max_changepoints,
             self.min_segment_years,
         )
-        if n_found > self.max_changepoints:
-            # Smaller penalties only add candidates
-            return False
         if config not in self.seen:
             self.seen.add(config)
             # Scored after an unpenalized refit, as in `detect_changepoints`
             value = self.normal.bic(config)
             if value < self.best[0]:
                 self.best = (value, config)
-        return True
 
     def result(self) -> Config:
         return _polish(self.normal, self.series, self.best[1], self.min_segment_years)
@@ -804,13 +799,10 @@ def _sparse(
     """Lowest-BIC change-point set along the lasso path."""
     gram, proj = _profiled(normal.gram, normal.proj[:, None], normal.n_base)
     score = _PathScore(normal, series, kinds, max_changepoints, min_segment_years)
-    alive = np.ones(1, bool)
     for coef, magnitude in _lasso_path(
-        gram, proj, _usable(normal.n_cand, kinds), n_lambdas, alive
+        gram, proj, _usable(normal.n_cand, kinds), n_lambdas
     ):
-        alive[0] = score.update(coef[:, 0], magnitude[:, 0])
-        if not alive[0]:
-            break
+        score.update(coef[:, 0], magnitude[:, 0])
     return score.result()
 
 
@@ -1109,14 +1101,11 @@ min_segment_years, n_candidates, n_lambdas, penalty
     # The lasso path is invariant to each series' scale, so all share the
     # unscaled profiled Gram matrix
     gram_p, proj_p = _profiled(gram, proj, p)
-    alive = np.ones(len(complete), bool)
     for coef, magnitude in _lasso_path(
-        gram_p, proj_p, _usable(n_cand, kinds), n_lambdas, alive
+        gram_p, proj_p, _usable(n_cand, kinds), n_lambdas
     ):
-        for k in np.flatnonzero(alive):
-            alive[k] = scores[k].update(coef[:, k], magnitude[:, k])
-        if not alive.any():
-            break
+        for k, score in enumerate(scores):
+            score.update(coef[:, k], magnitude[:, k])
 
     rows: list[dict] = []
     tables = []

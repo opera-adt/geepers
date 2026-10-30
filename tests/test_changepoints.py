@@ -402,6 +402,25 @@ class TestFitSparseChangepoints:
             fit_sparse_changepoints(dates, values, kinds=("jump",))  # type: ignore[arg-type]
 
 
+def _station_monthly(site: str) -> pd.Series:
+    """Vertical (mm) of a station in tests/data/unr.zip, as 30-day means."""
+    import zipfile
+    from pathlib import Path
+
+    with (
+        zipfile.ZipFile(Path(__file__).parent / "data/unr.zip") as archive,
+        archive.open(f"tests/data/unr/{site}.tenv3") as f,
+    ):
+        df = pd.read_csv(f, sep=r"\s+")
+    mm = (df["u0(m)"] + df["____up(m)"]).to_numpy() * 1000.0
+    s = pd.Series(mm - mm[0], index=pd.to_datetime(df["YYMMMDD"], format="%y%b%d"))
+    edges = pd.date_range(s.index[0], s.index[-1], freq=pd.Timedelta(days=MONTH))
+    means = s.groupby(pd.cut(s.index, edges, right=False), observed=True).mean()
+    return pd.Series(
+        means.to_numpy(), index=pd.DatetimeIndex([b.left for b in means.index])
+    ).dropna()
+
+
 class TestFitSparseChangepointsRegression:
     """Golden-value regression for `fit_sparse_changepoints`."""
 
@@ -425,6 +444,17 @@ class TestFitSparseChangepointsRegression:
         assert list(cps["kind"]) == ["offset", "rate"]
         assert list(cps["date"]) == [dates[36], dates[78]]
         assert found.rate == pytest.approx(-7.0, abs=0.02)
+
+    def test_busy_station_keeps_its_early_offset(self):
+        """Regression: the lasso path stopped once it held more clusters than
+        `max_changepoints`. On a station with many changes (AHUP, Kilauea)
+        small clusters appear before the large ones are resolved, and the
+        2006 offset was never found."""
+        s = _station_monthly("AHUP")
+        found = fit_sparse_changepoints(s.index, s.to_numpy(), sampling_days=MONTH)
+        offsets = found.changepoints[found.changepoints["offset"].notna()]
+        gap = np.abs((offsets["date"] - pd.Timestamp("2006-02-27")).dt.days)
+        assert (gap < 62).any()
 
     def test_golden(self, golden):
         dates, values = _monthly(seed=6)
