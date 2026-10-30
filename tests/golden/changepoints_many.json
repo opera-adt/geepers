@@ -1,0 +1,190 @@
+{
+  "changepoints": [
+    {
+      "date": "2019-01-01",
+      "kind": "offset",
+      "offset": 10.67158625242191,
+      "offset_sigma": 1.812976539102428,
+      "rate_change": null,
+      "rate_change_sigma": null,
+      "series": "1"
+    },
+    {
+      "date": "2022-10-01",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "rate_change": -3.1737061296356184,
+      "rate_change_sigma": 0.7186061077363272,
+      "series": "2"
+    },
+    {
+      "date": "2019-01-01",
+      "kind": "offset",
+      "offset": 7.467297853923275,
+      "offset_sigma": 1.2518785444173817,
+      "rate_change": null,
+      "rate_change_sigma": null,
+      "series": "4"
+    },
+    {
+      "date": "2022-06-02",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "rate_change": -3.6199378155679667,
+      "rate_change_sigma": 0.7543089157890585,
+      "series": "5"
+    },
+    {
+      "date": "2019-01-01",
+      "kind": "offset",
+      "offset": 9.078188887311931,
+      "offset_sigma": 1.440759098574906,
+      "rate_change": null,
+      "rate_change_sigma": null,
+      "series": "7"
+    },
+    {
+      "date": "2022-06-02",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "rate_change": -3.7616088283014073,
+      "rate_change_sigma": 0.8823592807113927,
+      "series": "8"
+    },
+    {
+      "date": "2019-01-01",
+      "kind": "offset",
+      "offset": 10.387597249586369,
+      "offset_sigma": 1.6167623815391408,
+      "rate_change": null,
+      "rate_change_sigma": null,
+      "series": "10"
+    },
+    {
+      "date": "2022-07-02",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "rate_change": -3.5093567212523133,
+      "rate_change_sigma": 0.7788608353552536,
+      "series": "11"
+    }
+  ],
+  "noise": {
+    "sigma_flicker": 1.2299594148554478,
+    "sigma_white": 1.1696443121127769
+  },
+  "summary": [
+    {
+      "bic": 142.7249504566924,
+      "bic_none": 142.7249504566924,
+      "n_changepoints": 0,
+      "noise_scale": 0.9506946449925914,
+      "rate": -2.9232126937620206,
+      "rate_sigma": 0.17670337436530412,
+      "series": "0"
+    },
+    {
+      "bic": 117.65229942825107,
+      "bic_none": 142.72495045669228,
+      "n_changepoints": 1,
+      "noise_scale": 1.523378789108942,
+      "rate": -3.772050663541626,
+      "rate_sigma": 0.36106436300429523,
+      "series": "1"
+    },
+    {
+      "bic": 132.79467981279782,
+      "bic_none": 142.7249504566925,
+      "n_changepoints": 1,
+      "noise_scale": 0.9818756774221639,
+      "rate": -6.128021978838971,
+      "rate_sigma": 0.5650617922218258,
+      "series": "2"
+    },
+    {
+      "bic": 142.7249504566924,
+      "bic_none": 142.7249504566924,
+      "n_changepoints": 0,
+      "noise_scale": 1.1394433024471362,
+      "rate": -3.4306150123969115,
+      "rate_sigma": 0.2117856427411809,
+      "series": "3"
+    },
+    {
+      "bic": 116.72021140910681,
+      "bic_none": 142.7249504566923,
+      "n_changepoints": 1,
+      "noise_scale": 1.0519083837952914,
+      "rate": -2.8183779033809433,
+      "rate_sigma": 0.24931857608184357,
+      "series": "4"
+    },
+    {
+      "bic": 129.26941424162834,
+      "bic_none": 142.72495045669262,
+      "n_changepoints": 1,
+      "noise_scale": 1.085700386317811,
+      "rate": -6.676195248784277,
+      "rate_sigma": 0.5691608258956469,
+      "series": "5"
+    },
+    {
+      "bic": 142.7249504566924,
+      "bic_none": 142.7249504566924,
+      "n_changepoints": 0,
+      "noise_scale": 1.0758393365933208,
+      "rate": -3.4063667209590203,
+      "rate_sigma": 0.1999637234229414,
+      "series": "6"
+    },
+    {
+      "bic": 112.59763201859911,
+      "bic_none": 142.72495045669237,
+      "n_changepoints": 1,
+      "noise_scale": 1.2106179002577429,
+      "rate": -3.066977938606897,
+      "rate_sigma": 0.2869351891487443,
+      "series": "7"
+    },
+    {
+      "bic": 134.12569028937622,
+      "bic_none": 142.72495045669228,
+      "n_changepoints": 1,
+      "noise_scale": 1.270007276710172,
+      "rate": -7.126822600938451,
+      "rate_sigma": 0.6657807251569408,
+      "series": "8"
+    },
+    {
+      "bic": 142.7249504566924,
+      "bic_none": 142.7249504566924,
+      "n_changepoints": 0,
+      "noise_scale": 0.7048244356066192,
+      "rate": -2.6360064314748857,
+      "rate_sigma": 0.1310040576780373,
+      "series": "9"
+    },
+    {
+      "bic": 111.02011209636393,
+      "bic_none": 142.7249504566923,
+      "n_changepoints": 1,
+      "noise_scale": 1.3585071102383617,
+      "rate": -3.528886275546337,
+      "rate_sigma": 0.3219872220237024,
+      "series": "10"
+    },
+    {
+      "bic": 131.99809867136463,
+      "bic_none": 142.72495045669228,
+      "n_changepoints": 1,
+      "noise_scale": 1.1077270199437639,
+      "rate": -6.505823058476039,
+      "rate_sigma": 0.5939344169357756,
+      "series": "11"
+    }
+  ]
+}

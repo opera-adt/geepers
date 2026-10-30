@@ -27,6 +27,8 @@ Three estimators share one model:
   candidate epoch and selects them with an L1 (lasso) penalty, the sparse
   trend prior of Prophet: a convex search whose result does not depend
   on the order change points are added.
+  `fit_sparse_changepoints_many` does the same for many series on one
+  time grid (InSAR pixels), solving all their lasso paths together.
 - `sample_changepoints` samples the posterior distribution of the number,
   epochs and kinds of change points by reversible-jump Markov chain Monte
   Carlo (Green, P. J., 1995, Reversible jump Markov chain Monte Carlo
@@ -76,8 +78,10 @@ from geepers.trend import DAYS_PER_YEAR, TrendResult, _design_matrix, estimate_t
 __all__ = [
     "ChangepointPosterior",
     "ChangepointResult",
+    "ManyChangepoints",
     "detect_changepoints",
     "fit_sparse_changepoints",
+    "fit_sparse_changepoints_many",
     "sample_changepoints",
 ]
 
@@ -268,6 +272,24 @@ class _Normal:
         self.n_base = series.base.shape[1]
         self.n_cand = n_cand
 
+    @classmethod
+    def from_parts(
+        cls,
+        gram: np.ndarray,
+        proj: np.ndarray,
+        yty: float,
+        n_obs: int,
+        n_base: int,
+        penalty: float | None = None,
+    ) -> _Normal:
+        """Wrap normal equations whitened elsewhere (e.g. shared by many series)."""
+        self = cls.__new__(cls)
+        self.gram, self.proj, self.yty = gram, proj, yty
+        self.n_obs, self.n_base = n_obs, n_base
+        self.n_cand = (gram.shape[0] - n_base) // 2
+        self.penalty = np.log(n_obs) if penalty is None else penalty
+        return self
+
     def columns(self, config: Config) -> tuple[np.ndarray, list[tuple[int, str]]]:
         """Column indices of a configuration and the (change point, part) of each."""
         labels = [(j, part) for j, kind in config for part in _PARTS[kind]]
@@ -317,6 +339,7 @@ def _stepwise(
     kinds: tuple[str, ...],
     max_changepoints: int,
     min_segment_years: float,
+    start: Config = (),
 ) -> Config:
     """Stepwise selection: add the best change point, then revise the others.
 
@@ -324,7 +347,8 @@ def _stepwise(
     kind or moved, whichever lowers the BIC most, until none does: an
     early change point otherwise keeps a rate change or a position that
     only compensated for one found later. BIC strictly decreases with
-    every accepted move, so the search terminates.
+    every accepted move, so the search terminates. A non-empty `start` is
+    revised before anything is added.
     """
 
     def additions(config: Config) -> list[Config]:
@@ -349,8 +373,10 @@ def _stepwise(
         top = min(scored, default=None, key=lambda s: s[0])
         return top if top is not None and top[0] < current else None
 
-    config: Config = ()
+    config = start
     bic = normal.bic(config)
+    while (step := best(revisions(config), bic)) is not None:
+        bic, config = step
     while len(config) < max_changepoints:
         step = best(additions(config), bic)
         if step is None:
@@ -606,13 +632,14 @@ def detect_changepoints(
     )
 
 
-def _profiled(normal: _Normal) -> tuple[np.ndarray, np.ndarray]:
-    """Profile the base terms out of the candidate normal equations."""
-    p = normal.n_base
-    G, b = normal.gram, normal.proj
-    cho = linalg.cho_factor(G[:p, :p], lower=True, check_finite=False)
-    X = linalg.cho_solve(cho, G[:p, p:], check_finite=False)
-    return G[p:, p:] - G[:p, p:].T @ X, b[p:] - X.T @ b[:p]
+def _profiled(gram: np.ndarray, b: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
+    """Profile the first `p` (base) terms out of the normal equations.
+
+    `b` may hold one right-hand side per column.
+    """
+    cho = linalg.cho_factor(gram[:p, :p], lower=True, check_finite=False)
+    x = linalg.cho_solve(cho, gram[:p, p:], check_finite=False)
+    return gram[p:, p:] - gram[:p, p:].T @ x, b[p:] - x.T @ b[:p]
 
 
 def _lasso_path(
@@ -624,14 +651,19 @@ def _lasso_path(
     tol: float = 1e-5,
     max_iter: int = 2000,
 ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-    """Lasso solutions ``min 1/2 b'Gb - p'b + lambda |D b|_1`` on a decreasing path.
+    """Lasso solutions ``min 1/2 b'Gb - p'b + lambda |D b|_1`` on decreasing paths.
 
-    Columns are standardized (``D`` = column norms), so offsets and rate
-    changes are penalized on the same scale. Solved by FISTA (Beck &
-    Teboulle, 2009) with warm starts. Returns ``(coefficients,
-    standardized magnitudes)`` per lambda, lazily, so the caller can
-    stop before the small penalties, where convergence is slowest.
+    `proj` holds one right-hand side per column, all sharing `gram`; each
+    gets its own path, from the penalty that selects nothing down to
+    `min_ratio` of it. Columns are standardized (``D`` = column norms),
+    so offsets and rate changes are penalized on the same scale. Solved
+    by FISTA (Beck & Teboulle, 2009) with warm starts, every right-hand
+    side at once. Yields ``(coefficients, standardized magnitudes)`` per
+    penalty. The whole path is always followed: stopping once it holds
+    more than `max_changepoints` clusters missed large changes on busy
+    series, where small clusters appear before the large ones resolve.
     """
+    n_rhs = proj.shape[1]
     norms = np.sqrt(np.clip(np.diag(gram), 0.0, None))
     usable = usable & (norms > 1e-8 * max(float(norms.max(initial=0.0)), 1e-300))
     idx = np.flatnonzero(usable)
@@ -639,30 +671,36 @@ def _lasso_path(
         return
     d = norms[idx]
     G = gram[np.ix_(idx, idx)] / np.outer(d, d)
-    b = proj[idx] / d
+    b = proj[idx] / d[:, None]
     lipschitz = float(np.linalg.eigvalsh(G)[-1])
-    lam_max = float(np.max(np.abs(b)))
-    gamma = np.zeros(len(idx))
-    for lam in lam_max * np.geomspace(1.0, min_ratio, n_lambdas):
-        z, t = gamma.copy(), 1.0
+    lam_max = np.max(np.abs(b), axis=0)
+    gamma = np.zeros((len(idx), n_rhs))
+    for ratio in np.geomspace(1.0, min_ratio, n_lambdas):
+        threshold = ratio * lam_max / lipschitz
+        z, t = gamma.copy(), np.ones(n_rhs)
+        running = np.ones(n_rhs, bool)
         for _ in range(max_iter):
-            step = z - (G @ z - b) / lipschitz
-            new = np.sign(step) * np.maximum(np.abs(step) - lam / lipschitz, 0.0)
-            change = new - gamma
-            if np.max(np.abs(change)) <= tol * max(1.0, float(np.max(np.abs(new)))):
-                gamma = new
+            cols = np.flatnonzero(running)
+            if len(cols) == 0:
                 break
+            zc = z[:, cols]
+            step = zc - (G @ zc - b[:, cols]) / lipschitz
+            new = np.sign(step) * np.maximum(np.abs(step) - threshold[cols], 0.0)
+            change = new - gamma[:, cols]
+            scale = np.maximum(1.0, np.max(np.abs(new), axis=0))
+            done = np.max(np.abs(change), axis=0) <= tol * scale
             # Adaptive restart (O'Donoghue & Candes, 2015): drop the momentum
             # when it points uphill, which the nearly collinear hinge columns
             # otherwise make oscillate for thousands of iterations
-            if float((z - new) @ change) > 0.0:
-                t = 1.0
-            t_next = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * t * t))
-            z = new + (t - 1.0) / t_next * change
-            gamma, t = new, t_next
-        coef = np.zeros(len(proj))
-        magnitude = np.zeros(len(proj))
-        coef[idx] = gamma / d
+            tc = np.where(np.sum((zc - new) * change, axis=0) > 0.0, 1.0, t[cols])
+            t_next = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * tc * tc))
+            z[:, cols] = new + (tc - 1.0) / t_next * change
+            gamma[:, cols] = new
+            t[cols] = t_next
+            running[cols[done]] = False
+        coef = np.zeros(proj.shape)
+        magnitude = np.zeros(proj.shape)
+        coef[idx] = gamma / d[:, None]
         magnitude[idx] = np.abs(gamma)
         yield coef, magnitude
 
@@ -674,20 +712,20 @@ def _cluster(
     kinds: tuple[str, ...],
     max_changepoints: int,
     min_segment_years: float,
-) -> tuple[Config, int]:
+) -> Config:
     """Merge the nonzero candidates of a lasso solution into change points.
 
     The lasso spreads one change over neighboring candidates, whose
     columns are nearly collinear. Candidates closer than
     `min_segment_years` form one change point at their magnitude-weighted
     mean epoch, with the parts (offset, rate change) any of them has.
-    Returns the strongest `max_changepoints` and the number found.
+    The strongest `max_changepoints` are kept.
     """
     n = len(series.candidates)
     off, rate = magnitude[:n], magnitude[n:]
     active = np.flatnonzero((coef[:n] != 0) | (coef[n:] != 0))
     if len(active) == 0:
-        return (), 0
+        return ()
     t = series.t[series.candidates]
     groups = np.split(
         active, np.flatnonzero(np.diff(t[active]) >= min_segment_years) + 1
@@ -705,7 +743,53 @@ def _cluster(
             kind = next((p for p in ranked if p in kinds), "both")
         found.append((float(weight.sum()), j, kind))
     strongest = sorted(found, reverse=True)[:max_changepoints]
-    return tuple(sorted((j, kind) for _, j, kind in strongest)), len(found)
+    return tuple(sorted((j, kind) for _, j, kind in strongest))
+
+
+class _PathScore:
+    """Lowest-BIC change-point set of one series along its lasso path."""
+
+    def __init__(
+        self,
+        normal: _Normal,
+        series: _Series,
+        kinds: tuple[str, ...],
+        max_changepoints: int,
+        min_segment_years: float,
+    ) -> None:
+        self.normal, self.series, self.kinds = normal, series, kinds
+        self.max_changepoints = max_changepoints
+        self.min_segment_years = min_segment_years
+        self.best: tuple[float, Config] = (normal.bic(()), ())
+        self.seen: set[Config] = {()}
+
+    def update(self, coef: np.ndarray, magnitude: np.ndarray) -> None:
+        """Score one solution of the path."""
+        config = _cluster(
+            self.series,
+            coef,
+            magnitude,
+            self.kinds,
+            self.max_changepoints,
+            self.min_segment_years,
+        )
+        if config not in self.seen:
+            self.seen.add(config)
+            # Scored after an unpenalized refit, as in `detect_changepoints`
+            value = self.normal.bic(config)
+            if value < self.best[0]:
+                self.best = (value, config)
+
+    def result(self) -> Config:
+        return _polish(self.normal, self.series, self.best[1], self.min_segment_years)
+
+
+def _usable(n_cand: int, kinds: tuple[str, ...]) -> np.ndarray:
+    """Candidate columns (offsets, then rate changes) that `kinds` allows."""
+    return np.r_[
+        np.full(n_cand, any("offset" in _PARTS[k] for k in kinds)),
+        np.full(n_cand, any("rate" in _PARTS[k] for k in kinds)),
+    ]
 
 
 def _sparse(
@@ -716,30 +800,20 @@ def _sparse(
     min_segment_years: float,
     n_lambdas: int,
 ) -> Config:
-    """Lowest-BIC change-point set along the lasso path."""
-    gram, proj = _profiled(normal)
-    n = normal.n_cand
-    usable = np.r_[
-        np.full(n, any("offset" in _PARTS[k] for k in kinds)),
-        np.full(n, any("rate" in _PARTS[k] for k in kinds)),
-    ]
-    best: tuple[float, Config] = (normal.bic(()), ())
-    seen: set[Config] = {()}
-    for coef, magnitude in _lasso_path(gram, proj, usable, n_lambdas):
-        config, n_found = _cluster(
-            series, coef, magnitude, kinds, max_changepoints, min_segment_years
-        )
-        if n_found > max_changepoints:
-            # Smaller penalties only add candidates
-            break
-        if config in seen:
-            continue
-        seen.add(config)
-        # Scored after an unpenalized refit, as in `detect_changepoints`
-        value = normal.bic(config)
-        if value < best[0]:
-            best = (value, config)
-    return _polish(normal, series, best[1], min_segment_years)
+    """Lowest-BIC set along the lasso path, then refined stepwise.
+
+    The lasso alone stops short on smooth signals and on busy series,
+    where the change points it keeps inflate the re-estimated noise.
+    """
+    gram, proj = _profiled(normal.gram, normal.proj[:, None], normal.n_base)
+    score = _PathScore(normal, series, kinds, max_changepoints, min_segment_years)
+    for coef, magnitude in _lasso_path(
+        gram, proj, _usable(normal.n_cand, kinds), n_lambdas
+    ):
+        score.update(coef[:, 0], magnitude[:, 0])
+    return _stepwise(
+        normal, series, kinds, max_changepoints, min_segment_years, start=score.result()
+    )
 
 
 def _polish(
@@ -807,10 +881,13 @@ def fit_sparse_changepoints(
     noise is then re-estimated with the change points in, up to
     `max_iterations` times.
 
-    The problem is convex, so unlike the stepwise search of
-    `detect_changepoints` the result does not depend on the order in
-    which change points are added. It tends to find the same change
-    points; where the two disagree the series is ambiguous.
+    The selection is finally refined with the moves of the stepwise
+    search (add, drop, change kind, move). Without that step the lasso
+    selection had 2.5-3.8 times the 3-year forecast error of
+    `detect_changepoints` on smooth signals and missed change points on
+    busy stations; with it the two mostly agree. Where they disagree the
+    series is ambiguous. For signals that are not piecewise linear see
+    `geepers.smooth`.
 
     Parameters
     ----------
@@ -854,6 +931,231 @@ max_iterations, penalty
         penalty,
         max_iterations,
     )
+
+
+@dataclass
+class ManyChangepoints:
+    """Output of `fit_sparse_changepoints_many`.
+
+    Attributes
+    ----------
+    summary : pd.DataFrame
+        One row per series (index: the series names): ``n_changepoints``,
+        ``rate`` and ``rate_sigma`` (present-day rate, input units per
+        year), ``noise_scale`` (the series' noise amplitude relative to
+        `noise`), ``bic`` and ``bic_none``. NaN for series that were not
+        fitted (any NaN value).
+    changepoints : pd.DataFrame
+        One row per change point: ``series`` plus the columns of
+        `ChangepointResult.changepoints`.
+    noise : TrendResult
+        The shared noise model, whose shape every series is fitted with.
+
+    """
+
+    summary: pd.DataFrame
+    changepoints: pd.DataFrame
+    noise: TrendResult
+
+
+def fit_sparse_changepoints_many(
+    dates: ArrayLike,
+    values: ArrayLike | pd.DataFrame,
+    *,
+    noise: TrendResult | None = None,
+    sampling_days: float = 1.0,
+    periods_years: tuple[float, ...] = (1.0, 0.5),
+    step_dates: ArrayLike | None = None,
+    kinds: tuple[Kind, ...] = ("offset", "rate", "both"),
+    max_changepoints: int = 5,
+    min_segment_years: float = 1.0,
+    n_candidates: int = 300,
+    n_lambdas: int = 40,
+    noise_model: NoiseModel = "FNWN",
+    method: Literal["exact", "whittle"] = "whittle",
+    n_noise_series: int = 50,
+    penalty: float | None = None,
+    seed: int | np.random.Generator | None = 0,
+) -> ManyChangepoints:
+    """Run `fit_sparse_changepoints` on many series sharing their epochs.
+
+    Meant for InSAR pixels or a network of stations on one time grid. The
+    noise *shape* (spectral index, white fraction, ...) is shared: it is
+    `noise`, or the median of `estimate_trend` fits to `n_noise_series`
+    randomly chosen series. Each series keeps its own noise *amplitude*,
+    estimated from its residuals around the model without change points.
+    The whitened normal equations are then built once, and the lasso
+    paths of all series are solved together, one matrix product per
+    iteration. Selection, BIC and the epoch polish are per series, as in
+    `fit_sparse_changepoints`, but the noise is not re-estimated with the
+    change points in: where change points inflate the residuals the noise
+    amplitude is overestimated and the selection is conservative. It also
+    skips the stepwise refinement of `fit_sparse_changepoints` to stay
+    fast, so use it to screen many series for piecewise-linear signals:
+    on smooth signals it inherits the weakness of the lasso selection.
+
+    Parameters
+    ----------
+    dates : array-like of datetime64
+        Epochs shared by all series. Ignored if `values` is a DataFrame
+        with a DatetimeIndex.
+    values : array-like or pd.DataFrame
+        Shape ``(n_series, n_epochs)``, or a DataFrame with one column per
+        series. Series with any NaN are not fitted.
+    noise : TrendResult, optional
+        Noise model to share, e.g. `estimate_trend` on a reference series.
+    sampling_days, periods_years, step_dates, kinds, max_changepoints, \
+min_segment_years, n_candidates, n_lambdas, penalty
+        As in `fit_sparse_changepoints`.
+    noise_model, method
+        Passed to `estimate_trend` for the shared noise. Default "FNWN"
+        and "whittle".
+    n_noise_series : int
+        Series the shared noise is estimated from. Default 50.
+    seed : int or np.random.Generator, optional
+        Seed for choosing those series. Default 0.
+
+    Returns
+    -------
+    ManyChangepoints
+
+    Raises
+    ------
+    ValueError
+        If `kinds` names an unknown kind or no series is complete.
+
+    """
+    kinds = _check_kinds(kinds)
+    if isinstance(values, pd.DataFrame):
+        names = [str(c) for c in values.columns]
+        if isinstance(values.index, pd.DatetimeIndex):
+            dates = values.index
+        matrix = values.to_numpy(dtype=float).T
+    else:
+        matrix = np.atleast_2d(np.asarray(values, dtype=float))
+        names = [str(i) for i in range(matrix.shape[0])]
+    complete = np.flatnonzero(np.all(np.isfinite(matrix), axis=1))
+    if len(complete) == 0:
+        msg = "No series without NaNs to fit"
+        raise ValueError(msg)
+
+    series = _prepare(
+        dates,
+        matrix[complete[0]],
+        sampling_days,
+        periods_years,
+        step_dates,
+        min_segment_years,
+        n_candidates,
+    )
+    if noise is None:
+        rng = np.random.default_rng(seed)
+        pick = rng.choice(complete, min(n_noise_series, len(complete)), replace=False)
+        fits = [
+            _fit_trend(
+                _Series(**{**vars(series), "y": matrix[i]}),
+                (),
+                sampling_days,
+                periods_years,
+                noise_model,
+                method,
+            )
+            for i in pick
+        ]
+
+        def median_of(name: str) -> float:
+            # A component the noise model does not have is NaN in every fit
+            values = np.array([getattr(f, name) for f in fits], dtype=float)
+            finite = values[np.isfinite(values)]
+            return float(np.median(finite)) if len(finite) else np.nan
+
+        noise = TrendResult(
+            velocity=np.nan,
+            velocity_uncertainty=np.nan,
+            kappa=median_of("kappa"),
+            sigma_powerlaw=median_of("sigma_powerlaw"),
+            sigma_white=median_of("sigma_white"),
+            sigma_flicker=median_of("sigma_flicker"),
+            sigma_randomwalk=median_of("sigma_randomwalk"),
+        )
+
+    n_epochs = int(series.obs_idx[-1]) + 1
+    chol = linalg.cholesky(
+        _noise_covariance(noise, series.obs_idx, n_epochs),
+        lower=True,
+        check_finite=False,
+    )
+    n_cand = len(series.candidates)
+    extra = [series.column(j, "offset") for j in range(n_cand)] + [
+        series.column(j, "rate") for j in range(n_cand)
+    ]
+    X = np.column_stack([series.base, *extra]) if extra else series.base
+    Xw = linalg.solve_triangular(chol, X, lower=True, check_finite=False)
+    Yw = linalg.solve_triangular(
+        chol, matrix[complete].T, lower=True, check_finite=False
+    )
+    gram = Xw.T @ Xw
+    proj = Xw.T @ Yw
+    yty = np.sum(Yw * Yw, axis=0)
+
+    # Each series' noise amplitude, from its residuals without change points
+    p = series.base.shape[1]
+    base_fit = linalg.solve(gram[:p, :p], proj[:p], assume_a="pos")
+    chi2 = yty - np.sum(proj[:p] * base_fit, axis=0)
+    scale2 = chi2 / (len(series.y) - p)
+
+    normals = [
+        _Normal.from_parts(
+            gram / s2, proj[:, k] / s2, float(yty[k] / s2), len(series.y), p, penalty
+        )
+        for k, s2 in enumerate(scale2)
+    ]
+    scores = [
+        _PathScore(normal, series, kinds, max_changepoints, min_segment_years)
+        for normal in normals
+    ]
+    # The lasso path is invariant to each series' scale, so all share the
+    # unscaled profiled Gram matrix
+    gram_p, proj_p = _profiled(gram, proj, p)
+    for coef, magnitude in _lasso_path(
+        gram_p, proj_p, _usable(n_cand, kinds), n_lambdas
+    ):
+        for k, score in enumerate(scores):
+            score.update(coef[:, k], magnitude[:, k])
+
+    rows: list[dict] = []
+    tables = []
+    for k, (score, normal) in enumerate(zip(scores, normals, strict=True)):
+        config = score.result()
+        cols, labels = normal.columns(config)
+        beta, cov, *_ = normal.solve(cols)
+        c = _rate_vector(series, labels)
+        rows.append(
+            {
+                "series": names[complete[k]],
+                "n_changepoints": len(config),
+                "rate": float(c @ beta),
+                "rate_sigma": float(np.sqrt(c @ cov @ c)),
+                "noise_scale": float(np.sqrt(scale2[k])),
+                "bic": float(normal.bic(config)),
+                "bic_none": float(normal.bic(())),
+            }
+        )
+        table = _amplitudes(series, labels, beta, cov, config)
+        table.insert(0, "series", names[complete[k]])
+        tables.append(table)
+    summary = (
+        pd.DataFrame(rows).set_index("series").reindex(pd.Index(names, name="series"))
+    )
+    nonempty = [t for t in tables if not t.empty]
+    changepoints = (
+        pd.concat(nonempty, ignore_index=True)
+        if nonempty
+        else pd.DataFrame(
+            columns=["series", *_amplitudes(series, [], [], [], ()).columns]
+        )
+    )
+    return ManyChangepoints(summary=summary, changepoints=changepoints, noise=noise)
 
 
 def _gelman_rubin(chains: np.ndarray) -> float:
