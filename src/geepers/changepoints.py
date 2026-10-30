@@ -73,7 +73,13 @@ from numpy.typing import ArrayLike
 from scipy import linalg, special
 
 from geepers.linearity import _noise_covariance
-from geepers.trend import DAYS_PER_YEAR, TrendResult, _design_matrix, estimate_trend
+from geepers.trend import (
+    DAYS_PER_YEAR,
+    TrendResult,
+    _design_matrix,
+    _step_years,
+    estimate_trend,
+)
 
 __all__ = [
     "ChangepointPosterior",
@@ -232,9 +238,8 @@ def _prepare(
             )
         )
     )
-    step_years = np.array(
-        [(s - epochs[0]).total_seconds() / 86400.0 / DAYS_PER_YEAR for s in known]
-    )
+    # As `estimate_trend` places them, so the two fits agree on the columns
+    step_years = _step_years(epochs, t, known)
     base, names = _design_matrix(t, 1, periods_years, step_years, [], [])
 
     inside = np.flatnonzero(

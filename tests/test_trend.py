@@ -118,6 +118,40 @@ class TestEstimateTrend:
         # trend must not absorb the step
         assert res.velocity == pytest.approx(0.0, abs=3 * res.velocity_uncertainty)
 
+    def test_step_finer_than_the_epoch_resolution(self):
+        # Regression: a computed step date with nanoseconds raised against
+        # epochs in microseconds
+        dates = pd.date_range("2018-01-01", periods=200, freq="D").as_unit("us")
+        y = np.random.default_rng(0).normal(0, 0.5, 200)
+        y[100:] += 20.0
+        step = dates[99] + pd.Timedelta(days=0.123456789123)
+        res = estimate_trend(
+            dates, y, noise_model="WN", periods_years=(), step_dates=[step]
+        )
+        assert res.parameters["step_0"][0] == pytest.approx(20.0, abs=1.0)
+
+    def test_step_on_an_observation_date(self):
+        """A step dated on an epoch starts at that epoch. Regression: step times
+        came from the raw timestamp but epochs from the rounded sampling grid,
+        so on monthly data the step started one epoch late."""
+        month = 365.25 / 12
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(96) * month), unit="D"
+        )
+        y = np.random.default_rng(0).normal(0, 0.5, 96)
+        y[36:] += 20.0
+        res = estimate_trend(
+            dates,
+            y,
+            sampling_days=month,
+            noise_model="WN",
+            periods_years=(),
+            step_dates=[dates[36]],
+        )
+        value, sigma = res.parameters["step_0"]
+        assert value == pytest.approx(20.0, abs=3 * sigma)
+        assert abs(res.residuals[36]) < 2.5
+
     def test_covariance_matches_the_sigmas(self):
         dates, y = _synthetic(n=400, sigma_white=0.5)
         res = estimate_trend(dates, y, noise_model="WN")
