@@ -1,0 +1,44 @@
+{
+  "acceptance_rate": 0.10541666666666667,
+  "changepoints": [
+    {
+      "date": "2019-01-01",
+      "date_high": "2019-01-31",
+      "date_low": "2019-01-01",
+      "kind": "offset",
+      "offset": 7.848480658848865,
+      "offset_sigma": 0.7512646995071383,
+      "probability": 1.0,
+      "rate_change": null,
+      "rate_change_sigma": null
+    },
+    {
+      "date": "2022-03-02",
+      "date_high": "2022-07-02",
+      "date_low": "2021-09-01",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "probability": 0.811,
+      "rate_change": -3.5173902534696397,
+      "rate_change_sigma": 0.33018528444556955
+    }
+  ],
+  "n_probability": [
+    0.0,
+    0.0,
+    0.8945,
+    0.101,
+    0.0045,
+    0.0
+  ],
+  "rate": -6.379099035458932,
+  "rate_samples_head": [
+    -6.097051966768715,
+    -6.202683759719204,
+    -5.998721045030616,
+    -6.563435360166194,
+    -6.251655446317241
+  ],
+  "rate_sigma": 0.32155946998069723
+}
