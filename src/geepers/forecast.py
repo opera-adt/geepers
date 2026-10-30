@@ -38,6 +38,7 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -324,6 +325,7 @@ def backtest(
     n_cutoffs: int = 5,
     min_history_years: float = 4.0,
     n_bins: int = 5,
+    forecaster: Callable[..., Any] | None = None,
     **forecast_kwargs: Any,
 ) -> Backtest:
     """Score `forecast_trend` on the data that followed past cutoffs.
@@ -348,8 +350,13 @@ def backtest(
         Shortest record fitted. Default 4.
     n_bins : int
         Number of lead-time bins in `metrics`. Default 5.
+    forecaster : callable, optional
+        What to score, called as ``forecaster(dates, values,
+        future_dates=..., **forecast_kwargs)`` and returning an object
+        whose ``table`` has the columns of `Forecast.table`, such as
+        `geepers.smooth.forecast_smooth`. Default `forecast_trend`.
     **forecast_kwargs
-        Passed to `forecast_trend` (e.g. ``sampling_days``, ``level``).
+        Passed to the forecaster (e.g. ``sampling_days``, ``level``).
 
     Returns
     -------
@@ -385,7 +392,7 @@ def backtest(
         later = (epochs > cutoff) & (epochs <= cutoff + horizon)
         if not later.any():
             continue
-        fc = forecast_trend(
+        fc = (forecaster or forecast_trend)(
             epochs[past], y[past], future_dates=epochs[later], **forecast_kwargs
         )
         table = fc.table
