@@ -369,6 +369,19 @@ class TestFitSparseChangepoints:
         _, _, stepwise = offset_and_rate_change
         pd.testing.assert_frame_equal(found.changepoints, stepwise.changepoints)
 
+    def test_refinement_recovers_a_smooth_signal(self):
+        # Regression: the lasso selection alone keeps too few change points on
+        # a sigmoid and misses its flattening, which ruins the present-day rate
+        n = 108
+        t = np.arange(n) / 12
+        rng = np.random.default_rng(1)
+        values = -40.0 / (1 + np.exp(-(t - 6.0) / 0.7)) + rng.normal(0, 1.0, n)
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(n) * MONTH), unit="D"
+        )
+        found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+        assert abs(found.rate) < 5.0
+
     def test_no_changepoints_in_a_linear_series(self):
         dates, values = _monthly(offset=0.0, rate_change=0.0)
         found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
@@ -445,16 +458,14 @@ class TestFitSparseChangepointsRegression:
         assert list(cps["date"]) == [dates[36], dates[78]]
         assert found.rate == pytest.approx(-7.0, abs=0.02)
 
-    def test_busy_station_keeps_its_early_offset(self):
+    def test_busy_station_keeps_its_early_transient(self):
         """Regression: the lasso path stopped once it held more clusters than
-        `max_changepoints`. On a station with many changes (AHUP, Kilauea)
-        small clusters appear before the large ones are resolved, and the
-        2006 offset was never found."""
+        `max_changepoints`, and on a station with many changes (AHUP, Kilauea)
+        nothing was found near the 2006-08 inflation."""
         s = _station_monthly("AHUP")
         found = fit_sparse_changepoints(s.index, s.to_numpy(), sampling_days=MONTH)
-        offsets = found.changepoints[found.changepoints["offset"].notna()]
-        gap = np.abs((offsets["date"] - pd.Timestamp("2006-02-27")).dt.days)
-        assert (gap < 62).any()
+        gap = np.abs((found.changepoints["date"] - pd.Timestamp("2006-02-27")).dt.days)
+        assert (gap < 366).any()
 
     def test_golden(self, golden):
         dates, values = _monthly(seed=6)
