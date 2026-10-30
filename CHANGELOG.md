@@ -34,6 +34,31 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.smooth`: `fit_smooth_trend` estimates a time-varying rate
+  without assuming its shape (penalized linear spline, smoothness and noise
+  by REML), used only with evidence over the piecewise-linear model;
+  `forecast_smooth` extrapolates it.
+- `geepers.forecast.backtest(forecaster=...)` scores any forecaster.
+- `geepers.changepoints.fit_sparse_changepoints_many`: the sparse fit for
+  many series on one time grid (shared noise shape, per-series amplitude,
+  all lasso paths solved together), returning a summary and a long table
+  of change points.
+- `geepers.changepoints.fit_sparse_changepoints`: change points selected
+  with an L1 (lasso) penalty along a path (FISTA with adaptive restart),
+  scored by BIC; returns a `ChangepointResult` like `detect_changepoints`.
+- `geepers.forecast`: `forecast_trend` extrapolates the change-point model
+  with intervals from the parameters, the predicted colored noise and
+  simulated future rate changes (Prophet's trend uncertainty); `backtest`
+  scores it at past cutoffs (RMSE, MAE, interval coverage by lead time).
+- `TrendResult.covariance`: the full parameter covariance.
+- `geepers.changepoints`: an unknown number of offsets and rate changes
+  with the trend, periodic terms and colored noise (the DiscoTimeS model,
+  Oelsmann et al. 2022, without PyMC). `detect_changepoints` selects them
+  stepwise by BIC under the `estimate_trend` noise covariance;
+  `sample_changepoints` samples their posterior by reversible-jump MCMC
+  with the amplitudes integrated out. Both report the present-day rate.
+- `estimate_trend(rate_change_dates=...)`: trend changes without an offset
+  (hinge terms `rate_change_<i>`).
 - `geepers.euler`: ITRF2020-PMM and ITRF2014-PMM plate-motion tables
   (`geepers/data/`), `load_plate_motion_model`, `plate_pole`,
   `plate_velocity_enu` and `PLATE_CODES` (UNR two-letter codes → PMM names).

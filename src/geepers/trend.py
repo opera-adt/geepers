@@ -93,6 +93,8 @@ class TrendResult:
         Observation-minus-model residuals at the observed epochs.
     model : np.ndarray
         Fitted model evaluated at the observed epochs.
+    covariance : np.ndarray
+        Covariance of the parameters, in the order of `parameters`.
 
     """
 
@@ -109,6 +111,7 @@ class TrendResult:
     bic: float = np.nan
     residuals: np.ndarray = field(default_factory=lambda: np.array([]))
     model: np.ndarray = field(default_factory=lambda: np.array([]))
+    covariance: np.ndarray = field(default_factory=lambda: np.empty((0, 0)))
 
 
 def _fractional_diff_coeffs(d: float, n: int) -> np.ndarray:
@@ -162,7 +165,10 @@ def _step_years(
         )
     )
     years = np.asarray((steps - dates[0]).total_seconds()) / 86400.0 / DAYS_PER_YEAR
-    first = dates.searchsorted(steps, side="left")
+    # At one resolution: searchsorted refuses values finer than the index
+    first = np.searchsorted(
+        dates.as_unit("ns").asi8, steps.as_unit("ns").asi8, side="left"
+    )
     inside = (first > 0) & (first < len(dates))
     years[inside] = t_years[first[inside]]
     return years
@@ -175,10 +181,13 @@ def _design_matrix(
     step_years: np.ndarray,
     log_terms: list[tuple[float, float]],
     exp_terms: list[tuple[float, float]],
+    rate_change_years: np.ndarray | None = None,
 ) -> tuple[np.ndarray, list[str]]:
     """Build the design matrix and matching parameter names.
 
-    Parameters are in years relative to the first epoch.
+    Parameters are in years relative to the first epoch. A rate change
+    is a hinge ``max(0, t - t_change)``: the series stays continuous and
+    its slope changes by the estimated amount.
     """
     cols: list[np.ndarray] = []
     names: list[str] = []
@@ -207,6 +216,10 @@ def _design_matrix(
         dt = np.clip(t_years - t0, 0.0, None)
         cols.append((1.0 - np.exp(-dt / tau)) * (t_years >= t0))
         names.append(f"exp_{i}")
+
+    for i, tc in enumerate(() if rate_change_years is None else rate_change_years):
+        cols.append(np.maximum(0.0, t_years - tc))
+        names.append(f"rate_change_{i}")
 
     return np.column_stack(cols), names
 
@@ -451,6 +464,7 @@ def estimate_trend(
     noise_model: Literal["PLWN", "PL", "WN", "FNWN", "RWFNWN"] = "PLWN",
     use_rmle: bool = True,
     method: Literal["exact", "whittle"] = "exact",
+    rate_change_dates: ArrayLike | None = None,
 ) -> TrendResult:
     """Estimate a trend and its realistic uncertainty from a time series.
 
@@ -507,6 +521,12 @@ def estimate_trend(
           with near-identical results; preferred when fitting many
           series (see `estimate_trend_many`). Gaps are filled by linear
           interpolation for the noise estimation stage only.
+    rate_change_dates : array-like of datetime64, optional
+        Epochs at which the trend changes without an offset (continuous
+        piecewise-linear trend). The changes are estimated as
+        ``rate_change_<i>``, input units per year; `velocity` stays the
+        rate before the first change. See
+        `geepers.changepoints.detect_changepoints` to find them.
 
     Returns
     -------
@@ -538,9 +558,21 @@ def estimate_trend(
     step_years = _step_years(dates, t_years, step_dates)
     log_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_log or [])]
     exp_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_exp or [])]
+    rate_change_years = np.array(
+        [
+            _to_years(d)
+            for d in (rate_change_dates if rate_change_dates is not None else [])
+        ]
+    )
 
     A, names = _design_matrix(
-        t_years, poly_deg, periods_years, step_years, log_terms, exp_terms
+        t_years,
+        poly_deg,
+        periods_years,
+        step_years,
+        log_terms,
+        exp_terms,
+        rate_change_years,
     )
 
     if np.linalg.matrix_rank(A) < A.shape[1]:
@@ -744,6 +776,7 @@ def estimate_trend(
         bic=float(k_total * np.log(n) - 2 * log_l),
         residuals=r,
         model=A @ beta + y_mean,
+        covariance=beta_cov,
     )
 
 

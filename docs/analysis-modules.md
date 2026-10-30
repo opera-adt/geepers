@@ -100,6 +100,151 @@ is a random walk. Declare known offsets with `step_dates`, or they
 count as non-linearity. The web viewer's linearity test estimates the
 offsets its step detector finds.
 
+## Offsets and rate changes at unknown epochs (`geepers.changepoints`)
+
+`estimate_trend` needs the offset epochs; `detect_steps` finds offsets
+only and `linearity_test` one hinge. `geepers.changepoints` estimates up
+to `max_changepoints` change points at once, each an offset, a rate
+change, or both, together with the trend, periodic terms, known steps
+and colored noise. The rate after the last change point is the
+present-day rate. The model follows DiscoTimeS (Oelsmann et al., 2022,
+J. Geod., https://doi.org/10.1007/s00190-022-01645-6), without PyMC:
+
+```python
+from geepers.changepoints import (
+    detect_changepoints, fit_sparse_changepoints, sample_changepoints,
+)
+
+found = detect_changepoints(dates, up_mm, sampling_days=30)
+sparse = fit_sparse_changepoints(dates, up_mm, sampling_days=30)  # same result type
+found.changepoints            # date, kind, offset, rate_change (+ sigmas)
+found.segments                # rate per segment
+found.rate, found.rate_sigma  # present-day rate
+
+post = sample_changepoints(dates, up_mm, sampling_days=30, detection=found)
+post.n_probability            # P(number of change points)
+post.probability              # P(change point at each candidate epoch)
+post.changepoints             # summary, with 95 % epoch intervals
+post.rate, post.rate_sigma    # averaged over all configurations
+post.rhat                     # chain convergence
+```
+
+- `detect_changepoints` is stepwise BIC selection under the
+  `estimate_trend` noise covariance, re-estimated with the change points
+  in. On long daily series `log(n)` overcounts correlated samples and
+  the selection is conservative; `penalty=2` gives the AIC.
+- `fit_sparse_changepoints` is the L1 (lasso) alternative: an offset and
+  a rate change at every candidate epoch, selected along a penalty path
+  by the same BIC after an unpenalized refit, then refined with the
+  moves of the stepwise search. Without that refinement the lasso
+  selection had 2.5-3.8 times the forecast error on smooth signals and
+  missed change points on busy stations; with it the two mostly agree.
+- `fit_sparse_changepoints_many` runs the sparse fit on many series that
+  share their epochs (InSAR pixels, a station network on one grid): one
+  shared noise shape (median of `estimate_trend` on a sample of series,
+  or `noise=`) with a per-series amplitude, whitened once, and all lasso
+  paths solved together. About 50 ms per series against 0.7 s for
+  `fit_sparse_changepoints`; the noise is not re-estimated with the
+  change points in and the stepwise refinement is skipped, so treat it
+  as a screen for piecewise-linear signals. Series with any NaN are
+  skipped.
+- `sample_changepoints` is reversible-jump MCMC over the number, epochs
+  and kinds of change points, with Gaussian priors on their sizes
+  (`offset_scale`, `rate_scale`) integrated out analytically and the
+  noise held at the `detect_changepoints` estimate. A few seconds for a
+  ten-year series. The prior scales act like any Bayes factor: wider
+  priors demand larger changes.
+- Change points sit on `n_candidates` (default 300) epochs at least
+  `min_segment_years` apart and from the ends. Pass known offsets as
+  `step_dates`. The flicker + white default matters for the same reason
+  as in `linearity_test`.
+
+## Smooth, time-varying rates (`geepers.smooth`)
+
+Decays, droughts, accelerating subsidence and multi-year cycles are not
+piecewise linear. `fit_smooth_trend` estimates the rate as a random walk
+(a penalized linear spline) with its smoothness and the noise estimated
+together by REML, and needs no shape in advance. A smooth trend is used
+only with evidence for one; otherwise the result is the
+`detect_changepoints` model, a straight line if that finds nothing:
+
+```python
+from geepers.forecast import backtest
+from geepers.smooth import fit_smooth_trend, forecast_smooth
+
+fit = fit_smooth_trend(dates, up_mm, sampling_days=30, step_dates=known_steps)
+fit.shape                     # "linear" | "piecewise" | "smooth"
+fit.evidence                  # likelihood gain over the line; smooth from 6
+fit.rate, fit.rate_sigma      # present-day rate
+fit.rates, fit.rates_sigma    # rate at every epoch
+
+fc = forecast_smooth(dates, up_mm, 3, sampling_days=30, fit=fit)
+fc.table[["mean", "lower", "upper"]]
+
+backtest(dates, up_mm, 3, forecaster=forecast_smooth, sampling_days=30)
+```
+
+A forecast continues the last rate with the periodic terms and the
+persisting noise. It never predicts a turning point: future slope changes
+only widen the interval, which grows faster than linearly with lead time.
+
+Relative to `detect_changepoints`, on 30 synthetic series per shape, the
+3-year forecast error is 0.48-0.77 on sigmoids, decays, acceleration and
+multi-year cycles, and 1.00-1.03 on lines and hinges, with coverage of
+the 95 % interval rising from 0.60-0.75 to 0.94 where a signal keeps
+changing. On 13 real stations it is better by over 10 % on 11 % of 55
+cutoffs and worse on another 11 %: identical on most stable, glacial
+rebound and tectonic records, mostly better on subsidence and volcanoes
+(0.55-1.00), worst at COSO (1.33).
+
+Limits:
+
+- The evidence threshold assumes flicker + white noise, where about 1 %
+  of linear series pass it. On a linear series whose noise is redder and
+  not small, the smooth trend is chosen far too often and follows the
+  noise: 27-85 % of series at spectral index -1.5, 65-100 % for a random
+  walk.
+- Knots default to one per year, so the rate is a yearly staircase and
+  cannot follow an annual cycle of varying amplitude; denser knots let the
+  present-day rate depend on the month the record ends.
+- The rate is less precise than a line's where a line or hinge is the
+  truth (0.53 against 0.20 mm/yr on a hinge), and on strongly unsteady
+  records the methods disagree on the present-day rate: at LEMA -112 ± 15
+  against -62 ± 5 mm/yr. Read such a rate with its uncertainty.
+- Each fit factorizes an n x n matrix about 150 times, so average daily
+  series to weekly or monthly first.
+
+## Forecasts and backtests (`geepers.forecast`)
+
+`forecast_trend` extrapolates the `detect_changepoints` model (present-day
+rate and periodic terms) with an interval built from three parts: the
+parameter uncertainty, the colored noise predicted from the past
+residuals (flicker persists, so its conditional mean is not zero), and
+future rate changes simulated at the rate and mean size this series has
+shown, as in Prophet (Taylor & Letham, 2018). `backtest` redoes the whole
+fit at past cutoffs and scores the forecasts against what followed:
+
+```python
+from geepers.forecast import backtest, forecast_trend
+
+fc = forecast_trend(dates, up_mm, horizon_years=5, sampling_days=30)
+fc.table[["mean", "lower", "upper", "sigma_model", "sigma_noise"]]
+fc.change_rates, fc.change_scales     # simulated future rate changes
+
+bt = backtest(dates, up_mm, horizon_years=3, sampling_days=30)
+bt.metrics                            # rmse, mae, coverage, width by lead
+```
+
+- Only rate changes are simulated by default. A past offset is usually an
+  event whose recurrence the record cannot predict, and simulating offsets
+  made the 95 % intervals cover 100 % at three times the needed width;
+  `simulate_changes=("offset", "rate")` turns them on.
+- On synthetic flicker + white series without change points the 95 %
+  intervals cover 92-96 % of the next three years. A record that has never
+  shown a rate change simulates none, so a first change is not covered
+  until it has been in the record long enough to be detected (coverage
+  0.24 half a year after a -4 mm/yr change, 0.97 after 2.5 years).
+
 ## Station stability metrics (`geepers.variability`)
 
 Quality metrics extracted from the AUS GNSS screening workflow:

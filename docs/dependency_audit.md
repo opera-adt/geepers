@@ -18,12 +18,14 @@ imports inside functions or `TYPE_CHECKING`). Heavy packages are **bold**.
 | `_types` | numpy, pandas | — |
 | `_version` | — | — |
 | `analysis` | numpy, pandas, pyproj | — |
+| `changepoints` | numpy, pandas, scipy | — |
 | `cli` | tyro | — |
 | `cme` | numpy, pandas | sklearn |
 | `collocation` | numpy, pyproj, scipy | shapely |
 | `constants` | — | — |
 | `cross_validation` | numpy, pyproj | — |
 | `euler` | numpy, pyproj | — |
+| `forecast` | numpy, pandas, scipy | — |
 | `gps` | **geopandas**, pandas | **rasterio** |
 | `gps_imaging` | numpy, pandas, scipy | — |
 | `gps_sources` | — | — |
@@ -40,6 +42,7 @@ imports inside functions or `TYPE_CHECKING`). Heavy packages are **bold**.
 | `quality` | numpy, pandas | — |
 | `rates` | **geopandas**, numpy, pandas | — |
 | `schemas` | pandas, **pandera** | — |
+| `smooth` | numpy, pandas, scipy | — |
 | `spline` | numpy, pyproj, scipy | — |
 | `steps` | numpy, pandas | — |
 | `strain` | numpy, **xarray** | — |
@@ -90,7 +93,7 @@ Nothing else. In particular not `io`, `processing`, `workflows`, `plotting`,
 |---|---|---|---|
 | **core** (no extra) | `gps_sources/*`, `schemas` (pandera optional), `utils` (split), `_types`, `constants`, `steps`, `trend`, `quality` | numpy, pandas, scipy, pyproj, requests, tqdm | cal-disp image, Venti core |
 | **`[grid]`** | `gps_imaging`, `euler`, `surface`, `spline`, `masks`, `collocation`, `geo_utils` | shapely (+ core) | cal-disp image (R-G5, R-G6), Venti `[calibration]` |
-| **`[analysis]`** | `io`, `processing`, `workflows`, `cli`, `rates`, `midas`, `cross_validation`, `linearity`, `variability`, `strain`, `cme`, `uncertainty`, `synthetic`, `validation`, `analysis`, `gps` | xarray, dask, zarr, rasterio, rioxarray, geopandas, pyogrio, pandera, lxml, tyro, scikit-learn | validation package, research |
+| **`[analysis]`** | `io`, `processing`, `workflows`, `cli`, `rates`, `midas`, `cross_validation`, `linearity`, `changepoints`, `forecast`, `smooth`, `variability`, `strain`, `cme`, `uncertainty`, `synthetic`, `validation`, `analysis`, `gps` | xarray, dask, zarr, rasterio, rioxarray, geopandas, pyogrio, pandera, lxml, tyro, scikit-learn | validation package, research |
 | **`[plot]`** (exists) | `plotting` | matplotlib, contextily | notebooks |
 | **`[all]`** | everything | | |
 

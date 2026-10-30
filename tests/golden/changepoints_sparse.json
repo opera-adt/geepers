@@ -1,0 +1,58 @@
+{
+  "bic": 168.44990091339184,
+  "bic_none": 1210.1795260642218,
+  "changepoints": [
+    {
+      "date": "2019-01-01",
+      "kind": "offset",
+      "offset": 8.730458601407047,
+      "offset_sigma": 0.6932074510206501,
+      "rate_change": null,
+      "rate_change_sigma": null
+    },
+    {
+      "date": "2022-01-31",
+      "kind": "rate",
+      "offset": null,
+      "offset_sigma": null,
+      "rate_change": -2.7918008903590006,
+      "rate_change_sigma": 0.3850207903345546
+    },
+    {
+      "date": "2024-09-01",
+      "kind": "offset",
+      "offset": -3.4934277759314383,
+      "offset_sigma": 0.76536786407241,
+      "rate_change": null,
+      "rate_change_sigma": null
+    }
+  ],
+  "rate": -6.138924372167661,
+  "rate_sigma": 0.2620902696376326,
+  "segments": [
+    {
+      "end": "2019-01-01",
+      "rate": -3.3471234818086613,
+      "rate_sigma": 0.1798154927204646,
+      "start": "2016-01-01"
+    },
+    {
+      "end": "2022-01-31",
+      "rate": -3.3471234818086613,
+      "rate_sigma": 0.1798154927204646,
+      "start": "2019-01-01"
+    },
+    {
+      "end": "2024-09-01",
+      "rate": -6.138924372167661,
+      "rate_sigma": 0.2620902696376326,
+      "start": "2022-01-31"
+    },
+    {
+      "end": "2025-12-01",
+      "rate": -6.138924372167661,
+      "rate_sigma": 0.2620902696376326,
+      "start": "2024-09-01"
+    }
+  ]
+}
