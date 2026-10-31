@@ -254,17 +254,28 @@ Limits:
   of any class, while 13-31 % of stations exceed it (see `geepers.neighbors`). It
   remains a judgement. About 1 in 5 moderate signals (a 30 mm decay over 12 years)
   is missed and gets the piecewise model.
-- **The limit of 3 does not suit InSAR pixels.** On three 10-year stacks (Prado
-  twice, Oahe) with 5 x 5 multilooks at 10 m and 30-day medians, pixels 250-500
-  m apart share nearly all real signal, so a smooth verdict on their difference
-  is close to a false alarm. It happens on 10-20 % at a limit of 3, 3.5-10 % at
-  5, 1-4.5 % at 8 and 0-2.5 % at 12. Use `max_random_walk_mm=8` for pixels. Decays
-  added to those differences are then found on 96 % at 120 mm, 53 % at 60 mm and
-  21 % at 30 mm, against 100 %, 90 % and 52 % at 3. A difference has sqrt(2) more
-  noise than a pixel, so these rates are pessimistic for one pixel, and the limit
-  will differ for other stacks and multilook sizes.
-  This has not been checked against GNSS: these stacks are dam-sized crops with one
-  usable station (CANC, where GNSS fits no random walk and the pixel 2.7-3.8).
+- **Use `max_random_walk_mm=5` for DISP-S1 pixels, not the default of 3.** Most of a pixel's
+  random walk is InSAR rather than ground: on 200 station pairs of frame F11116 over 10
+  years, the median is 0 in GNSS and 1.7 mm/sqrt(yr) in pixels (90 % at 1.8 and 8.0).
+  Official products at 30 m, 5 x 5 medians, 30-day bins, against GNSS on the same pairs:
+
+  | Limit | Strong GNSS signals found (9 pairs) | False on other pairs | False on windows 500 m apart |
+  |---|---|---|---|
+  | 3 | 89 % | 0-4 % | 5-19 % |
+  | 5 | 89 % | 0-4 % | 2-6.5 % |
+  | 8 | 56 % | 0-4 % | 0-3 % |
+  | 12 | 44 % | 0-1 % | 0-3 % |
+
+  False rates are from F11116 and F38502, with stations selected twice in the second:
+  by record length, and for smooth signals in the Central Valley. Detection is from the
+  second alone: 13 smooth pairs from 16 stations, of which 6 use each station only once,
+  so read it as a size, not a rate. Where the signal is strong, pixels follow GNSS (r about
+  1; CRCN-KDL1 -52.8 against -56.0 mm/yr). The right limit depends on product and multilook:
+  10 m stacks with 5 x 5 windows at Prado and Oahe false-alarmed on 10-20 % at 3 and 1-4.5 %
+  at 8.
+- GNSS smooth signals that pixels lack point at the monument rather than the ground, as at
+  BFSH (random walk 9-10 in GNSS, 0-2 in pixels, on all three of its pairs). This is one
+  station, and it is not implemented as a check.
 - Knots default to one per year, so the rate is a yearly staircase and
   cannot follow an annual cycle of varying amplitude; denser knots let the
   present-day rate depend on the month the record ends.
