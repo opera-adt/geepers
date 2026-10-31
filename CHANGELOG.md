@@ -34,6 +34,12 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `UnrSource.monuments`: the UNR monument table, with each station classified
+  as building, deep-braced, braced, rock pin, pillar, mast or unknown.
+  `scripts/unr-monuments.py` pulls it and joins it to a neighbor check.
+- `geepers-trends` command: fits `smooth`, `piecewise` or `sparse` trends to
+  stations from a list or bounding box, in mm/yr, with optional forecasts and
+  neighbor comparison.
 - `geepers.neighbors.check_neighbors`: differences close stations to tell a
   smooth signal the neighbors share from one local to a station, and splits
   random-walk noise among stations.

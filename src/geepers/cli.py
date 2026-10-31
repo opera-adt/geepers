@@ -25,5 +25,11 @@ def cli():  # noqa: D103
 cli.__doc__ = main.__doc__
 
 
+def trends_cli():  # noqa: D103
+    from .station_trends import main as trends_main
+
+    tyro.cli(trends_main)
+
+
 if __name__ == "__main__":
     cli()

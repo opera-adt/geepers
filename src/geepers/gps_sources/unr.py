@@ -37,10 +37,49 @@ GPS_BASE_URL = (
 STATION_LLH_URL = "https://geodesy.unr.edu/NGLStationPages/llh.out"
 STATION_LLH_FILENAME = "station_llh_all_{today}.csv"
 STEPS_URL = "https://geodesy.unr.edu/NGLStationPages/steps.txt"
+MONUMENTS_URL = "https://geodesy.unr.edu/monuments/MonumentTable.txt"
 # Seconds before an HTTP download is abandoned (connect, read)
 REQUEST_TIMEOUT = (10, 120)
 
 logger = logging.getLogger("geepers")
+
+# First match wins: a mast on a roof moves with the building, not the mast
+_MONUMENT_CLASSES = (
+    ("building", r"\b(?:ROOF|BUILDING|CHIMNEY|SILO|WALL|MASONRY|BRICK)\b"),
+    ("deep_braced", r"\bDEEP\b.*\b(?:DRILL|DRIVEN|WYATT|BRAC)"),
+    ("braced", r"BRAC|WYATT|DRILL"),
+    ("rock_pin", r"\bPIN\b|ROCK-PIN"),
+    ("pillar", r"PILLAR|PILAR|\bPIER\b"),
+    ("mast", r"MAST|POLE|TRIPOD|TOWER|\bROD\b|\bPOST\b|TUBE|PIPE"),
+)
+
+
+def _parse_monuments(text: str) -> pd.DataFrame:
+    """Parse the colon-separated monument table, classifying each station."""
+    rows = []
+    for line in text.splitlines():
+        parts = [part.strip() for part in line.split(":")]
+        if len(parts) < 6 or parts[0] == "Site":
+            continue
+        # A few foundations hold a colon themselves
+        rows.append((parts[0], parts[1], parts[2], " ".join(parts[3:-2]), *parts[-2:]))
+    columns = [
+        "id",
+        "description",
+        "height_m",
+        "foundation",
+        "foundation_depth_m",
+        "geology",
+    ]
+    df = pd.DataFrame(rows, columns=columns)
+    for column in ("height_m", "foundation_depth_m"):
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    text_upper = (df["description"] + " | " + df["foundation"]).str.upper()
+    df["monument_class"] = "unknown"
+    # Latest assignment wins, so go from the last class to the first
+    for name, pattern in reversed(_MONUMENT_CLASSES):
+        df.loc[text_upper.str.contains(pattern, regex=True), "monument_class"] = name
+    return df.sort_values("id", ignore_index=True)
 
 
 class UnrSource(BaseGpsSource):
@@ -362,6 +401,42 @@ class UnrSource(BaseGpsSource):
         for col in ("threshold_distance", "distance_from_eq", "magnitude"):
             df[col] = pd.to_numeric(df[col], errors="coerce")
         return df.sort_values(["id", "date"], ignore_index=True)
+
+    def monuments(self, station_ids: list[str] | None = None) -> pd.DataFrame:
+        """Fetch the UNR table of station monuments.
+
+        Parses https://geodesy.unr.edu/monuments/MonumentTable.txt. The table
+        comes from station logs and is incomplete: about a quarter of its
+        foundations and most of its depths and geology are blank.
+
+        Parameters
+        ----------
+        station_ids : list of str, optional
+            Only return these stations.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per station: ``id``, ``description``, ``height_m``,
+            ``foundation``, ``foundation_depth_m``, ``geology`` and
+            ``monument_class``, one of "building", "deep_braced", "braced",
+            "rock_pin", "pillar", "mast" or "unknown". Heights and depths
+            that are not plain numbers are NaN.
+
+        """
+        df = self._read_monuments_table().copy()
+        if station_ids is not None:
+            wanted = {s.upper() for s in station_ids}
+            df = df[df["id"].isin(wanted)].reset_index(drop=True)
+        return df
+
+    @staticmethod
+    @cache
+    def _read_monuments_table() -> pd.DataFrame:
+        """Download and parse the UNR monument table (cached)."""
+        response = requests.get(MONUMENTS_URL, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        return _parse_monuments(response.text)
 
     def get_global_station_list(self) -> list[str]:
         """Get the list of "processed" stations from UNR.

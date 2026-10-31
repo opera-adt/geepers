@@ -104,6 +104,14 @@ Future values are taken as exact, so the interval leaves out their
 uncertainty. `backtest` uses the observed values, which scores a perfect
 forecast of the driver: an upper limit on what it can add.
 
+With USGS daily well levels against GNSS up within 15 km (155 pairs from 57 stations
+and 18 wells in Houston, Las Vegas and the eastern Sierra, so not independent), the
+2-year backtest error is 0.83 of the fit without the well where its amplitude is
+significant at 3 sigma (53 pairs; better by over 10 % on 68 %, worse on 4 %) and 1.00
+where it is not. Near the main Houston well, all 22 stations fall as the water falls.
+A trending well takes part of the rate, a median of 1.2 mm/yr where it is significant,
+so the rate then means the motion the well does not explain.
+
 ## Is a single rate enough? (`geepers.linearity`)
 
 A velocity is only worth extrapolating if the series is linear.
@@ -241,10 +249,22 @@ Limits:
   `max_random_walk_mm` (default 3). On simulated
   linear series the smooth trend is chosen on 1-2 % with a true random walk
   up to 3 mm/sqrt(yr) and on 14 % at 5, against 8-28 % and 43 % without the
-  limit. Differences of station pairs within 25 km give a median of 2.7
-  mm/sqrt(yr), including local signals, so 3 is a generous limit on
-  monument noise, but not a measurement of it. About 1 in 5 moderate signals
-  (a 30 mm decay over 12 years) is missed and gets the piecewise model.
+  limit. Differences of same-class station pairs within 25 km have medians from 0.7
+  (deep-braced) to 2.0 mm/sqrt(yr) (masts), so 3 sits above typical monument noise
+  of any class, while 13-31 % of stations exceed it (see `geepers.neighbors`). It
+  remains a judgement. About 1 in 5 moderate signals (a 30 mm decay over 12 years)
+  is missed and gets the piecewise model.
+- **The limit of 3 does not suit InSAR pixels.** On three 10-year stacks (Prado
+  twice, Oahe) with 5 x 5 multilooks at 10 m and 30-day medians, pixels 250-500
+  m apart share nearly all real signal, so a smooth verdict on their difference
+  is close to a false alarm. It happens on 10-20 % at a limit of 3, 3.5-10 % at
+  5, 1-4.5 % at 8 and 0-2.5 % at 12. Use `max_random_walk_mm=8` for pixels. Decays
+  added to those differences are then found on 96 % at 120 mm, 53 % at 60 mm and
+  21 % at 30 mm, against 100 %, 90 % and 52 % at 3. A difference has sqrt(2) more
+  noise than a pixel, so these rates are pessimistic for one pixel, and the limit
+  will differ for other stacks and multilook sizes.
+  This has not been checked against GNSS: these stacks are dam-sized crops with one
+  usable station (CANC, where GNSS fits no random walk and the pixel 2.7-3.8).
 - Knots default to one per year, so the rate is a yearly staircase and
   cannot follow an annual cycle of varying amplitude; denser knots let the
   present-day rate depend on the month the record ends.
@@ -308,16 +328,65 @@ check.pairs                   # shape and random walk of every difference
 - `local_random_walk_mm` splits the pairs' random-walk variance among stations.
   It needs a group with an odd cycle, such as three stations in reach of each
   other, and is otherwise NaN.
+- `noisy` flags a share above the limit. It also catches jumps the fit did not
+  remove, so read it as an unstable record rather than a measured random walk:
+  P792 has 256 mm/sqrt(yr) from a 563 mm jump between consecutive months.
 
-On 197 North American stations in 41 clusters, the 22 smooth stations with a
-verdict split into 12 shared and 10 local; there is no monument record to score
-these against. The median local random walk is 1.06
-mm/sqrt(yr) in eastern and 1.35 in western North America for non-PBO stations,
-and 0.25 for PBO stations (named `P###`, a proxy for deep-drilled braced
-monuments). Monument type, rather than region, explains why close pairs in
-eastern North America looked noisier: their median of 3.1 compares with 3.3 for
-western non-PBO pairs and 0.9 for PBO pairs. Each pair costs a fit, so the
-time grows with `max_neighbors`.
+The estimators recover a known random walk within about 10 % from 3 mm/sqrt(yr)
+up, in simulation. At a true 2 the flag fires on 3-5 % of stations and at 3 on about
+40 %. Below 1 the amplitude is unreliable, and a third of real shares are zero.
+
+### Do monuments explain it?
+
+On 850 North American stations in 181 clusters, scored with the UNR monument table
+(`UnrSource.monuments`), up component, 30-day medians, excluding Hawaii:
+
+| Monument | Same-class pairs, median mm/sqrt(yr) (95 % CI) | Stations `noisy` |
+|---|---|---|
+| Deep-braced | 0.73 (0.28-1.10) | 13 % |
+| Other braced | 1.14 (0.87-1.81) | 17 % |
+| Building | 1.90 (1.61-2.24) | 25 % |
+| Mast | 2.00 (1.27-4.75) | 27 % |
+| Pillar | 0.00 (0.00-3.14), 8 pairs only | 31 % |
+
+- Poor monuments are worse, but explain only part of it. Buildings, masts and pillars
+  have 1.9 times the odds of braced monuments of being `noisy` (Fisher p = 0.001), yet
+  13 % of deep-braced stations are noisy too. Deep and other braced do not differ
+  (station shares, Mann-Whitney p = 0.5).
+- Region does not matter once the monument is known: same-class pairs of buildings are
+  1.88 in the east and 1.92 in the west. Eastern stations looked noisier because
+  more of them are on buildings.
+- **A `local` verdict does not identify a poor monument.** It covers 4 % of braced
+  stations and 7 % of buildings, masts and pillars, and 9 of the 11 deep-braced stations
+  with a verdict are local. On Kilauea almost every smooth station is local.
+- Deeper foundations look quieter (2.5 mm/sqrt(yr) up to 2 m, 0.9 beyond 10 m), but only
+  34 stations list a depth. Each pair costs a fit, so the time grows with
+  `max_neighbors`.
+
+## Monuments (`UnrSource.monuments`)
+
+`UnrSource().monuments()` reads the UNR monument table for 12,478 stations and
+classifies each. A mast on a roof counts as a building, since it moves with one.
+The table comes from station logs: 17 % have no usable type, and most depths and
+geology are blank. Station names do not stand in for it: of 230 `P###` stations
+in the study below, 113 are deep-braced, 81 braced and 35 unspecified.
+
+```bash
+python scripts/unr-monuments.py -o joined.csv --neighbors trends/neighbors.csv
+```
+
+## Trends from the command line
+
+`geepers-trends` runs these fits on stations from a list or a bounding box,
+with medians on a 30-day grid and the source's step catalog:
+
+```bash
+geepers-trends --stations P056 LEMA GODE -o trends --horizon-years 3
+geepers-trends --bbox -118 33.5 -117 34.5 -o trends --components up east --neighbors
+```
+
+It writes `trends.csv` (mm/yr), `forecasts.csv` (mm) and, with `--neighbors`,
+`neighbors.csv` and `neighbor_pairs.csv`. See `geepers-trends --help`.
 
 ## Station stability metrics (`geepers.variability`)
 

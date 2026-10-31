@@ -5117,8 +5117,8 @@ packages:
   timestamp: 1790256848815
 - pypi: ./
   name: geepers
-  version: 0.3.0.post1.dev65+g4b7473558.d20261006
-  sha256: 739e9058217c7e0e8735715dfacc0924dd42f374263b15dc01a61f428068b259
+  version: 0.3.0.post1.dev134+g5e1d11c96
+  sha256: 7f13cb6f354c349d99e95006f6ca5b4c6d31ec3987c262ac60975072f70ead10
   requires_dist:
   - numpy
   - pandas

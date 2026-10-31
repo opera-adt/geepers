@@ -81,6 +81,7 @@ test = [
 # Entry points for the command line interface
 [project.scripts]
 geepers = "geepers.cli:cli"
+geepers-trends = "geepers.cli:trends_cli"
 
 
 [tool.pixi.project]

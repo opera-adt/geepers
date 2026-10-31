@@ -70,7 +70,8 @@ class NeighborCheck:
         - ``random_walk_mm``: fitted on the station alone, mm/sqrt(yr),
           including whatever deformation looks like one.
         - ``local_random_walk_mm``: the station's share of the differences'
-          random walk, NaN where the pairs cannot determine it.
+          random walk, at most ``random_walk_mm``, NaN where the pairs cannot
+          determine it.
         - ``noisy``: `local_random_walk_mm` exceeds the limit.
     pairs : pd.DataFrame
         One row per pair: ``a``, ``b``, ``km``, ``n_epochs``, ``shape``,
@@ -124,12 +125,19 @@ def _random_walk_mm(
     return float(per_root_year / _UNITS_PER_MM[units])
 
 
-def _station_shares(ids: list[str], pairs: pd.DataFrame) -> dict[str, float]:
+def _station_shares(
+    ids: list[str], pairs: pd.DataFrame, own: Mapping[str, float]
+) -> dict[str, float]:
     """Split the pairs' random-walk variance among the stations.
 
     Each difference gives ``a_i + a_j``. That fixes the shares only for a
     connected group holding an odd cycle (three stations all within reach
     of each other, say), since a chain can move variance along itself.
+
+    A station cannot hold more than its own record shows (`own`), which also
+    keeps one wild neighbor from being blamed on a quiet station: real pairs
+    do not add up exactly, and an unconstrained fit put 165 mm/sqrt(yr) on a
+    station whose own record has 6.
     """
     usable = pairs[pairs["random_walk_mm"].notna()]
     position = {station: k for k, station in enumerate(ids)}
@@ -159,8 +167,12 @@ def _station_shares(ids: list[str], pairs: pd.DataFrame) -> dict[str, float]:
         design[rows, inside["b"].map(index).to_numpy()] = 1.0
         if np.linalg.matrix_rank(design) < len(members):
             continue
-        solution, _ = optimize.nnls(design, inside["random_walk_mm"].to_numpy() ** 2)
-        for station, variance in zip(members, solution, strict=True):
+        # A zero-width bound is not allowed, though a record can fit no random walk
+        upper = np.maximum([own[station] ** 2 for station in members], 1e-12)
+        fit = optimize.lsq_linear(
+            design, inside["random_walk_mm"].to_numpy() ** 2, bounds=(0.0, upper)
+        )
+        for station, variance in zip(members, fit.x, strict=True):
             shares[station] = float(np.sqrt(variance))
     return shares
 
@@ -284,7 +296,9 @@ def check_neighbors(
         found,
         columns=["a", "b", "km", "n_epochs", "shape", "evidence", "random_walk_mm"],
     )
-    shares = _station_shares(ids, pairs)
+    shares = _station_shares(
+        ids, pairs, {n: r[2] for n, r in zip(ids, single, strict=True)}
+    )
 
     rows = []
     for name, (shape, evidence, amplitude) in zip(ids, single, strict=True):
