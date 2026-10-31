@@ -93,3 +93,16 @@ def test_vectorised_over_arrays_and_relative_motion():
     # PA relative to NA across southern California: ~45-50 mm/yr to the NW
     rel = np.hypot(ve_pa - ve_na, vn_pa - vn_na)
     assert np.all((rel > 40.0) & (rel < 55.0)), rel
+
+
+def test_plate_velocity_keeps_the_input_shape():
+    """A 2-D lon/lat grid gives 2-D east/north equal to the flat result (the
+    design matrix interleaves east and north per point)."""
+    lon, lat = np.meshgrid(np.linspace(-96, -94, 5), np.linspace(29, 31, 3))
+    ve, vn, vu = plate_velocity_enu(lon, lat, "NA")
+    fe, fn, _ = plate_velocity_enu(lon.ravel(), lat.ravel(), "NA")
+    assert ve.shape == vn.shape == vu.shape == lon.shape
+    np.testing.assert_allclose(ve.ravel(), fe)
+    np.testing.assert_allclose(vn.ravel(), fn)
+    e0, n0, _ = plate_velocity_enu(-95.0, 30.0, "NA")  # a scalar point
+    assert e0.shape == n0.shape == (1,)
