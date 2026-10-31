@@ -93,6 +93,8 @@ class TrendResult:
         Observation-minus-model residuals at the observed epochs.
     model : np.ndarray
         Fitted model evaluated at the observed epochs.
+    covariance : np.ndarray
+        Covariance of the parameters, in the order of `parameters`.
 
     """
 
@@ -109,6 +111,7 @@ class TrendResult:
     bic: float = np.nan
     residuals: np.ndarray = field(default_factory=lambda: np.array([]))
     model: np.ndarray = field(default_factory=lambda: np.array([]))
+    covariance: np.ndarray = field(default_factory=lambda: np.empty((0, 0)))
 
 
 def _fractional_diff_coeffs(d: float, n: int) -> np.ndarray:
@@ -748,6 +751,7 @@ def estimate_trend(
         bic=float(k_total * np.log(n) - 2 * log_l),
         residuals=r,
         model=A @ beta + y_mean,
+        covariance=beta_cov,
     )
 
 
