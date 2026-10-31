@@ -19,6 +19,7 @@ from geepers._optional import to_point_frame, validate
 from geepers.constants import EPS
 from geepers.utils import decimal_years_to_datetimes
 
+from ._download import download_file
 from .base import BaseGpsSource
 from .unr import REQUEST_TIMEOUT
 
@@ -250,13 +251,8 @@ class UnrGridSource(BaseGpsSource):
         )
         dest = output_dir / url.rsplit("/", 1)[-1]
         if not dest.exists():
-            if session is None:
-                resp = requests.get(url, timeout=REQUEST_TIMEOUT)
-            else:
-                resp = session.get(url, timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            with dest.open("wb") as f:
-                f.write(resp.content)
+            # atomic: an existing dest is always a complete, non-HTML file
+            download_file(url, dest, session=session, timeout=REQUEST_TIMEOUT)
         return dest
 
     def download_data_files(
