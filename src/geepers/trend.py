@@ -151,10 +151,13 @@ def _design_matrix(
     step_years: np.ndarray,
     log_terms: list[tuple[float, float]],
     exp_terms: list[tuple[float, float]],
+    rate_change_years: np.ndarray | None = None,
 ) -> tuple[np.ndarray, list[str]]:
     """Build the design matrix and matching parameter names.
 
-    Parameters are in years relative to the first epoch.
+    Parameters are in years relative to the first epoch. A rate change
+    is a hinge ``max(0, t - t_change)``: the series stays continuous and
+    its slope changes by the estimated amount.
     """
     cols: list[np.ndarray] = []
     names: list[str] = []
@@ -183,6 +186,10 @@ def _design_matrix(
         dt = np.clip(t_years - t0, 0.0, None)
         cols.append((1.0 - np.exp(-dt / tau)) * (t_years >= t0))
         names.append(f"exp_{i}")
+
+    for i, tc in enumerate(() if rate_change_years is None else rate_change_years):
+        cols.append(np.maximum(0.0, t_years - tc))
+        names.append(f"rate_change_{i}")
 
     return np.column_stack(cols), names
 
@@ -427,6 +434,7 @@ def estimate_trend(
     noise_model: Literal["PLWN", "PL", "WN", "FNWN", "RWFNWN"] = "PLWN",
     use_rmle: bool = True,
     method: Literal["exact", "whittle"] = "exact",
+    rate_change_dates: ArrayLike | None = None,
 ) -> TrendResult:
     """Estimate a trend and its realistic uncertainty from a time series.
 
@@ -483,6 +491,12 @@ def estimate_trend(
           with near-identical results; preferred when fitting many
           series (see `estimate_trend_many`). Gaps are filled by linear
           interpolation for the noise estimation stage only.
+    rate_change_dates : array-like of datetime64, optional
+        Epochs at which the trend changes without an offset (continuous
+        piecewise-linear trend). The changes are estimated as
+        ``rate_change_<i>``, input units per year; `velocity` stays the
+        rate before the first change. See
+        `geepers.changepoints.detect_changepoints` to find them.
 
     Returns
     -------
@@ -516,9 +530,21 @@ def estimate_trend(
     )
     log_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_log or [])]
     exp_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_exp or [])]
+    rate_change_years = np.array(
+        [
+            _to_years(d)
+            for d in (rate_change_dates if rate_change_dates is not None else [])
+        ]
+    )
 
     A, names = _design_matrix(
-        t_years, poly_deg, periods_years, step_years, log_terms, exp_terms
+        t_years,
+        poly_deg,
+        periods_years,
+        step_years,
+        log_terms,
+        exp_terms,
+        rate_change_years,
     )
 
     if np.linalg.matrix_rank(A) < A.shape[1]:
