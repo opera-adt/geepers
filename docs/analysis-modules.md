@@ -286,6 +286,39 @@ bt.metrics                            # rmse, mae, coverage, width by lead
   until it has been in the record long enough to be detected (coverage
   0.24 half a year after a -4 mm/yr change, 0.97 after 2.5 years).
 
+## Comparing neighbors (`geepers.neighbors`)
+
+On one record, a smooth signal, a bad monument and a slow random walk look
+alike. `check_neighbors` differences stations within `max_distance_km`, which
+removes what they share:
+
+```python
+from geepers.neighbors import check_neighbors
+
+check = check_neighbors(series, coordinates, units="m", step_dates=steps)
+check.stations[["shape", "signal", "local_random_walk_mm", "noisy"]]
+check.pairs                   # shape and random walk of every difference
+```
+
+- `signal` is "shared" where a station's smooth signal leaves most of its
+  differences, so it is not the monument: real regional motion or common-mode
+  noise. It is "local" where it stays. **Local does not mean a bad monument**:
+  it also describes deformation smaller than the station spacing. On Kilauea
+  almost every smooth station is local, from real, steep gradients.
+- `local_random_walk_mm` splits the pairs' random-walk variance among stations.
+  It needs a group with an odd cycle, such as three stations in reach of each
+  other, and is otherwise NaN.
+
+On 197 North American stations in 41 clusters, the 22 smooth stations with a
+verdict split into 12 shared and 10 local; there is no monument record to score
+these against. The median local random walk is 1.06
+mm/sqrt(yr) in eastern and 1.35 in western North America for non-PBO stations,
+and 0.25 for PBO stations (named `P###`, a proxy for deep-drilled braced
+monuments). Monument type, rather than region, explains why close pairs in
+eastern North America looked noisier: their median of 3.1 compares with 3.3 for
+western non-PBO pairs and 0.9 for PBO pairs. Each pair costs a fit, so the
+time grows with `max_neighbors`.
+
 ## Station stability metrics (`geepers.variability`)
 
 Quality metrics extracted from the AUS GNSS screening workflow:

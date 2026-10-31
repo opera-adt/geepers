@@ -34,6 +34,9 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.neighbors.check_neighbors`: differences close stations to tell a
+  smooth signal the neighbors share from one local to a station, and splits
+  random-walk noise among stations.
 - `regressors` in `detect_changepoints`, `fit_sparse_changepoints`,
   `sample_changepoints`, `fit_smooth_trend`, `forecast_trend` and `backtest`,
   and `future_regressors` in the forecasts: a change an explanatory series
