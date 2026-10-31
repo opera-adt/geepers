@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from functools import cache, lru_cache
+from functools import cache, lru_cache, partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -305,16 +305,22 @@ class UnrGridSource(BaseGpsSource):
         retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
         s.mount("https://", HTTPAdapter(max_retries=retries))
 
-        return thread_map(
+        # thread_map passes only max_workers/chunksize/tqdm options through;
+        # anything else is rejected ("Unknown argument(s)"), so the per-file
+        # arguments are bound here.
+        download_one = partial(
             self._download_file,
-            grid_id_list,
             plate=plate,
             output_dir=output_dir,
-            max_workers=max_workers,
             session=s,
-            desc="Downloading data files",
             version=version,
             gridded_type=gridded_type,
+        )
+        return thread_map(
+            download_one,
+            grid_id_list,
+            max_workers=max_workers,
+            desc="Downloading data files",
         )
 
     @staticmethod
