@@ -30,6 +30,7 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -45,6 +46,8 @@ from geepers.smooth import _UNITS_PER_MM, SmoothResult, _unique_steps, fit_smoot
 from geepers.trend import DAYS_PER_YEAR, estimate_trend
 
 __all__ = ["NeighborCheck", "check_neighbors"]
+
+logger = logging.getLogger("geepers")
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
@@ -279,7 +282,14 @@ def check_neighbors(
         common = grid[a].index.intersection(grid[b].index)
         if len(common) < min_epochs:
             return None
-        shape, evidence, amplitude = analyze(grid[a][common] - grid[b][common], [a, b])
+        try:
+            shape, evidence, amplitude = analyze(
+                grid[a][common] - grid[b][common], [a, b]
+            )
+        except np.linalg.LinAlgError as e:
+            # Identical records, as for co-located stations in one pixel
+            logger.warning("%s - %s: difference cannot be fitted (%s)", a, b, e)
+            return None
         return {
             "a": a,
             "b": b,
