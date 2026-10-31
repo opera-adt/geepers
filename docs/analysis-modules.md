@@ -190,17 +190,18 @@ only with evidence for one; otherwise the result is the
 from geepers.forecast import backtest
 from geepers.smooth import fit_smooth_trend, forecast_smooth
 
-fit = fit_smooth_trend(dates, up_mm, sampling_days=30, step_dates=known_steps)
+# units is required: "m" for geepers' GNSS series, or "mm"
+fit = fit_smooth_trend(dates, up, units="m", sampling_days=30, step_dates=known_steps)
 fit.shape                     # "linear" | "piecewise" | "smooth"
 fit.evidence                  # gain over the line (allowed a limited random
-                              # walk, `max_random_walk`); smooth from 6
+                              # walk, `max_random_walk_mm`); smooth from 6
 fit.rate, fit.rate_sigma      # present-day rate
 fit.rates, fit.rates_sigma    # rate at every epoch
 
-fc = forecast_smooth(dates, up_mm, 3, sampling_days=30, fit=fit)
+fc = forecast_smooth(dates, up, 3, sampling_days=30, fit=fit)
 fc.table[["mean", "lower", "upper"]]
 
-backtest(dates, up_mm, 3, forecaster=forecast_smooth, sampling_days=30)
+backtest(dates, up, 3, forecaster=forecast_smooth, sampling_days=30, units="m")
 ```
 
 A forecast continues the last rate with the periodic terms and the
@@ -220,8 +221,7 @@ Limits:
 
 - A single record cannot separate a smooth signal from a random walk, so
   the evidence is measured against a line allowed random-walk noise up to
-  `max_random_walk`. **The default of 3 assumes millimeters: pass 0.003
-  for meters**, or nearly every series stays non-smooth. On simulated
+  `max_random_walk_mm` (default 3). On simulated
   linear series the smooth trend is chosen on 1-2 % with a true random walk
   up to 3 mm/sqrt(yr) and on 14 % at 5, against 8-28 % and 43 % without the
   limit. Differences of station pairs within 25 km give a median of 2.7

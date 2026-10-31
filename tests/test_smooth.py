@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import zipfile
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -11,11 +12,14 @@ import pytest
 
 from geepers.changepoints import detect_changepoints
 from geepers.forecast import backtest
-from geepers.smooth import fit_smooth_trend, forecast_smooth
+from geepers.smooth import fit_smooth_trend as _fit_smooth_trend
+from geepers.smooth import forecast_smooth
 from geepers.synthetic import power_law_noise
 from geepers.trend import estimate_trend
 
 MONTH = 365.25 / 12
+# Every series here is in millimeters
+fit_smooth_trend = partial(_fit_smooth_trend, units="mm")
 
 
 def _series(signal=None, *, n: int = 144, flicker: float = 0.7, seed: int = 4):
@@ -111,7 +115,7 @@ class TestFitSmoothTrend:
                     rng.normal(0, 1.0, len(values))
                 )
                 fit = fit_smooth_trend(
-                    dates, values, sampling_days=MONTH, max_random_walk=limit
+                    dates, values, sampling_days=MONTH, max_random_walk_mm=limit
                 )
                 count += fit.shape == "smooth"
             return count
@@ -127,24 +131,29 @@ class TestFitSmoothTrend:
         sigmoid = fit_smooth_trend(dates, values, sampling_days=MONTH)
         assert sigmoid.shape == "smooth"
 
-    def test_the_limit_is_in_input_units(self):
+    def test_meters_and_millimeters_agree(self):
+        """Regression: a 3 m limit on a series in meters had no effect."""
         dates, values, _ = _series(_decay)
-        mm = fit_smooth_trend(dates, values, sampling_days=MONTH, detect_changes=False)
-        m = fit_smooth_trend(
-            dates,
-            values / 1000.0,
-            sampling_days=MONTH,
-            detect_changes=False,
-            max_random_walk=0.003,
-        )
+        mm = fit_smooth_trend(dates, values, sampling_days=MONTH)
+        m = _fit_smooth_trend(dates, values / 1000.0, units="m", sampling_days=MONTH)
         assert m.shape == mm.shape
         assert m.evidence == pytest.approx(mm.evidence, abs=0.5)
         assert 1000.0 * m.rate == pytest.approx(mm.rate, rel=1e-3)
 
+    def test_units_are_required(self):
+        dates, values, _ = _series()
+        with pytest.raises(TypeError, match="units"):
+            _fit_smooth_trend(dates, values, sampling_days=MONTH)
+
+    def test_unknown_units_raise(self):
+        dates, values, _ = _series()
+        with pytest.raises(ValueError, match="units must be 'm' or 'mm'"):
+            _fit_smooth_trend(dates, values, units="cm", sampling_days=MONTH)
+
     def test_the_limit_lowers_the_evidence(self):
         dates, values, _ = _series(_decay)
         free = fit_smooth_trend(
-            dates, values, sampling_days=MONTH, max_random_walk=None
+            dates, values, sampling_days=MONTH, max_random_walk_mm=None
         )
         limited = fit_smooth_trend(dates, values, sampling_days=MONTH)
         assert limited.evidence < free.evidence
@@ -319,6 +328,7 @@ class TestForecastSmooth:
             n_cutoffs=3,
             forecaster=forecast_smooth,
             sampling_days=MONTH,
+            units="mm",
         )
         assert result.predictions["cutoff"].nunique() == 3
         assert 0.7 <= result.coverage <= 1.0
