@@ -63,6 +63,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        env: [test, core-test]
         # One pixi environment per dependency tier (see pyproject
         # [tool.pixi.environments]): the full set, and the extras-free core
         # with its test subset. `core-only` above covers the pip route.
