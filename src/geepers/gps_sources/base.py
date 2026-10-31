@@ -296,6 +296,10 @@ class BaseGpsSource(ABC):
 
         Accepts tz-aware date strings (e.g. UTC ISO timestamps); the tz is
         dropped so the bound compares against the tz-naive ``date`` column.
+        The start bound is floored to its day: daily solutions are stamped at
+        midnight, so an acquisition time such as ``2016-09-27T00:26`` would
+        otherwise drop that day's solution and the first InSAR epoch would be
+        matched to the next day's.
         """
 
         def _naive(value: str) -> pd.Timestamp:
@@ -303,7 +307,7 @@ class BaseGpsSource(ABC):
             return ts.tz_localize(None) if ts.tzinfo is not None else ts
 
         if start_date:
-            df = df[df["date"] >= _naive(start_date)]
+            df = df[df["date"] >= _naive(start_date).normalize()]
         if end_date:
             df = df[df["date"] <= _naive(end_date)]
         return df
