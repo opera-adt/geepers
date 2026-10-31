@@ -47,6 +47,7 @@ def clean_step_dates(
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
     min_separation_days: float = 1.0,
+    epochs: ArrayLike | None = None,
 ) -> list[pd.Timestamp]:
     """Reduce step epochs to those a fit over one record can estimate.
 
@@ -68,6 +69,12 @@ def clean_step_dates(
         Steps closer together than this are merged, keeping the
         earliest. Use the sampling interval of the series being fitted
         (30 for 30-day means). Default 1.
+    epochs : array-like of datetime64, optional
+        Observation epochs of the series. Steps that start at the same
+        epoch are merged too, keeping the earliest: two steps inside one
+        data gap, however far apart, are the same column of the design
+        matrix. Steps with no epoch after them are dropped. Pass this
+        whenever the series has gaps.
 
     Returns
     -------
@@ -92,7 +99,17 @@ def clean_step_dates(
     for date in inside:
         if not kept or date - kept[-1] >= separation:
             kept.append(date)
-    return kept
+    if epochs is None:
+        return kept
+    observed = pd.DatetimeIndex(pd.to_datetime(np.asarray(epochs))).sort_values()
+    # At one resolution: searchsorted refuses values finer than the index
+    nanoseconds = observed.as_unit("ns").asi8
+    by_first_epoch: dict[int, pd.Timestamp] = {}
+    for date in kept:
+        i = int(np.searchsorted(nanoseconds, date.as_unit("ns").value))
+        if 0 < i < len(observed):
+            by_first_epoch.setdefault(i, date)
+    return list(by_first_epoch.values())
 
 
 def white_noise_sigma(values: np.ndarray) -> float:
