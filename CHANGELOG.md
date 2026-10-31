@@ -76,6 +76,8 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Fixed
 
+- `clean_step_dates(epochs=...)`: also merges steps that start at the same
+  epoch. Two steps inside one data gap made `estimate_trend` raise.
 - `estimate_trend` and `linearity_test` started a step dated on an
   observation one epoch late when rounding to the sampling grid moved that
   epoch earlier than its timestamp (e.g. monthly data). Steps now start at

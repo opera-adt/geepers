@@ -9,6 +9,7 @@ from geepers.steps import (
     white_noise_sigma,
 )
 from geepers.synthetic import SyntheticStep, power_law_noise, synthetic_timeseries
+from geepers.trend import estimate_trend
 
 
 @pytest.fixture
@@ -112,6 +113,55 @@ class TestMinimumStepSize:
 
 
 class TestCleanStepDates:
+    def test_steps_in_one_data_gap_are_merged(self):
+        # Regression: 200 days apart, but no epoch between them, so they are
+        # the same column of the design matrix and the fit raised
+        epochs = pd.date_range("2018-01-01", periods=400, freq="D")
+        epochs = epochs[(epochs < "2018-06-01") | (epochs > "2019-02-01")]
+        kept = clean_step_dates(
+            ["2018-06-15", "2019-01-01", "2019-06-01"],
+            epochs[0],
+            epochs[-1],
+            epochs=epochs,
+        )
+        assert kept == [pd.Timestamp("2018-06-15")]
+
+    def test_a_step_finer_than_the_epoch_resolution(self):
+        epochs = pd.date_range("2020-01-01", periods=10, freq="D").as_unit("us")
+        step = epochs[4] + pd.Timedelta(days=0.123456789123)
+        kept = clean_step_dates([step], epochs[0], epochs[-1], epochs=epochs)
+        assert kept == [step]
+
+    def test_merged_steps_can_be_fitted(self):
+        dates = pd.date_range("2016-01-01", periods=1000, freq="D")
+        keep = (dates < "2017-01-01") | (dates > "2017-09-01")
+        y = np.random.default_rng(0).normal(0, 1.0, 1000)
+        steps = ["2017-02-01", "2017-07-01"]
+        with pytest.raises(ValueError, match="rank deficient"):
+            estimate_trend(dates[keep], y[keep], noise_model="WN", step_dates=steps)
+        kept = clean_step_dates(
+            steps, dates[keep][0], dates[keep][-1], epochs=dates[keep]
+        )
+        res = estimate_trend(dates[keep], y[keep], noise_model="WN", step_dates=kept)
+        assert "step_0" in res.parameters
+        assert "step_1" not in res.parameters
+
+    def test_a_step_after_the_last_epoch_is_dropped(self):
+        epochs = pd.date_range("2020-01-01", periods=10, freq="D")
+        kept = clean_step_dates(
+            [pd.Timestamp("2020-01-05"), pd.Timestamp("2020-01-10 12:00")],
+            epochs[0],
+            "2021-01-01",
+            epochs=epochs,
+        )
+        assert kept == [pd.Timestamp("2020-01-05")]
+
+    def test_without_epochs_nothing_changes(self):
+        kept = clean_step_dates(
+            ["2018-06-15", "2019-01-01"], "2018-01-01", "2020-01-01"
+        )
+        assert len(kept) == 2
+
     def test_drops_steps_outside_the_record(self):
         kept = clean_step_dates(
             ["2010-05-01", "2014-01-01", "2016-03-01", "2024-01-01", "2030-01-01"],
