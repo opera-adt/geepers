@@ -228,6 +228,17 @@ class TestInputs:
         assert fit.step_dates[0] == when
         assert fit.parameters["step_0"][0] == pytest.approx(40.0, abs=1.5)
 
+    def test_a_pair_that_cannot_be_fitted_does_not_stop_the_others(self):
+        """Regression: co-located stations can have identical pixels, so the
+        difference is exactly zero and its noise cannot be estimated."""
+        series = {"A": _station(0), "B": _station(0), "C": _station(1)}
+        check = check_neighbors(series, _coords(list(series)), units="mm")
+        assert len(check.stations) == 3
+        assert {"A", "B"} not in [
+            set(p) for p in zip(check.pairs["a"], check.pairs["b"], strict=False)
+        ]
+        assert len(check.pairs) == 2
+
     def test_threads_give_the_same_answer(self):
         series = {f"S{k}": _station(k) for k in range(3)}
         coords = _coords(list(series))
