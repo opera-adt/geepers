@@ -33,7 +33,7 @@ from geepers.constants import SENTINEL_1_WAVELENGTH
 from geepers.gps_sources import SideshowSource, UnrSource
 from geepers.io import XarrayReader
 from geepers.processing import get_quality_reader, process_insar_data
-from geepers.quality import select_gps_reference
+from geepers.quality import drop_relocations, select_gps_reference
 from geepers.uncertainty import get_sigma_los_df
 
 logger = logging.getLogger("geepers")
@@ -106,6 +106,7 @@ def main(
     insar_buffer: int = 0,
     insar_buffer_meters: float | None = None,
     gps_time_window: int = 10,
+    max_gps_step_meters: float | None = 10.0,
     wavelength: float = SENTINEL_1_WAVELENGTH,
     structure_function: bool = True,
     requirement_mm: tuple[float, float] | None = None,
@@ -156,6 +157,11 @@ def main(
     gps_time_window
         Number of days for GPS rolling average window to reduce temporal noise.
         Default is 10 days. Set to 0 to disable smoothing.
+    max_gps_step_meters
+        A GPS position step above this between consecutive days is a
+        monument moved under the same station id, not ground motion: the
+        record is split there and only its longest segment is used
+        (`geepers.quality.drop_relocations`). Default 10 m; None disables it.
     wavelength
         Radar wavelength in meters, used to convert phase (radians) to meters
         when the InSAR stack units are not already meters.
@@ -252,14 +258,24 @@ def main(
     los_reader = XarrayReader.from_file(los_enu_file, units="unitless")
     station_to_los_gps: dict[str, pd.DataFrame] = {}
 
-    for station_row, df in tqdm(
+    for station_row, downloaded in tqdm(
         zip(df_gps_stations.itertuples(), df_gps_list, strict=True),
         total=len(df_gps_stations),
         desc="Projecting GPS -> LOS",
     ):
-        if df is None:
+        if downloaded is None:
             warnings.warn(f"Failed to download {station_row}; skipping.", stacklevel=2)
             continue
+        df = downloaded
+        if max_gps_step_meters is not None:
+            df, relocated = drop_relocations(df, max_gps_step_meters)
+            if relocated:
+                logger.warning(
+                    "%s: position step above %s m (monument moved); keeping"
+                    " its longest segment",
+                    station_row.Index,
+                    max_gps_step_meters,
+                )
 
         enu_vec = np.nan_to_num(
             los_reader.read_window(station_row.lon, station_row.lat, 0)

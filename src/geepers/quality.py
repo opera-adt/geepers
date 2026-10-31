@@ -84,6 +84,56 @@ class StationQuality:
     rms_misfit: float
 
 
+def drop_relocations(
+    df: pd.DataFrame,
+    max_step_meters: float = 10.0,
+    columns: tuple[str, str, str] = ("east", "north", "up"),
+) -> tuple[pd.DataFrame, bool]:
+    """Keep a station's longest record between non-physical position steps.
+
+    A 3-D position change above `max_step_meters` between consecutive
+    solutions is not ground motion (near-field coseismic steps reach about
+    5 m) but a monument moved under the same station id: UNR's GINN moves
+    about 1 km between 2019 and 2020. The series before and after it are
+    different points, so the record is split there and only the segment
+    with the most solutions is kept.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        One station's solutions in time order, with `columns` in meters.
+    max_step_meters : float
+        Largest step kept within one record.
+    columns : tuple of str
+        The east, north and up columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        The rows of the longest segment.
+    bool
+        True if a segment was dropped.
+
+    Examples
+    --------
+    >>> df = pd.DataFrame({"east": [0.0, 0.001, 349.0], "north": 0.0, "up": 0.0})
+    >>> kept, relocated = drop_relocations(df)
+    >>> len(kept), relocated
+    (2, True)
+
+    """
+    enu = df[list(columns)].to_numpy(dtype=float)
+    valid = np.flatnonzero(np.isfinite(enu).all(axis=1))
+    if valid.size < 2:
+        return df, False
+    step = np.linalg.norm(np.diff(enu[valid], axis=0), axis=1)
+    breaks = np.flatnonzero(step > max_step_meters) + 1
+    if not breaks.size:
+        return df, False
+    longest = max(np.split(valid, breaks), key=len)
+    return df.iloc[longest].copy(), True
+
+
 def compute_station_quality(df: pd.DataFrame) -> StationQuality:
     """Compute quality metrics for a single station's merged GPS/InSAR data.
 
