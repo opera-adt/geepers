@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import Literal
@@ -44,7 +45,7 @@ import pandas as pd
 from numpy.typing import ArrayLike
 from scipy import linalg, optimize
 
-__all__ = ["TrendResult", "estimate_trend", "estimate_trend_many"]
+__all__ = ["TrendResult", "estimate_trend", "estimate_trend_many", "lagged_regressor"]
 
 logger = logging.getLogger("geepers")
 
@@ -145,6 +146,33 @@ def _powerlaw_covariance(kappa: float, n: int) -> np.ndarray:
         C[idx + lag, idx] = diag
         C[idx, idx + lag] = diag
     return C
+
+
+def _step_years(
+    dates: pd.DatetimeIndex, t_years: np.ndarray, step_dates: ArrayLike | None
+) -> np.ndarray:
+    """Step times on the sampling-grid time axis `t_years` of `dates`.
+
+    A step inside the record starts at the first epoch on or after its
+    date. Converting the raw date instead misplaces it whenever rounding
+    to the sampling grid moves that epoch earlier than the date (a step
+    dated on a monthly epoch would start one epoch late). Steps at or
+    before the first epoch, or after the last, keep their raw time, so
+    the fit still reports them as outside the record.
+    """
+    steps = pd.DatetimeIndex(
+        pd.to_datetime(
+            np.atleast_1d(np.asarray([] if step_dates is None else step_dates))
+        )
+    )
+    years = np.asarray((steps - dates[0]).total_seconds()) / 86400.0 / DAYS_PER_YEAR
+    # At one resolution: searchsorted refuses values finer than the index
+    first = np.searchsorted(
+        dates.as_unit("ns").asi8, steps.as_unit("ns").asi8, side="left"
+    )
+    inside = (first > 0) & (first < len(dates))
+    years[inside] = t_years[first[inside]]
+    return years
 
 
 def _design_matrix(
@@ -438,6 +466,7 @@ def estimate_trend(
     use_rmle: bool = True,
     method: Literal["exact", "whittle"] = "exact",
     rate_change_dates: ArrayLike | None = None,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> TrendResult:
     """Estimate a trend and its realistic uncertainty from a time series.
 
@@ -500,6 +529,14 @@ def estimate_trend(
         ``rate_change_<i>``, input units per year; `velocity` stays the
         rate before the first change. See
         `geepers.changepoints.detect_changepoints` to find them.
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series (hydrological loading, well levels,
+        temperature) with one value per entry of `dates`, before NaNs
+        in `values` are dropped. Each is estimated as ``reg_<name>``, in
+        observation units per regressor unit, simultaneously with the
+        trend: a regressor that itself trends takes that part of the
+        rate. Epochs where a regressor is NaN are dropped. See
+        `lagged_regressor` for delayed responses.
 
     Returns
     -------
@@ -507,11 +544,26 @@ def estimate_trend(
         Estimated trend, uncertainties, noise parameters, and fit
         diagnostics. Velocity is per **year**.
 
+    Raises
+    ------
+    ValueError
+        If fewer than 10 usable epochs remain, two epochs round to the
+        same sampling interval, the model is rank deficient, or a
+        regressor does not have one value per epoch.
+
     """
     dates = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    good = np.isfinite(y_all)
-    dates, y = dates[good], y_all[good]
+    reg_names = [] if regressors is None else [str(k) for k in regressors]
+    reg_all = np.empty((len(y_all), 0))
+    if regressors is not None and reg_names:
+        columns = [np.asarray(regressors[name], dtype=float) for name in reg_names]
+        if any(c.shape != y_all.shape for c in columns):
+            msg = f"Every regressor needs one value per epoch ({len(y_all)})"
+            raise ValueError(msg)
+        reg_all = np.column_stack(columns)
+    good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
+    dates, y, reg = dates[good], y_all[good], reg_all[good]
     if len(y) < 10:
         msg = f"Need at least 10 finite observations, got {len(y)}"
         raise ValueError(msg)
@@ -528,9 +580,7 @@ def estimate_trend(
     def _to_years(d) -> float:
         return (pd.Timestamp(d) - dates[0]).total_seconds() / 86400.0 / DAYS_PER_YEAR
 
-    step_years = np.array(
-        [_to_years(d) for d in (step_dates if step_dates is not None else [])]
-    )
+    step_years = _step_years(dates, t_years, step_dates)
     log_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_log or [])]
     exp_terms = [(_to_years(d), float(tau)) for d, tau in (postseismic_exp or [])]
     rate_change_years = np.array(
@@ -549,6 +599,8 @@ def estimate_trend(
         exp_terms,
         rate_change_years,
     )
+    A = np.column_stack([A, reg])
+    names += [f"reg_{name}" for name in reg_names]
 
     if np.linalg.matrix_rank(A) < A.shape[1]:
         msg = (
@@ -753,6 +805,65 @@ def estimate_trend(
         model=A @ beta + y_mean,
         covariance=beta_cov,
     )
+
+
+def lagged_regressor(
+    dates: ArrayLike,
+    driver_dates: ArrayLike,
+    driver_values: ArrayLike,
+    lags_days: ArrayLike,
+    name: str = "driver",
+) -> pd.DataFrame:
+    """Sample a driver at fixed lags before each epoch, as regressors.
+
+    A response that follows its driver with a delay (an aquifer after
+    rainfall or river stage, a monument after temperature) is modeled as
+    a distributed lag: one regressor per lag, each the driver linearly
+    interpolated at ``date - lag``. Pass the result as `regressors` to
+    `estimate_trend`; the estimated coefficients are the response at
+    each lag.
+
+    Parameters
+    ----------
+    dates : array-like of datetime64
+        Epochs of the series to explain.
+    driver_dates, driver_values : array-like
+        The driver series. Need not share the epochs of `dates`.
+    lags_days : array-like of float
+        Lags in days (0 = same time).
+    name : str
+        Column prefix. Default "driver".
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed like `dates`, one column ``<name>_lag<lag>d`` per lag.
+        NaN where ``date - lag`` falls outside the driver's span, so
+        `estimate_trend` drops those epochs.
+
+    Examples
+    --------
+    >>> dates = pd.date_range("2020-01-01", periods=3, freq="D")
+    >>> lagged_regressor(dates, dates, [0.0, 1.0, 2.0], [0, 1])
+                driver_lag0d  driver_lag1d
+    2020-01-01           0.0           NaN
+    2020-01-02           1.0           0.0
+    2020-01-03           2.0           1.0
+
+    """
+    epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
+    drv_dates = pd.DatetimeIndex(pd.to_datetime(np.asarray(driver_dates)))
+    drv = np.asarray(driver_values, dtype=float)
+    keep = np.isfinite(drv)
+    origin = drv_dates[keep][0]
+    drv_days = np.asarray((drv_dates[keep] - origin).total_seconds()) / 86400.0
+    days = np.asarray((epochs - origin).total_seconds()) / 86400.0
+    columns = {}
+    for lag in np.atleast_1d(np.asarray(lags_days, dtype=float)):
+        columns[f"{name}_lag{lag:g}d"] = np.interp(
+            days - lag, drv_days, drv[keep], left=np.nan, right=np.nan
+        )
+    return pd.DataFrame(columns, index=epochs)
 
 
 def _fit_one(
