@@ -9,17 +9,19 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import cache
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 import requests
 
+from geepers._optional import to_point_frame, validate
 from geepers._types import PathOrStr
-from geepers.schemas import StationObservationSchema
 
 from .base import BaseGpsSource, validate_station_id
+
+if TYPE_CHECKING:
+    import geopandas as gpd
 
 __all__ = ["UnrSource"]
 
@@ -130,7 +132,7 @@ class UnrSource(BaseGpsSource):
             df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
 
         if frame == "ENU":
-            StationObservationSchema.validate(df, lazy=True)
+            validate(df, "StationObservationSchema", lazy=True)
 
         return df
 
@@ -158,9 +160,7 @@ class UnrSource(BaseGpsSource):
         df.columns = ["id", "lat", "lon", "alt"]
         df.loc[:, "lon"] = df.lon - (np.round(df.lon / 360) * 360)
 
-        return gpd.GeoDataFrame(
-            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326"
-        )
+        return to_point_frame(df)
 
     def download_station_data(
         self,

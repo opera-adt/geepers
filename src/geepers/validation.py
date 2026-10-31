@@ -78,8 +78,8 @@ def _fit_one(
     if method == "trend":
         from geepers.trend import estimate_trend
 
-        res = estimate_trend(dates[good], v, periods_years=(1.0, 0.5))
-        return res.velocity, res.velocity_uncertainty
+        trend_res = estimate_trend(dates[good], v, periods_years=(1.0, 0.5))
+        return trend_res.velocity, trend_res.velocity_uncertainty
     msg = f"Unknown method: {method}"
     raise ValueError(msg)
 

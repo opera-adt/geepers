@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "title": "ITRF2014-PMM rotation pole cartesian components",
+    "reference": "Altamimi et al 2017: https://doi.org/10.1093/gji/ggx136",
+    "units": {
+      "omega_x": "deg/Myr",
+      "omega_y": "deg/Myr",
+      "omega_z": "deg/Myr"
+    },
+    "coordinate_system": "cartesian",
+    "description": "Rotation pole components for major tectonic plates from ITRF2014 Plate Motion Model",
+    "source": "Ported from opera-adt/Venti src/venti/models/data (2026-10-06)"
+  },
+  "plates": {
+    "ANTA": {
+      "name": "Antarctic Plate",
+      "omega_x": -0.0688,
+      "omega_y": -0.09,
+      "omega_z": 0.1874
+    },
+    "ARAB": {
+      "name": "Arabian Plate",
+      "omega_x": 0.3205,
+      "omega_y": -0.0378,
+      "omega_z": 0.4011
+    },
+    "AUST": {
+      "name": "Australian Plate",
+      "omega_x": 0.4194,
+      "omega_y": 0.3284,
+      "omega_z": 0.3375
+    },
+    "EURA": {
+      "name": "Eurasian Plate",
+      "omega_x": -0.0235,
+      "omega_y": -0.1476,
+      "omega_z": 0.214
+    },
+    "INDI": {
+      "name": "Indian Plate",
+      "omega_x": 0.3205,
+      "omega_y": -0.0014,
+      "omega_z": 0.4038
+    },
+    "NAZC": {
+      "name": "Nazca Plate",
+      "omega_x": -0.0925,
+      "omega_y": -0.429,
+      "omega_z": 0.4508
+    },
+    "NOAM": {
+      "name": "North American Plate",
+      "omega_x": 0.0066,
+      "omega_y": -0.1928,
+      "omega_z": -0.0176
+    },
+    "NUBI": {
+      "name": "Nubian Plate",
+      "omega_x": 0.0274,
+      "omega_y": -0.1704,
+      "omega_z": 0.2037
+    },
+    "PCFC": {
+      "name": "Pacific Plate",
+      "omega_x": -0.1135,
+      "omega_y": 0.2907,
+      "omega_z": -0.6025
+    },
+    "SOAM": {
+      "name": "South American Plate",
+      "omega_x": -0.0751,
+      "omega_y": -0.0835,
+      "omega_z": -0.0389
+    },
+    "SOMA": {
+      "name": "Somalia Plate",
+      "omega_x": -0.0336,
+      "omega_y": -0.2206,
+      "omega_z": 0.2454
+    }
+  }
+}

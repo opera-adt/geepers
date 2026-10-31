@@ -10,17 +10,16 @@ import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING, Final, Literal
 
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from geepers.schemas import StationObservationSchema
+from geepers._optional import to_point_frame, validate
 from geepers.utils import decimal_years_to_datetimes, get_cache_dir
 
 from .base import BaseGpsSource
 
 if TYPE_CHECKING:
-    pass
+    import geopandas as gpd
 
 __all__ = ["SideshowSource"]
 
@@ -102,12 +101,12 @@ class SideshowSource(BaseGpsSource):
         df = df[["date", *df.columns[:-1].to_list()]]
         df = self._filter_by_date(df, start_date, end_date)
         df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
-        return StationObservationSchema.validate(df, lazy=True)
+        return validate(df, "StationObservationSchema", lazy=True)
 
     @staticmethod
     @lru_cache(maxsize=128)
     def _read_series(station_id: str) -> pd.DataFrame:
-        _raw_names = ["decimal_year"] + SideshowSource._names[1:]
+        _raw_names = ["decimal_year", *SideshowSource._names[1:]]
         # https://sideshow.jpl.nasa.gov/post/tables/GNSS_Time_Series.pdf
         # Time Series and Residual Format
         # Column 1: Decimal_YR
@@ -147,9 +146,7 @@ class SideshowSource(BaseGpsSource):
         df = pd.DataFrame(stations)
         df.loc[:, "lon"] = df.lon - (np.round(df.lon / 360) * 360)
 
-        return gpd.GeoDataFrame(
-            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326"
-        )
+        return to_point_frame(df)
 
 
 # Create instance for backward compatibility

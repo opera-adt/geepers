@@ -2,18 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # Part of geepers, https://github.com/opera-adt/geepers. If you copy or adapt
 # any of this code, keep this notice and cite the repository (see NOTICE).
+from __future__ import annotations
+
 import datetime
 import os
 import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 
 from ._types import DateOrDatetime
+
+if TYPE_CHECKING:
+    import geopandas as gpd
 
 DATE_FORMAT = "%Y%m%d"
 DATETIME_FORMAT = "%Y%m%dT%H%M%S"
@@ -92,7 +97,7 @@ def _get_path_from_gdal_str(name: Path | str) -> Path:
     s = str(name)
     if s.upper().startswith("DERIVED_SUBDATASET"):
         # like DERIVED_SUBDATASET:AMPLITUDE:slc_filepath.tif
-        p = s.split(":")[-1].strip('"').strip("'")
+        p = s.rsplit(":", maxsplit=1)[-1].strip('"').strip("'")
     elif ":" in s and (s.upper().startswith("NETCDF") or s.upper().startswith("HDF")):
         # like NETCDF:"slc_filepath.nc":subdataset
         p = s.split(":")[1].strip('"').strip("'")
@@ -178,7 +183,10 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
 
 
 def read_geo_csv(filename: Path | str) -> gpd.GeoDataFrame:
-    """Read a CSV file with a geometry column."""
+    """Read a CSV file with a geometry column (needs the ``analysis`` extra)."""
+    from ._optional import require
+
+    gpd = require("geopandas")
     df = gpd.read_file(filename)  # This just returns a pandas DataFrame
     return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkt(df.geometry))
 

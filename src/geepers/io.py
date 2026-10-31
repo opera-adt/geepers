@@ -395,6 +395,8 @@ class XarrayReader:
 
         windows: list[xr.DataArray] = []
         for xx, yy, lat_deg in zip(xa, ya, la, strict=True):
+            bx: float | None
+            by: float | None
             if buffer_meters is not None:
                 bx, by = self._buffer_meters_to_native(buffer_meters, lat_deg)
                 buf_px_x = int(np.ceil(bx / res_x))

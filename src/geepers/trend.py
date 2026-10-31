@@ -289,9 +289,13 @@ def _negative_log_likelihood_mixture(
 
 def _whittle_noise_estimate(
     resid_grid: np.ndarray,
-    noise_model: Literal["PLWN", "PL"],
+    noise_model: Literal["PLWN", "PL", "FNWN", "RWFNWN"],
 ) -> tuple[float, float]:
     """Estimate (kappa, phi) from the periodogram of gridded residuals.
+
+    Only ``"PL"`` changes the model (phi fixed at 0). The mixture models
+    ``"FNWN"`` and ``"RWFNWN"`` are fitted with the free-kappa PLWN spectrum
+    in this approximation (see ``test_trend.py::...fnwn_whittle``).
 
     Whittle's frequency-domain approximation to the Gaussian likelihood:
     each evaluation is O(n) on the FFT periodogram instead of an O(n^3)
@@ -347,6 +351,7 @@ def _whittle_noise_estimate(
             )
             if best is None or res.fun < best.fun:
                 best = res
+    assert best is not None  # at least one start point was evaluated
     kappa = float(np.clip(best.x[0], -3.0, 0.0))
     phi = 0.0 if noise_model == "PL" else float(1.0 / (1.0 + np.exp(-best.x[1])))
     return kappa, phi
@@ -405,6 +410,7 @@ def _whittle_mixture_estimate(
         )
         if best is None or res.fun < best.fun:
             best = res
+    assert best is not None  # at least one start point was evaluated
     return _softmax_weights(best.x)
 
 
@@ -574,6 +580,7 @@ def estimate_trend(
                 )
                 if best is None or res.fun < best.fun:
                     best = res
+            assert best is not None  # at least one start point was evaluated
             mixture_weights = _softmax_weights(best.x)
             nll = float(best.fun)
         kappa_hat = -1.0 if noise_model == "FNWN" else np.nan
@@ -620,6 +627,7 @@ def estimate_trend(
             )
             if best is None or res.fun < best.fun:
                 best = res
+        assert best is not None  # at least one start point was evaluated
         kappa_hat = float(best.x[0])
         phi_hat = 0.0
         nll = float(best.fun)
@@ -628,10 +636,10 @@ def estimate_trend(
         # The PLWN likelihood surface in (kappa, phi) is smooth; this is
         # much cheaper than multi-start Nelder-Mead.
         z0_grid = [-2.0, 0.0, 2.0]
-        args = (C_cache, obs_idx, n_epochs, A, y0, use_rmle)
-        starts = sorted(
+        args_plwn = (C_cache, obs_idx, n_epochs, A, y0, use_rmle)
+        starts_plwn = sorted(
             (
-                (_negative_log_likelihood(np.array([k0, z0]), *args), k0, z0)
+                (_negative_log_likelihood(np.array([k0, z0]), *args_plwn), k0, z0)
                 for k0 in (-0.4, -1.0, -1.6)
                 for z0 in z0_grid
             ),
@@ -640,16 +648,18 @@ def estimate_trend(
         # have a flat kappa/phi trade-off ridge, so a single Nelder-Mead run
         # occasionally converges to a secondary basin.
         best = None
-        for _, k0, z0 in starts[:2]:
+        # distinct names: `z0` above is bound to a tuple in the mixture branch
+        for _, k_start, z_start in starts_plwn[:2]:
             res = optimize.minimize(
                 _negative_log_likelihood,
-                x0=np.array([k0, z0]),
-                args=args,
+                x0=np.array([k_start, z_start]),
+                args=args_plwn,
                 method="Nelder-Mead",
                 options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 300},
             )
             if best is None or res.fun < best.fun:
                 best = res
+        assert best is not None  # at least one start point was evaluated
         kappa_hat = float(best.x[0])
         phi_hat = float(1.0 / (1.0 + np.exp(-best.x[1])))
         nll = float(best.fun)
@@ -717,7 +727,7 @@ def estimate_trend(
 
 def _fit_one(
     args: tuple[np.ndarray, np.ndarray, str, dict],
-) -> dict[str, float]:
+) -> dict[str, float | str]:
     """Fit a single series for `estimate_trend_many` (must be picklable)."""
     dates, values, name, kwargs = args
     nan_row = dict.fromkeys(

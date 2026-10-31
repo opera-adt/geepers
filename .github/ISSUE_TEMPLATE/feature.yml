@@ -1,0 +1,46 @@
+name: Feature
+description: New behaviour, tied to a requirement or plan task
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: plan-task
+    attributes:
+      label: Plan task / requirement
+      description: The `docs/plan.md` task (T##) or PRD requirement (R-*) this implements, if any.
+      placeholder: "T30 / R-S2"
+  - type: textarea
+    id: what
+    attributes:
+      label: What should change
+      description: Behaviour as the user of the library or CLI will see it.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves, with numbers where there are any (e.g. a trade-study result).
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Tests that will exist, and whether the golden or the e2e gate is affected.
+      value: |
+        - [ ] unit tests for the new behaviour
+        - [ ] golden unaffected / regenerated on purpose with changelog
+        - [ ] e2e gate run (value-changing only)
+    validations:
+      required: true
+  - type: dropdown
+    id: value-changing
+    attributes:
+      label: Changes product values?
+      options:
+        - "No"
+        - "Yes, behind a flag defaulting to current behaviour"
+        - "Yes, default behaviour changes (needs golden regeneration)"
+    validations:
+      required: true

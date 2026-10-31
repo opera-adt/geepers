@@ -89,7 +89,7 @@ def main(
     bbox: tuple[float, float, float, float],
     start_date: datetime.datetime = datetime.datetime(2016, 1, 1),
     output_dir=Path("geojson_sources"),
-    version: Literal["0.1", "0.2"] = "0.2",
+    version: Literal["0.1", "0.3"] = "0.3",
 ):
     """Export a GeoDataFrame to multiple GeoJSON files organized by date.
 
@@ -102,12 +102,12 @@ def main(
     start_date : datetime
         First date to download from UNR.
         Default is 2016-01-01
-    version : Literal["0.1", "0.2"]
-        UNR grid product version to download. Default "0.2".
+    version : Literal["0.1", "0.3"]
+        UNR grid product version to download. Default "0.3" (there is no 0.2).
 
     """
     unrg = UnrGridSource(version=version)
-    gdf = unrg.timeseries_many(bbox=bbox, start_date=start_date)
+    gdf = unrg.timeseries_many(bbox=bbox, start_date=start_date.strftime("%Y-%m-%d"))
     export_gdf_to_geojson_sources(gdf=gdf, output_dir=output_dir)
 
 

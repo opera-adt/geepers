@@ -14,17 +14,19 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import geopandas as gpd
 import pandas as pd
 import requests
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import thread_map
 
 from geepers import utils
+from geepers._optional import has_module, is_geo_frame, require, validate
 from geepers._types import PathOrStr
-from geepers.schemas import PointSchema
+
+if TYPE_CHECKING:
+    import geopandas as gpd
 
 __all__ = ["BaseGpsSource", "validate_station_id"]
 
@@ -108,8 +110,10 @@ class BaseGpsSource(ABC):
                 return None
             df.insert(0, "id", sid)  # keep id as a column for melt/pivot
             row = station_rows.loc[sid]
+            # "geometry" exists only when geopandas is installed
             for col in ("lon", "lat", "alt", "geometry"):
-                df[col] = row[col]
+                if col in row.index:
+                    df[col] = row[col]
             return df
 
         # (Optional) parallel map
@@ -129,7 +133,11 @@ class BaseGpsSource(ABC):
             raise ValueError(msg)
         big = pd.concat(dfs, ignore_index=True)
 
-        return gpd.GeoDataFrame(big, geometry="geometry", crs="EPSG:4326")
+        if "geometry" in big.columns and has_module("geopandas"):
+            import geopandas as gpd
+
+            return gpd.GeoDataFrame(big, geometry="geometry", crs="EPSG:4326")
+        return big
 
     def __init__(self, cache_dir: PathOrStr | None = None):
         """Initialize the GPS data source.
@@ -256,21 +264,27 @@ class BaseGpsSource(ABC):
             Filtered GeoDataFrame.
 
         """
-        # Apply bbox filter (coordinate slicing: much faster than a
-        # geometric clip for point layers)
+        # Apply bbox filter on the lon/lat columns: works for a plain
+        # DataFrame as well as a GeoDataFrame, and is faster than a geometric
+        # clip for point layers.
         if bbox is not None:
             west, south, east, north = bbox
-            gdf = gdf.cx[west:east, south:north]
+            inside = gdf["lon"].between(west, east) & gdf["lat"].between(south, north)
+            gdf = gdf[inside]
 
-        # Apply mask filter
+        # Apply mask filter (needs geometries, i.e. geopandas)
         if mask is not None:
+            if not is_geo_frame(gdf):
+                require("geopandas")  # raises with the install hint
+                msg = "mask filtering needs a GeoDataFrame of stations"
+                raise TypeError(msg)
             gdf = gdf[gdf.geometry.within(mask.union_all())]
 
         # Reset index for cleaner output
         gdf = gdf.reset_index(drop=True)
 
-        # Validate basic point schema
-        return PointSchema.validate(gdf, lazy=True)
+        # Validate basic point schema (no-op without pandera)
+        return validate(gdf, "PointSchema", lazy=True)
 
     def _filter_by_date(
         self,
@@ -359,7 +373,7 @@ class BaseGpsSource(ABC):
         result = self.stations()
         if not to_geodataframe:
             # Convert to regular DataFrame, drop geometry
-            return pd.DataFrame(result.drop(columns="geometry"))
+            return pd.DataFrame(result.drop(columns="geometry", errors="ignore"))
         return result
 
     def station_lonlat(self, station_id: str) -> tuple[float, float]:

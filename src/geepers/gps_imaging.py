@@ -27,12 +27,14 @@ doi:10.1029/2020GL087976.
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
 from scipy.spatial import Delaunay
+
+from geepers._optional import require
 
 __all__ = [
     "make_ssf",
@@ -421,3 +423,98 @@ def msf_interpolate(
         rows.append(row)
 
     return pd.DataFrame(rows)
+
+
+def reinterpolate_nodes(
+    nodes: pd.DataFrame,
+    exclude: Any,
+    columns: tuple[tuple[str, str], ...] = (
+        ("ve", "sigma_ve"),
+        ("vn", "sigma_vn"),
+        ("vu", "sigma_vu"),
+    ),
+    *,
+    lon: str = "lon",
+    lat: str = "lat",
+    ssf: np.ndarray | None = None,
+    method: Method = "weighted_median",
+    robust_network: bool = False,
+) -> pd.DataFrame:
+    """Replace grid-node values inside exclusion areas by MSF estimates from outside.
+
+    GNSS-side remove-restore for the calibration grid (Venti PRD R-G5): the
+    UNR grid is a 25 km median-filtered interpolation, so a fast-subsiding
+    basin or a coseismic area leaks into the surrounding nodes. Nodes inside
+    the curated defo/event polygons are dropped from the input and
+    re-estimated with the median spatial filter from the nodes outside, so the
+    calibration surface sees only the regional field there.
+
+    Parameters
+    ----------
+    nodes : pd.DataFrame
+        Grid nodes with `lon`, `lat` and the value/sigma columns.
+    exclude : shapely geometry, iterable of geometries, or GeoSeries/GeoDataFrame
+        Exclusion areas (any object with ``union_all()`` or ``.geometry``
+        works). Requires shapely (``geepers[grid]``).
+    columns : tuple of (value, sigma) column-name pairs
+        Pairs to re-estimate; pairs whose columns are absent are skipped.
+    lon, lat : str
+        Coordinate column names.
+    ssf, method, robust_network
+        Passed to `msf_interpolate`.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of `nodes` with the inside values replaced, their sigmas set to
+        the robust scatter of the contributing nodes (formal sigma where the
+        scatter is undefined), and a boolean ``reinterpolated`` column.
+
+    """
+    shapely = require("shapely")
+    if hasattr(exclude, "union_all"):
+        geom = exclude.union_all()
+    elif hasattr(exclude, "geometry"):
+        geom = exclude.geometry.union_all()
+    elif isinstance(exclude, shapely.Geometry):
+        geom = exclude
+    else:
+        geom = shapely.union_all(list(exclude))
+
+    x = nodes[lon].to_numpy(float)
+    y = nodes[lat].to_numpy(float)
+    inside = np.asarray(shapely.contains_xy(geom, x, y), dtype=bool)
+
+    out = nodes.copy()
+    out["reinterpolated"] = inside
+    if not inside.any():
+        return out
+    if inside.all():
+        msg = "every node lies inside the exclusion areas; nothing to interpolate from"
+        raise ValueError(msg)
+
+    for value_col, sigma_col in columns:
+        if value_col not in out.columns or sigma_col not in out.columns:
+            continue
+        est = msf_interpolate(
+            x[~inside],
+            y[~inside],
+            out.loc[~inside, value_col].to_numpy(float),
+            out.loc[~inside, sigma_col].to_numpy(float),
+            x[inside],
+            y[inside],
+            ssf,
+            method=method,
+            robust_network=robust_network,
+        )
+        sigma = est["sigma_robust"].to_numpy(float)
+        formal = est["sigma_formal"].to_numpy(float)
+        sigma = np.where(np.isfinite(sigma) & (sigma > 0), sigma, formal)
+        out.loc[inside, value_col] = est["value"].to_numpy(float)
+        out.loc[inside, sigma_col] = sigma
+    logger.info(
+        "Re-interpolated %d of %d grid nodes inside the exclusion areas",
+        int(inside.sum()),
+        inside.size,
+    )
+    return out

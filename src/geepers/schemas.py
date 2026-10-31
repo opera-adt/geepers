@@ -17,6 +17,8 @@ from pandera.pandas import DataFrameModel, Field
 from pandera.typing import DataFrame, Index, Series
 from pandera.typing.geopandas import GeoSeries as GeoSeriesType
 
+from .constants import EPS
+
 __all__ = [
     "GPSUncertaintySchema",
     "GridCellSchema",
@@ -24,9 +26,6 @@ __all__ = [
     "StationObservationSchema",
     "StationSchema",
 ]
-
-# Avoid zero standard deviations in uncertainty columns
-EPS = 1e-9
 
 
 class Plate(StrEnum):

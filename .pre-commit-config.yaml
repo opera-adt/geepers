@@ -10,6 +10,7 @@ repos:
       - id: check-case-conflict
       - id: check-docstring-first
       - id: check-merge-conflict
+      - id: check-toml
       - id: check-yaml
         args: [--allow-multiple-documents]
         # conda recipe uses Jinja2 templating, which is not valid YAML
@@ -33,9 +34,32 @@ repos:
         types_or: [python, jupyter]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.16.0"
+    rev: "v2.3.1"  # v1.16 cannot parse the `type` statements in current numpy stubs
     hooks:
       - id: mypy
+        # As in Venti: check our annotations, not third-party stubs. mypy 2.x
+        # with current pandas/numpy stubs reports ~40 pre-existing errors
+        # (Series vs DataFrame, numpy scalar types) that are upstream debt.
+        args: [--no-site-packages]
         additional_dependencies:
         - types-requests
         - pandera[pandas,mypy,geopandas]
+
+  # Shared kit hooks (00_tools/standards/pre-commit-config.yaml)
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout
+        # Notebook outputs are the rendered documentation (mkdocs-jupyter runs
+        # with execute: false), so keep them; strip only metadata and counts.
+        args: [--keep-output]
+
+  - repo: local
+    hooks:
+      - id: spdx-header
+        name: SPDX license header
+        entry: python scripts/spdx_check.py --license Apache-2.0
+        language: python
+        types: [python]
+        # geepers' convention (CLAUDE.md "Attribution") covers src/ and scripts/
+        exclude: '(^src/geepers/_version\.py$|^tests/|^docs/|^notebooks/)'

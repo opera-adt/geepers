@@ -4,5 +4,9 @@
 # any of this code, keep this notice and cite the repository (see NOTICE).
 SPEED_OF_LIGHT = 299_792_458  # meters / second
 
+# Smallest admissible standard deviation in uncertainty columns (avoids
+# division by zero in weights). Shared by the schemas and the GPS sources.
+EPS = 1e-9
+
 SENTINEL_1_FREQUENCY = 5.405e9  # Hz
 SENTINEL_1_WAVELENGTH = SPEED_OF_LIGHT / SENTINEL_1_FREQUENCY  # meters

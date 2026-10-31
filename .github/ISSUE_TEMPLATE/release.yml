@@ -1,0 +1,30 @@
+name: Release
+description: Checklist for tagging a release
+title: "Release vX.Y.Z"
+labels: ["release"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      value: |
+        - [ ] all tests pass in the `dev` env; pre-commit clean
+        - [ ] golden regenerated on purpose inside the Docker image (if values changed) and `validate` passes at tolerance
+        - [ ] e2e / VnV gate run on the benchmark frames; report linked below
+        - [ ] CHANGELOG entry explains every value difference vs the previous release
+        - [ ] dependency budget check passes for the `ops` env / image
+        - [ ] docs built with `--strict`; algorithm-parameter docs updated
+        - [ ] version tagged on the fork; upstream PR opened (milestone releases only)
+        - [ ] delivery package built and handed over (SAS releases)
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: VnV report, changelog PR, image digest, snapshot id.

@@ -1,0 +1,105 @@
+{
+  "metadata": {
+    "title": "ITRF2020-PMM rotation pole cartesian components",
+    "reference": "Altamimi et al 2023: https://doi.org/10.1029/2023GL106373",
+    "units": {
+      "omega_x": "deg/Myr",
+      "omega_y": "deg/Myr",
+      "omega_z": "deg/Myr"
+    },
+    "coordinate_system": "cartesian",
+    "description": "Rotation pole components for major tectonic plates from the ITRF2020 Plate Motion Model",
+    "source": "Ported from opera-adt/Venti src/venti/models/data (2026-10-06)"
+  },
+  "plates": {
+    "AMUR": {
+      "name": "Amurian Plate",
+      "omega_x": -0.0364,
+      "omega_y": -0.1532,
+      "omega_z": 0.2325
+    },
+    "ANTA": {
+      "name": "Antarctic Plate",
+      "omega_x": -0.0746,
+      "omega_y": -0.0866,
+      "omega_z": 0.1882
+    },
+    "ARAB": {
+      "name": "Arabian Plate",
+      "omega_x": 0.3135,
+      "omega_y": -0.0406,
+      "omega_z": 0.3994
+    },
+    "AUST": {
+      "name": "Australian Plate",
+      "omega_x": 0.4132,
+      "omega_y": 0.3265,
+      "omega_z": 0.3398
+    },
+    "CARB": {
+      "name": "Caribbean Plate",
+      "omega_x": 0.0576,
+      "omega_y": -0.3949,
+      "omega_z": 0.2017
+    },
+    "EURA": {
+      "name": "Eurasian Plate",
+      "omega_x": -0.0237,
+      "omega_y": -0.1442,
+      "omega_z": 0.2091
+    },
+    "INDI": {
+      "name": "Indian Plate",
+      "omega_x": 0.3159,
+      "omega_y": 0.0037,
+      "omega_z": 0.401
+    },
+    "NAZC": {
+      "name": "Nazca Plate",
+      "omega_x": -0.0907,
+      "omega_y": -0.4336,
+      "omega_z": 0.4459
+    },
+    "NOAM": {
+      "name": "North American Plate",
+      "omega_x": 0.0126,
+      "omega_y": -0.1849,
+      "omega_z": -0.0272
+    },
+    "NUBI": {
+      "name": "Nubian Plate",
+      "omega_x": 0.025,
+      "omega_y": -0.1625,
+      "omega_z": 0.1991
+    },
+    "PCFC": {
+      "name": "Pacific Plate",
+      "omega_x": -0.1122,
+      "omega_y": 0.2836,
+      "omega_z": -0.5984
+    },
+    "SOAM": {
+      "name": "South American Plate",
+      "omega_x": -0.0725,
+      "omega_y": -0.0784,
+      "omega_z": -0.0437
+    },
+    "SOMA": {
+      "name": "Somalia Plate",
+      "omega_x": -0.0225,
+      "omega_y": -0.1997,
+      "omega_z": 0.2401
+    }
+  },
+  "orb_components": {
+    "description": "Origin Rate and Bias components",
+    "units": {
+      "TX": "mm/yr",
+      "TY": "mm/yr",
+      "TZ": "mm/yr"
+    },
+    "TX": 0.37,
+    "TY": 0.35,
+    "TZ": 0.74
+  }
+}

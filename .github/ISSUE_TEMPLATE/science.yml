@@ -1,0 +1,39 @@
+name: Science / trade study
+description: A question about the algorithm that needs data to answer (TS-* in the PRD)
+title: "[TS]: "
+labels: ["science"]
+body:
+  - type: input
+    id: study-id
+    attributes:
+      label: Study ID
+      placeholder: "TS-G1"
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: One sentence. What decision depends on the answer?
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Method and truth
+      description: Data (frames, GNSS sources, period), what is compared against what, and what counts as truth.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit criterion
+      description: The number or outcome that closes the study, stated before the study starts.
+    validations:
+      required: true
+  - type: textarea
+    id: outputs
+    attributes:
+      label: Outputs
+      value: |
+        - [ ] `studies/<ID>/REPORT.md` with results and recommendation
+        - [ ] parameter / frame-table change proposed (or explicitly none)
+        - [ ] reusable code moved into the library with tests, or marked throwaway

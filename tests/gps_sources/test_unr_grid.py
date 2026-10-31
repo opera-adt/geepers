@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from geepers.constants import EPS
 from geepers.gps_sources.unr_grid import UnrGridSource
-from geepers.schemas import EPS
 
 
 class TestUnrGridSource:

@@ -1,0 +1,46 @@
+name: Bug
+description: Something produces a wrong result, crashes, or disagrees with its documentation
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened
+      description: Command or call, and the output (plain text preferred).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Smallest input that shows it. Name the frame/pair and the config if it needs real data.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "cal-disp 0.5.0 / venti 2a7e61f / pixi env dev"
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Does it change product values?
+      options:
+        - "No (tooling, docs, logging)"
+        - "Yes, for some inputs"
+        - "Yes, for every product"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Suspected cause, related issues, workaround.

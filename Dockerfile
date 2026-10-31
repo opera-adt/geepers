@@ -22,7 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-cache-dir /wheels/*.whl matplotlib \
+# The `geepers` command needs the [analysis] extra; a bare wheel is the core only
+RUN wheel="$(ls /wheels/*.whl)" \
+    && python -m pip install --no-cache-dir "${wheel}[grid,analysis]" matplotlib \
     && rm -rf /wheels
 
 # Run as an unprivileged user; HOME must be writable for the GPS cache dir

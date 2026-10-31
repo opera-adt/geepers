@@ -10,20 +10,20 @@ from functools import cache, lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-import geopandas as gpd
 import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter, Retry
 from tqdm.contrib.concurrent import thread_map
 
-from geepers.schemas import EPS, GridCellSchema, StationObservationSchema
+from geepers._optional import to_point_frame, validate
+from geepers.constants import EPS
 from geepers.utils import decimal_years_to_datetimes
 
 from .base import BaseGpsSource
 from .unr import REQUEST_TIMEOUT
 
 if TYPE_CHECKING:
-    pass
+    import geopandas as gpd
 
 __all__ = ["UnrGridSource"]
 
@@ -144,7 +144,7 @@ class UnrGridSource(BaseGpsSource):
 
         df = self._filter_by_date(df, start_date, end_date)
         df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
-        return StationObservationSchema.validate(df, lazy=True)
+        return validate(df, "StationObservationSchema", lazy=True)
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         """Read raw grid point data from the source.
@@ -164,14 +164,8 @@ class UnrGridSource(BaseGpsSource):
         )
         df_out["alt"] = 0.0  # Grid points don't have altitude info
 
-        # Convert to GeoDataFrame
-        gdf = gpd.GeoDataFrame(
-            df_out,
-            geometry=gpd.points_from_xy(df_out.lon, df_out.lat),
-            crs="EPSG:4326",
-        )
-
-        return gdf
+        # GeoDataFrame when geopandas is installed, plain DataFrame otherwise
+        return to_point_frame(df_out)
 
     def stations(
         self,
@@ -196,8 +190,8 @@ class UnrGridSource(BaseGpsSource):
         # Get data using base class method
         gdf = super().stations(bbox, mask)
 
-        # Apply grid-specific schema validation
-        GridCellSchema.validate(gdf, lazy=True)
+        # Apply grid-specific schema validation (no-op without pandera)
+        validate(gdf, "GridCellSchema", lazy=True)
 
         return gdf
 
@@ -391,7 +385,7 @@ class UnrGridSource(BaseGpsSource):
         # which the schema rejects; clamp to its minimum
         df_out.loc[:, sigma_cols] = df_out[sigma_cols].clip(lower=EPS)
 
-        return StationObservationSchema.validate(df_out, lazy=True)
+        return validate(df_out, "StationObservationSchema", lazy=True)
 
     @staticmethod
     @cache

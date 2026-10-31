@@ -35,6 +35,31 @@ The current available GPS data sources are:
 
 All sources implement a common interface through the `BaseGpsSource` class, making it easy to switch between data providers or combine data from multiple sources.
 
+## Installation
+
+geepers has a lean core and optional extras, so the operational DISP-CAL image
+can install only GNSS retrieval:
+
+| Install | What you get | Dependencies added |
+|---|---|---|
+| `pip install geepers` | GNSS retrieval: `UnrSource`, `UnrGridSource`, `SideshowSource` (plain DataFrames) | numpy, pandas, scipy, pyproj, requests, tqdm, tyro |
+| `pip install "geepers[grid]"` | + GPS Imaging re-interpolation with exclusion areas, Euler poles and plate-motion tables | shapely |
+| `pip install "geepers[analysis]"` | + InSAR comparison, MIDAS, strain, validation, schemas; sources return GeoDataFrames | geopandas, pyogrio, xarray, dask, rasterio, rioxarray, zarr, pandera, lxml |
+| `pip install "geepers[plot]"` | + plotting | matplotlib, contextily |
+| `pip install "geepers[all]"` | everything above | |
+
+Without `[analysis]`, `stations()` and `timeseries_many()` return plain
+`pandas.DataFrame`s with `lon`/`lat` columns and pandera validation is
+skipped; with it installed the behaviour is the one shown below.
+
+With [pixi](https://pixi.sh) (lock file committed):
+
+```bash
+pixi install -e dev                     # grid + analysis + test/docs tooling
+pixi run -e dev pytest --record-mode none
+pixi install -e ops                     # the core only, as in the operational image
+```
+
 ## Quick Start
 
 ### Basic Usage
