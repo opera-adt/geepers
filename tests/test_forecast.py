@@ -271,3 +271,110 @@ class TestForecastRegression:
                 "coverage": result.coverage,
             },
         )
+
+
+def _driven(seed: int = 4, n: int = 168):
+    """Fourteen years of monthly data with a multi-year driver (a well level)."""
+    t = np.arange(n) / 12
+    driver = 3.0 * np.sin(2 * np.pi * t / 7.0) + 2.0 * np.sin(2 * np.pi * t / 2.7)
+    dates, values = _monthly(flicker=0.3, seed=seed, n=n)
+    return dates, values + 8.0 * driver, driver
+
+
+class TestForecastRegressors:
+    def test_a_known_driver_lowers_the_error(self):
+        dates, values, driver = _driven()
+        past = np.arange(len(values)) < 132
+        kwargs = {"future_dates": dates[~past], "sampling_days": MONTH}
+        plain = forecast_trend(dates[past], values[past], **kwargs)
+        driven = forecast_trend(
+            dates[past],
+            values[past],
+            regressors={"well": driver[past]},
+            future_regressors={"well": driver[~past]},
+            **kwargs,
+        )
+
+        def rms(fc):
+            return np.sqrt(np.mean((fc.table["mean"] - values[~past]) ** 2))
+
+        assert rms(driven) < rms(plain) / 3
+        amplitude, sigma = driven.changepoints.trend.parameters["reg_well"]
+        assert abs(amplitude - 8.0) < max(3 * sigma, 0.5)
+
+    def test_regressors_may_come_in_any_order(self):
+        dates, values, driver = _driven()
+        other = np.cos(np.arange(len(values)) / 9.0)
+        past = np.arange(len(values)) < 132
+        kwargs = {
+            "future_dates": dates[~past],
+            "sampling_days": MONTH,
+            "regressors": {"a": driver[past], "b": other[past]},
+            "simulate_changes": (),
+        }
+        ordered = forecast_trend(
+            dates[past],
+            values[past],
+            future_regressors={"a": driver[~past], "b": other[~past]},
+            **kwargs,
+        )
+        swapped = forecast_trend(
+            dates[past],
+            values[past],
+            future_regressors={"b": other[~past], "a": driver[~past]},
+            **kwargs,
+        )
+        np.testing.assert_allclose(ordered.table["mean"], swapped.table["mean"])
+
+    def test_nan_in_a_regressor_drops_the_epoch(self):
+        dates, values, driver = _driven()
+        driver = driver.copy()
+        driver[20] = np.nan
+        fc = forecast_trend(
+            dates,
+            values,
+            future_dates=dates[-1:] + pd.Timedelta(days=30),
+            sampling_days=MONTH,
+            regressors={"well": driver},
+            future_regressors={"well": [0.0]},
+        )
+        assert len(fc.changepoints.model) == len(values) - 1
+
+    @pytest.mark.parametrize(
+        ("future", "match"),
+        [
+            (None, "must match the regressors"),
+            ({"rain": [0.0, 0.0, 0.0]}, "must match the regressors"),
+            ({"well": [0.0]}, "one value per epoch"),
+            ({"well": [0.0, np.nan, 0.0]}, "must be finite"),
+        ],
+    )
+    def test_bad_future_regressors_raise(self, future, match):
+        dates, values, driver = _driven(n=72)
+        with pytest.raises(ValueError, match=match):
+            forecast_trend(
+                dates,
+                values,
+                future_dates=dates[-1] + pd.to_timedelta([30, 60, 90], unit="D"),
+                sampling_days=MONTH,
+                regressors={"well": driver},
+                future_regressors=future,
+            )
+
+    def test_future_regressors_without_a_past_raise(self):
+        dates, values, _ = _driven(n=72)
+        with pytest.raises(ValueError, match="must match the regressors"):
+            forecast_trend(
+                dates,
+                values,
+                future_dates=dates[-1:] + pd.Timedelta(days=30),
+                sampling_days=MONTH,
+                future_regressors={"well": [0.0]},
+            )
+
+    def test_backtest_gives_the_forecaster_the_driver_after_each_cutoff(self):
+        dates, values, driver = _driven()
+        kwargs = {"n_cutoffs": 2, "sampling_days": MONTH}
+        plain = backtest(dates, values, 2, **kwargs)
+        driven = backtest(dates, values, 2, regressors={"well": driver}, **kwargs)
+        assert driven.metrics["rmse"].mean() < plain.metrics["rmse"].mean()

@@ -87,6 +87,23 @@ lags = lagged_regressor(dates, rain_dates, rain_mm, [0, 30, 60, 90], name="rain"
 res = estimate_trend(dates, up_mm, regressors=lags)
 ```
 
+`detect_changepoints`, `fit_sparse_changepoints`, `sample_changepoints` and
+`fit_smooth_trend` take the same argument, so a change the driver explains
+is not reported as a change point or a smooth signal. The forecasts also need
+the driver's future values:
+
+```python
+fc = forecast_trend(
+    dates, up_mm, future_dates=future,
+    regressors={"well": level}, future_regressors={"well": level_future},
+)
+backtest(dates, up_mm, 3, regressors={"well": level})
+```
+
+Future values are taken as exact, so the interval leaves out their
+uncertainty. `backtest` uses the observed values, which scores a perfect
+forecast of the driver: an upper limit on what it can add.
+
 ## Is a single rate enough? (`geepers.linearity`)
 
 A velocity is only worth extrapolating if the series is linear.
