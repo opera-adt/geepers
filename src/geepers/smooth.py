@@ -34,7 +34,7 @@ model of `geepers.changepoints.detect_changepoints`, a straight line where
 that finds nothing.
 
 The gain is measured against a line whose noise may also hold a random
-walk, up to `max_random_walk`: a free random walk can explain any single
+walk, up to `max_random_walk_mm`: a free random walk can explain any single
 record, so its amplitude has to be limited by what monuments can do. A
 signal needing more than that is taken as deformation. Noise beyond the
 limit, and deformation below it, are still mistaken for each other; only
@@ -48,9 +48,9 @@ shown.
 
 Example:
 -------
->>> fit = fit_smooth_trend(dates, up_mm, sampling_days=30)     # doctest: +SKIP
->>> fit.rate, fit.rate_sigma, fit.shape                        # doctest: +SKIP
->>> fc = forecast_smooth(dates, up_mm, 3, sampling_days=30)    # doctest: +SKIP
+>>> fit = fit_smooth_trend(dates, up, units="m", sampling_days=30)   # doctest: +SKIP
+>>> fit.rate, fit.rate_sigma, fit.shape                             # doctest: +SKIP
+>>> fc = forecast_smooth(dates, up, 3, sampling_days=30, fit=fit)   # doctest: +SKIP
 >>> fc.table[["mean", "lower", "upper"]]                       # doctest: +SKIP
 
 """
@@ -82,6 +82,7 @@ _PHIS = (0.001, 0.01, 0.05, 0.2, 0.5, 0.8, 0.95, 0.999)
 _LOG_LAMBDAS = np.linspace(np.log(1e-5), np.log(1e5), 16)
 # Share of the correlated noise that is random walk, for the line's noise
 _RANDOM_WALK_SHARES = (0.003, 0.01, 0.03, 0.1, 0.2, 0.4, 0.7, 0.95)
+_UNITS_PER_MM = {"mm": 1.0, "m": 1e-3}
 
 
 @dataclass
@@ -124,7 +125,7 @@ class SmoothResult:
     evidence : float
         Twice the restricted log-likelihood gain of the smooth trend over
         a straight line (with the steps), each with its own noise estimate;
-        the line's may hold a random walk up to `max_random_walk`.
+        the line's may hold a random walk up to `max_random_walk_mm`.
     sigma_slope_change : float
         Standard deviation of the rate change between knots, input units
         per year (0 unless `shape` is "smooth").
@@ -284,13 +285,14 @@ def fit_smooth_trend(
     dates: ArrayLike,
     values: ArrayLike,
     *,
+    units: Literal["m", "mm"],
     sampling_days: float = 1.0,
     periods_years: tuple[float, ...] = (1.0, 0.5),
     step_dates: ArrayLike | None = None,
     detect_changes: bool = True,
     knots_per_year: float = 1.0,
     min_evidence: float = 6.0,
-    max_random_walk: float | None = 3.0,
+    max_random_walk_mm: float | None = 3.0,
 ) -> SmoothResult:
     """Fit a smooth trend, its smoothness estimated from the data.
 
@@ -299,7 +301,12 @@ def fit_smooth_trend(
     dates : array-like of datetime64
         Observation epochs; gaps are allowed.
     values : array-like of float
-        Observations (any unit); NaNs are dropped.
+        Observations in `units`; NaNs are dropped.
+    units : {"m", "mm"}
+        Unit of `values`. Required, because `max_random_walk_mm` is a
+        physical limit and no default would suit both: geepers' GNSS series
+        are in meters, and a limit taken 1000 times too large or too small
+        changes the results without any error.
     sampling_days : float
         Nominal sampling interval in days. Each likelihood evaluation
         factorizes an n x n matrix about 150 times per fit, so average
@@ -328,12 +335,10 @@ def fit_smooth_trend(
         + white noise reach it, and at most 3 % for any record length from
         5 to 20 years and any flicker amplitude tried.
 
-    max_random_walk : float or None
-        Largest random-walk noise the straight line may be given, in input
-        units per square root of a year. **The default of 3 assumes
-        millimeters: pass 0.003 for meters**, or the smooth trend is
-        rejected on nearly every series. None compares against flicker +
-        white noise only.
+    max_random_walk_mm : float or None
+        Largest random-walk noise the straight line may be given, in
+        mm/sqrt(yr) whatever the `units`. Default 3. None compares against
+        flicker + white noise only.
 
         Differences of station pairs within 25 km give a median of 2.7
         mm/sqrt(yr), which still includes local signals, so 3 is a generous
@@ -350,9 +355,12 @@ def fit_smooth_trend(
     Raises
     ------
     ValueError
-        If there are fewer than 10 finite values.
+        If there are fewer than 10 finite values, or `units` is unknown.
 
     """
+    if units not in _UNITS_PER_MM:
+        msg = f"units must be 'm' or 'mm', got {units!r}"
+        raise ValueError(msg)
     epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
     good = np.isfinite(y_all)
@@ -394,7 +402,7 @@ def fit_smooth_trend(
     nll_smooth, phi, lam = _search_smooth(flicker, z @ z.T, x, y0)
     evidence = max(0.0, 2.0 * (nll_line - nll_smooth))
     # Only a series that would go smooth needs the slower comparison
-    if max_random_walk is not None and evidence >= min_evidence:
+    if max_random_walk_mm is not None and evidence >= min_evidence:
         random_walk = _powerlaw_covariance(-2.0, int(obs_idx[-1]) + 1)[
             np.ix_(obs_idx, obs_idx)
         ]
@@ -404,7 +412,7 @@ def fit_smooth_trend(
             x,
             y0,
             sampling_days / DAYS_PER_YEAR,
-            max_random_walk,
+            max_random_walk_mm * _UNITS_PER_MM[units],
         )
         evidence = max(0.0, 2.0 * (min(nll_line, nll_limited) - nll_smooth))
     rate_dates: list[pd.Timestamp] = []
@@ -535,7 +543,8 @@ def forecast_smooth(
     sampling_days : float
         Nominal sampling interval in days. Default 1.
     **fit_kwargs
-        Passed to `fit_smooth_trend`.
+        Passed to `fit_smooth_trend`, which needs `units` unless `fit` is
+        given.
 
     Returns
     -------
