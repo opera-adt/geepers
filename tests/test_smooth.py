@@ -37,7 +37,7 @@ def _series(signal=None, *, n: int = 144, flicker: float = 0.7, seed: int = 4):
 
 
 def _decay(t):
-    return -30.0 * (1.0 - np.exp(-np.maximum(0.0, t - 4.0) / 1.5))
+    return -60.0 * (1.0 - np.exp(-np.maximum(0.0, t - 4.0) / 1.5))
 
 
 def _cycle(t):
@@ -80,7 +80,7 @@ class TestFitSmoothTrend:
         dates, _, _, fit = decay
         assert fit.rates.index.equals(dates)
         t = np.arange(len(dates)) / 12
-        true_rate = -3.0 - 20.0 * np.exp(-np.maximum(0.0, t - 4.0) / 1.5) * (t > 4.0)
+        true_rate = -3.0 - 40.0 * np.exp(-np.maximum(0.0, t - 4.0) / 1.5) * (t > 4.0)
         # Rates are noisy but must find the fast phase and the return to -3
         assert fit.rates.iloc[56] < -8.0
         assert abs(fit.rates.iloc[-1] - true_rate[-1]) < 3 * fit.rates_sigma.iloc[-1]
@@ -95,6 +95,59 @@ class TestFitSmoothTrend:
         )
         assert kept.shape != "smooth"
         assert kept.sigma_slope_change == 0.0
+
+    def test_random_walk_noise_is_not_taken_for_a_signal(self):
+        # A straight line with a 5 mm/sqrt(yr) random walk: the flicker-only
+        # comparison often reads it as a smooth signal, the limited one rarely
+        month_years = MONTH / 365.25
+
+        def shapes(limit):
+            count = 0
+            for seed in range(12):
+                # Its own stream: the series' white noise uses `seed`
+                rng = np.random.default_rng(seed + 1000)
+                dates, values, _ = _series(seed=seed)
+                values = values + 5.0 * np.sqrt(month_years) * np.cumsum(
+                    rng.normal(0, 1.0, len(values))
+                )
+                fit = fit_smooth_trend(
+                    dates, values, sampling_days=MONTH, max_random_walk=limit
+                )
+                count += fit.shape == "smooth"
+            return count
+
+        free, limited = shapes(None), shapes(3.0)
+        assert free >= 3
+        assert limited < free
+
+    def test_large_signals_pass_the_random_walk_limit(self, decay):
+        *_, fit = decay
+        assert fit.shape == "smooth"
+        dates, values, _ = _series(lambda t: -80.0 / (1 + np.exp(-(t - 6.0) / 0.7)))
+        sigmoid = fit_smooth_trend(dates, values, sampling_days=MONTH)
+        assert sigmoid.shape == "smooth"
+
+    def test_the_limit_is_in_input_units(self):
+        dates, values, _ = _series(_decay)
+        mm = fit_smooth_trend(dates, values, sampling_days=MONTH, detect_changes=False)
+        m = fit_smooth_trend(
+            dates,
+            values / 1000.0,
+            sampling_days=MONTH,
+            detect_changes=False,
+            max_random_walk=0.003,
+        )
+        assert m.shape == mm.shape
+        assert m.evidence == pytest.approx(mm.evidence, abs=0.5)
+        assert 1000.0 * m.rate == pytest.approx(mm.rate, rel=1e-3)
+
+    def test_the_limit_lowers_the_evidence(self):
+        dates, values, _ = _series(_decay)
+        free = fit_smooth_trend(
+            dates, values, sampling_days=MONTH, max_random_walk=None
+        )
+        limited = fit_smooth_trend(dates, values, sampling_days=MONTH)
+        assert limited.evidence < free.evidence
 
     def test_rejected_smoothness_keeps_detected_rate_changes(self):
         # Regression: falling back to a plain line dropped a detected rate

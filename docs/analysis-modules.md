@@ -192,7 +192,8 @@ from geepers.smooth import fit_smooth_trend, forecast_smooth
 
 fit = fit_smooth_trend(dates, up_mm, sampling_days=30, step_dates=known_steps)
 fit.shape                     # "linear" | "piecewise" | "smooth"
-fit.evidence                  # likelihood gain over the line; smooth from 6
+fit.evidence                  # gain over the line (allowed a limited random
+                              # walk, `max_random_walk`); smooth from 6
 fit.rate, fit.rate_sigma      # present-day rate
 fit.rates, fit.rates_sigma    # rate at every epoch
 
@@ -207,21 +208,26 @@ persisting noise. It never predicts a turning point: future slope changes
 only widen the interval, which grows faster than linearly with lead time.
 
 Relative to `detect_changepoints`, on 30 synthetic series per shape, the
-3-year forecast error is 0.48-0.77 on sigmoids, decays, acceleration and
-multi-year cycles, and 1.00-1.03 on lines and hinges, with coverage of
-the 95 % interval rising from 0.60-0.75 to 0.94 where a signal keeps
+3-year forecast error is 0.48-0.79 on sigmoids, decays, acceleration and
+multi-year cycles, and 1.00-1.09 on lines and hinges, with coverage of
+the 95 % interval rising from 0.60-0.75 to 0.87 where a signal keeps
 changing. On 13 real stations it is better by over 10 % on 11 % of 55
-cutoffs and worse on another 11 %: identical on most stable, glacial
-rebound and tectonic records, mostly better on subsidence and volcanoes
-(0.55-1.00), worst at COSO (1.33).
+cutoffs and worse on 9 %: identical on most stable, glacial rebound and
+tectonic records, mostly better on subsidence and volcanoes (0.55-1.00),
+worst at COSO (1.33).
 
 Limits:
 
-- The evidence threshold assumes flicker + white noise, where about 1 %
-  of linear series pass it. On a linear series whose noise is redder and
-  not small, the smooth trend is chosen far too often and follows the
-  noise: 27-85 % of series at spectral index -1.5, 65-100 % for a random
-  walk.
+- A single record cannot separate a smooth signal from a random walk, so
+  the evidence is measured against a line allowed random-walk noise up to
+  `max_random_walk`. **The default of 3 assumes millimeters: pass 0.003
+  for meters**, or nearly every series stays non-smooth. On simulated
+  linear series the smooth trend is chosen on 1-2 % with a true random walk
+  up to 3 mm/sqrt(yr) and on 14 % at 5, against 8-28 % and 43 % without the
+  limit. Differences of station pairs within 25 km give a median of 2.7
+  mm/sqrt(yr), including local signals, so 3 is a generous limit on
+  monument noise, but not a measurement of it. About 1 in 5 moderate signals
+  (a 30 mm decay over 12 years) is missed and gets the piecewise model.
 - Knots default to one per year, so the rate is a yearly staircase and
   cannot follow an annual cycle of varying amplitude; denser knots let the
   present-day rate depend on the month the record ends.

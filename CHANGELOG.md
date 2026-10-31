@@ -34,6 +34,10 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.smooth.fit_smooth_trend(max_random_walk=3.0)`: the evidence is
+  measured against a line allowed random-walk noise up to this amplitude
+  (input units per root year; assumes mm), so redder noise is rarely taken
+  for a signal. Changes which series go smooth.
 - `geepers.smooth`: `fit_smooth_trend` estimates a time-varying rate
   without assuming its shape (penalized linear spline, smoothness and noise
   by REML), used only with evidence over the piecewise-linear model;
