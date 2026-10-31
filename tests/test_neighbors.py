@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from geepers.neighbors import _on_grid, check_neighbors
+from geepers.neighbors import _on_grid, _station_shares, check_neighbors
 from geepers.smooth import fit_smooth_trend
 from geepers.synthetic import power_law_noise
 
@@ -124,6 +124,38 @@ class TestRandomWalk:
         check = check_neighbors(series, coords, units="mm", max_distance_km=20.0)
         assert len(check.pairs) == 2
         assert check.stations["local_random_walk_mm"].isna().all()
+
+
+class TestShares:
+    @staticmethod
+    def _pairs(rows):
+        return pd.DataFrame(rows, columns=["a", "b", "random_walk_mm"])
+
+    def test_a_consistent_triangle_is_solved_exactly(self):
+        pairs = self._pairs(
+            [
+                ("A", "B", np.sqrt(5.0)),
+                ("A", "C", np.sqrt(10.0)),
+                ("B", "C", np.sqrt(13.0)),
+            ]
+        )
+        shares = _station_shares(list("ABC"), pairs, dict.fromkeys("ABC", 100.0))
+        assert shares["A"] == pytest.approx(1.0, abs=1e-3)
+        assert shares["B"] == pytest.approx(2.0, abs=1e-3)
+        assert shares["C"] == pytest.approx(3.0, abs=1e-3)
+
+    def test_a_station_holds_no_more_than_its_own_record(self):
+        """Regression: pairs not adding up put 165 on a station with 6 of its own."""
+        pairs = self._pairs([("A", "B", 200.0), ("A", "C", 3.0), ("B", "C", 190.0)])
+        shares = _station_shares(list("ABC"), pairs, {"A": 3.0, "B": 195.0, "C": 2.0})
+        assert shares["A"] <= 3.0 + 1e-6
+        assert shares["C"] <= 2.0 + 1e-6
+        assert shares["B"] > 100.0
+
+    def test_a_record_without_random_walk_holds_none(self):
+        pairs = self._pairs([("A", "B", 5.0), ("A", "C", 5.0), ("B", "C", 7.0)])
+        shares = _station_shares(list("ABC"), pairs, {"A": 0.0, "B": 7.0, "C": 7.0})
+        assert shares["A"] == pytest.approx(0.0, abs=1e-3)
 
 
 class TestInputs:
