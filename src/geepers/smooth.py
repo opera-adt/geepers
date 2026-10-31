@@ -31,9 +31,14 @@ alike, so a flexible fit can report noise as signal. The fit therefore
 uses the smooth trend only if its likelihood gain exceeds `min_evidence`,
 calibrated on simulated linear series. Otherwise it is the piecewise-linear
 model of `geepers.changepoints.detect_changepoints`, a straight line where
-that finds nothing. The calibration assumes flicker + white noise: on a
-series whose noise is really redder (spectral index -1.5 or a random walk)
-the smooth trend is chosen far too often and follows the noise.
+that finds nothing.
+
+The gain is measured against a line whose noise may also hold a random
+walk, up to `max_random_walk`: a free random walk can explain any single
+record, so its amplitude has to be limited by what monuments can do. A
+signal needing more than that is taken as deformation. Noise beyond the
+limit, and deformation below it, are still mistaken for each other; only
+other records (neighboring stations) can tell them apart.
 
 A forecast does not extend the curve: the last rate continues, plus the
 periodic terms and the persisting part of the noise, and it never
@@ -75,6 +80,8 @@ __all__ = ["SmoothForecast", "SmoothResult", "fit_smooth_trend", "forecast_smoot
 # flicker to nearly pure white.
 _PHIS = (0.001, 0.01, 0.05, 0.2, 0.5, 0.8, 0.95, 0.999)
 _LOG_LAMBDAS = np.linspace(np.log(1e-5), np.log(1e5), 16)
+# Share of the correlated noise that is random walk, for the line's noise
+_RANDOM_WALK_SHARES = (0.003, 0.01, 0.03, 0.1, 0.2, 0.4, 0.7, 0.95)
 
 
 @dataclass
@@ -116,7 +123,8 @@ class SmoothResult:
         and "linear" where it did not.
     evidence : float
         Twice the restricted log-likelihood gain of the smooth trend over
-        a straight line (with the steps), each with its own noise estimate.
+        a straight line (with the steps), each with its own noise estimate;
+        the line's may hold a random walk up to `max_random_walk`.
     sigma_slope_change : float
         Standard deviation of the rate change between knots, input units
         per year (0 unless `shape` is "smooth").
@@ -211,6 +219,39 @@ def _search_noise(
     return best
 
 
+def _search_random_walk_noise(
+    flicker: np.ndarray,
+    random_walk: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    years_per_step: float,
+    max_random_walk: float,
+) -> float:
+    """Find the best likelihood of a line with limited random-walk noise.
+
+    The amplitude depends on the variance scale, which the likelihood
+    profiles out, so it is checked after the fact for each mixture.
+    """
+    best = np.inf
+    for share in _RANDOM_WALK_SHARES:
+        correlated = (1.0 - share) * flicker + share * random_walk
+        for phi in _PHIS:
+            cov = _noise_mixture(correlated, phi)
+            value = _nll_core(cov, x, y, True)
+            if value >= best:
+                continue
+            cho = linalg.cho_factor(cov, lower=True, check_finite=False)
+            ci_x = linalg.cho_solve(cho, x, check_finite=False)
+            beta = linalg.solve(x.T @ ci_x, ci_x.T @ y, assume_a="pos")
+            r = y - x @ beta
+            chi2 = float(r @ linalg.cho_solve(cho, r, check_finite=False))
+            s2 = chi2 / (len(y) - x.shape[1])
+            amplitude = np.sqrt(s2 * (1.0 - phi) * share / years_per_step)
+            if amplitude <= max_random_walk:
+                best = value
+    return best
+
+
 def _search_smooth(
     flicker: np.ndarray, zzt: np.ndarray, x: np.ndarray, y: np.ndarray
 ) -> tuple[float, float, float]:
@@ -249,6 +290,7 @@ def fit_smooth_trend(
     detect_changes: bool = True,
     knots_per_year: float = 1.0,
     min_evidence: float = 6.0,
+    max_random_walk: float | None = 3.0,
 ) -> SmoothResult:
     """Fit a smooth trend, its smoothness estimated from the data.
 
@@ -285,6 +327,21 @@ def fit_smooth_trend(
         used. Default 6: about 1 % of simulated linear series with flicker
         + white noise reach it, and at most 3 % for any record length from
         5 to 20 years and any flicker amplitude tried.
+
+    max_random_walk : float or None
+        Largest random-walk noise the straight line may be given, in input
+        units per square root of a year. **The default of 3 assumes
+        millimeters: pass 0.003 for meters**, or the smooth trend is
+        rejected on nearly every series. None compares against flicker +
+        white noise only.
+
+        Differences of station pairs within 25 km give a median of 2.7
+        mm/sqrt(yr), which still includes local signals, so 3 is a generous
+        limit on monument noise. On simulated linear series the smooth
+        trend is chosen on 2 % with a true random walk of 3 and on 14 % at
+        5, against 28 % and 43 % without the limit. Signals near the limit
+        are missed more often (1 in 5 of 30 mm decays over 12 years) and
+        get the piecewise model instead.
 
     Returns
     -------
@@ -336,6 +393,20 @@ def fit_smooth_trend(
     nll_line, _ = _search_noise(flicker, x, y0)
     nll_smooth, phi, lam = _search_smooth(flicker, z @ z.T, x, y0)
     evidence = max(0.0, 2.0 * (nll_line - nll_smooth))
+    # Only a series that would go smooth needs the slower comparison
+    if max_random_walk is not None and evidence >= min_evidence:
+        random_walk = _powerlaw_covariance(-2.0, int(obs_idx[-1]) + 1)[
+            np.ix_(obs_idx, obs_idx)
+        ]
+        nll_limited = _search_random_walk_noise(
+            flicker,
+            random_walk,
+            x,
+            y0,
+            sampling_days / DAYS_PER_YEAR,
+            max_random_walk,
+        )
+        evidence = max(0.0, 2.0 * (min(nll_line, nll_limited) - nll_smooth))
     rate_dates: list[pd.Timestamp] = []
     if evidence < min_evidence:
         rate_dates = screened_rates
