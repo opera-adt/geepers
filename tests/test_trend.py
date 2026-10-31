@@ -118,6 +118,22 @@ class TestEstimateTrend:
         # trend must not absorb the step
         assert res.velocity == pytest.approx(0.0, abs=3 * res.velocity_uncertainty)
 
+    def test_rate_change_estimated(self):
+        dates, y = _synthetic(n=900, velocity=2.0, sigma_white=0.5)
+        t_yr = np.arange(900) / 365.25
+        y -= 6.0 * np.maximum(0.0, t_yr - t_yr[400])
+        res = estimate_trend(
+            dates,
+            y,
+            noise_model="WN",
+            periods_years=(),
+            rate_change_dates=[dates[400]],
+        )
+        value, sigma = res.parameters["rate_change_0"]
+        assert value == pytest.approx(-6.0, abs=3 * sigma)
+        # `velocity` stays the rate before the change
+        assert res.velocity == pytest.approx(2.0, abs=3 * res.velocity_uncertainty)
+
     def test_annual_amplitude(self):
         rng = np.random.default_rng(3)
         n = 730
