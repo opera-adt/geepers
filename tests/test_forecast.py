@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from geepers.changepoints import detect_changepoints
+from geepers.changepoints import detect_changepoints, fit_sparse_changepoints
 from geepers.forecast import _symmetric_root, backtest, forecast_trend
 from geepers.synthetic import power_law_noise
 
@@ -113,6 +113,13 @@ class TestForecastTrend:
         assert with_changes.change_rates["offset"] == 0  # not simulated by default
         assert without.change_rates == {"offset": 0.0, "rate": 0.0}
         assert wide > 1.2 * narrow
+
+    def test_accepts_the_sparse_fit(self):
+        dates, values = _monthly(rate_change=-4.0)
+        found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+        fc = forecast_trend(dates, values, 2, sampling_days=MONTH, changepoints=found)
+        assert fc.changepoints is found
+        assert len(fc.table) == 24
 
     def test_future_dates(self, linear):
         dates, values, found = linear

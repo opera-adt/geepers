@@ -13,7 +13,7 @@ changes), or both, and is fitted together with the trend, the periodic
 terms, the known steps and temporally correlated noise. The rate after
 the last change point is the present-day rate.
 
-Two estimators share one model:
+Three estimators share one model:
 
 - `detect_changepoints` searches by forward-backward stepwise selection
   on the Bayesian information criterion (Schwarz, G., 1978, Estimating
@@ -23,6 +23,10 @@ Two estimators share one model:
   with the change points included until the selection stops changing:
   estimated without them, offsets and rate changes are absorbed into a
   larger flicker amplitude.
+- `fit_sparse_changepoints` puts an offset and a rate change at every
+  candidate epoch and selects them with an L1 (lasso) penalty, the sparse
+  trend prior of Prophet: a convex search whose result does not depend
+  on the order change points are added.
 - `sample_changepoints` samples the posterior distribution of the number,
   epochs and kinds of change points by reversible-jump Markov chain Monte
   Carlo (Green, P. J., 1995, Reversible jump Markov chain Monte Carlo
@@ -57,6 +61,7 @@ Example:
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -72,6 +77,7 @@ __all__ = [
     "ChangepointPosterior",
     "ChangepointResult",
     "detect_changepoints",
+    "fit_sparse_changepoints",
     "sample_changepoints",
 ]
 
@@ -438,6 +444,65 @@ def _check_kinds(kinds: tuple[str, ...]) -> tuple[Kind, ...]:
     return tuple(dict.fromkeys(kinds))  # type: ignore[arg-type]
 
 
+def _select(
+    series: _Series,
+    search: Callable[[_Normal], Config],
+    sampling_days: float,
+    periods_years: tuple[float, ...],
+    noise_model: NoiseModel,
+    method: Literal["exact", "whittle"],
+    penalty: float | None,
+    max_iterations: int,
+) -> ChangepointResult:
+    """Alternate `search` with re-estimating the noise, then summarize the fit."""
+    n_epochs = int(series.obs_idx[-1]) + 1
+
+    def refit(config: Config) -> tuple[TrendResult, _Normal]:
+        trend = _fit_trend(
+            series, config, sampling_days, periods_years, noise_model, method
+        )
+        C = _noise_covariance(trend, series.obs_idx, n_epochs)
+        return trend, _Normal(series, C, penalty)
+
+    config: Config = ()
+    trend, normal = refit(config)
+    for _ in range(max_iterations):
+        selected = search(normal)
+        if selected == config:
+            break
+        config = selected
+        trend, normal = refit(config)
+
+    cols, labels = normal.columns(config)
+    beta, cov, *_ = normal.solve(cols)
+    design = np.column_stack(
+        [series.base, *(series.column(j, part) for j, part in labels)]
+    )
+
+    bounds = [series.epochs[0], *(series.date(j) for j, _ in config), series.epochs[-1]]
+    segments = []
+    for k in range(len(config) + 1):
+        c = _rate_vector(series, labels, until=k)
+        segments.append(
+            {
+                "start": bounds[k],
+                "end": bounds[k + 1],
+                "rate": float(c @ beta),
+                "rate_sigma": float(np.sqrt(c @ cov @ c)),
+            }
+        )
+    return ChangepointResult(
+        changepoints=_amplitudes(series, labels, beta, cov, config),
+        segments=pd.DataFrame(segments),
+        rate=segments[-1]["rate"],
+        rate_sigma=segments[-1]["rate_sigma"],
+        trend=trend,
+        bic=float(normal.bic(config)),
+        bic_none=float(normal.bic(())),
+        model=design @ beta,
+    )
+
+
 def detect_changepoints(
     dates: ArrayLike,
     values: ArrayLike,
@@ -527,51 +592,267 @@ def detect_changepoints(
         min_segment_years,
         n_candidates,
     )
-    n_epochs = int(series.obs_idx[-1]) + 1
-
-    def refit(config: Config) -> tuple[TrendResult, _Normal]:
-        trend = _fit_trend(
-            series, config, sampling_days, periods_years, noise_model, method
-        )
-        C = _noise_covariance(trend, series.obs_idx, n_epochs)
-        return trend, _Normal(series, C, penalty)
-
-    config: Config = ()
-    trend, normal = refit(config)
-    for _ in range(max_iterations):
-        selected = _stepwise(normal, series, kinds, max_changepoints, min_segment_years)
-        if selected == config:
-            break
-        config = selected
-        trend, normal = refit(config)
-
-    cols, labels = normal.columns(config)
-    beta, cov, *_ = normal.solve(cols)
-    design = np.column_stack(
-        [series.base, *(series.column(j, part) for j, part in labels)]
+    return _select(
+        series,
+        lambda normal: _stepwise(
+            normal, series, kinds, max_changepoints, min_segment_years
+        ),
+        sampling_days,
+        periods_years,
+        noise_model,
+        method,
+        penalty,
+        max_iterations,
     )
 
-    bounds = [series.epochs[0], *(series.date(j) for j, _ in config), series.epochs[-1]]
-    segments = []
-    for k in range(len(config) + 1):
-        c = _rate_vector(series, labels, until=k)
-        segments.append(
-            {
-                "start": bounds[k],
-                "end": bounds[k + 1],
-                "rate": float(c @ beta),
-                "rate_sigma": float(np.sqrt(c @ cov @ c)),
-            }
+
+def _profiled(normal: _Normal) -> tuple[np.ndarray, np.ndarray]:
+    """Profile the base terms out of the candidate normal equations."""
+    p = normal.n_base
+    G, b = normal.gram, normal.proj
+    cho = linalg.cho_factor(G[:p, :p], lower=True, check_finite=False)
+    X = linalg.cho_solve(cho, G[:p, p:], check_finite=False)
+    return G[p:, p:] - G[:p, p:].T @ X, b[p:] - X.T @ b[:p]
+
+
+def _lasso_path(
+    gram: np.ndarray,
+    proj: np.ndarray,
+    usable: np.ndarray,
+    n_lambdas: int,
+    min_ratio: float = 1e-3,
+    tol: float = 1e-5,
+    max_iter: int = 2000,
+) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    """Lasso solutions ``min 1/2 b'Gb - p'b + lambda |D b|_1`` on a decreasing path.
+
+    Columns are standardized (``D`` = column norms), so offsets and rate
+    changes are penalized on the same scale. Solved by FISTA (Beck &
+    Teboulle, 2009) with warm starts. Returns ``(coefficients,
+    standardized magnitudes)`` per lambda, lazily, so the caller can
+    stop before the small penalties, where convergence is slowest.
+    """
+    norms = np.sqrt(np.clip(np.diag(gram), 0.0, None))
+    usable = usable & (norms > 1e-8 * max(float(norms.max(initial=0.0)), 1e-300))
+    idx = np.flatnonzero(usable)
+    if len(idx) == 0:
+        return
+    d = norms[idx]
+    G = gram[np.ix_(idx, idx)] / np.outer(d, d)
+    b = proj[idx] / d
+    lipschitz = float(np.linalg.eigvalsh(G)[-1])
+    lam_max = float(np.max(np.abs(b)))
+    gamma = np.zeros(len(idx))
+    for lam in lam_max * np.geomspace(1.0, min_ratio, n_lambdas):
+        z, t = gamma.copy(), 1.0
+        for _ in range(max_iter):
+            step = z - (G @ z - b) / lipschitz
+            new = np.sign(step) * np.maximum(np.abs(step) - lam / lipschitz, 0.0)
+            change = new - gamma
+            if np.max(np.abs(change)) <= tol * max(1.0, float(np.max(np.abs(new)))):
+                gamma = new
+                break
+            # Adaptive restart (O'Donoghue & Candes, 2015): drop the momentum
+            # when it points uphill, which the nearly collinear hinge columns
+            # otherwise make oscillate for thousands of iterations
+            if float((z - new) @ change) > 0.0:
+                t = 1.0
+            t_next = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * t * t))
+            z = new + (t - 1.0) / t_next * change
+            gamma, t = new, t_next
+        coef = np.zeros(len(proj))
+        magnitude = np.zeros(len(proj))
+        coef[idx] = gamma / d
+        magnitude[idx] = np.abs(gamma)
+        yield coef, magnitude
+
+
+def _cluster(
+    series: _Series,
+    coef: np.ndarray,
+    magnitude: np.ndarray,
+    kinds: tuple[str, ...],
+    max_changepoints: int,
+    min_segment_years: float,
+) -> tuple[Config, int]:
+    """Merge the nonzero candidates of a lasso solution into change points.
+
+    The lasso spreads one change over neighboring candidates, whose
+    columns are nearly collinear. Candidates closer than
+    `min_segment_years` form one change point at their magnitude-weighted
+    mean epoch, with the parts (offset, rate change) any of them has.
+    Returns the strongest `max_changepoints` and the number found.
+    """
+    n = len(series.candidates)
+    off, rate = magnitude[:n], magnitude[n:]
+    active = np.flatnonzero((coef[:n] != 0) | (coef[n:] != 0))
+    if len(active) == 0:
+        return (), 0
+    t = series.t[series.candidates]
+    groups = np.split(
+        active, np.flatnonzero(np.diff(t[active]) >= min_segment_years) + 1
+    )
+    found = []
+    for group in groups:
+        weight = off[group] + rate[group]
+        j = int(np.round(np.average(group, weights=weight)))
+        has = {"offset": off[group].sum(), "rate": rate[group].sum()}
+        parts = [part for part, w in has.items() if w > 0]
+        if len(parts) == 2 and "both" in kinds:
+            kind = "both"
+        else:
+            ranked = sorted(parts, key=lambda part: -has[part])
+            kind = next((p for p in ranked if p in kinds), "both")
+        found.append((float(weight.sum()), j, kind))
+    strongest = sorted(found, reverse=True)[:max_changepoints]
+    return tuple(sorted((j, kind) for _, j, kind in strongest)), len(found)
+
+
+def _sparse(
+    normal: _Normal,
+    series: _Series,
+    kinds: tuple[str, ...],
+    max_changepoints: int,
+    min_segment_years: float,
+    n_lambdas: int,
+) -> Config:
+    """Lowest-BIC change-point set along the lasso path."""
+    gram, proj = _profiled(normal)
+    n = normal.n_cand
+    usable = np.r_[
+        np.full(n, any("offset" in _PARTS[k] for k in kinds)),
+        np.full(n, any("rate" in _PARTS[k] for k in kinds)),
+    ]
+    best: tuple[float, Config] = (normal.bic(()), ())
+    seen: set[Config] = {()}
+    for coef, magnitude in _lasso_path(gram, proj, usable, n_lambdas):
+        config, n_found = _cluster(
+            series, coef, magnitude, kinds, max_changepoints, min_segment_years
         )
-    return ChangepointResult(
-        changepoints=_amplitudes(series, labels, beta, cov, config),
-        segments=pd.DataFrame(segments),
-        rate=segments[-1]["rate"],
-        rate_sigma=segments[-1]["rate_sigma"],
-        trend=trend,
-        bic=float(normal.bic(config)),
-        bic_none=float(normal.bic(())),
-        model=design @ beta,
+        if n_found > max_changepoints:
+            # Smaller penalties only add candidates
+            break
+        if config in seen:
+            continue
+        seen.add(config)
+        # Scored after an unpenalized refit, as in `detect_changepoints`
+        value = normal.bic(config)
+        if value < best[0]:
+            best = (value, config)
+    return _polish(normal, series, best[1], min_segment_years)
+
+
+def _polish(
+    normal: _Normal, series: _Series, config: Config, min_segment_years: float
+) -> Config:
+    """Move each change point to the lowest-BIC epoch within half a segment.
+
+    The lasso shares a change between nearly collinear neighbors, so the
+    merged epoch is only approximate: the weighted mean of a rate change
+    spread over the epochs before it lands early.
+    """
+    t = series.t[series.candidates]
+    bic = normal.bic(config)
+    improved = True
+    while improved:
+        improved = False
+        for i, (j, kind) in enumerate(config):
+            rest = config[:i] + config[i + 1 :]
+            near = np.flatnonzero(np.abs(t - t[j]) < 0.5 * min_segment_years)
+            for k in near:
+                if k == j or not _separated(series, rest, int(k), min_segment_years):
+                    continue
+                trial = tuple(sorted((*rest, (int(k), kind))))
+                value = normal.bic(trial)
+                if value < bic:
+                    bic, config, improved = value, trial, True
+                    break
+            if improved:
+                break
+    return config
+
+
+def fit_sparse_changepoints(
+    dates: ArrayLike,
+    values: ArrayLike,
+    *,
+    sampling_days: float = 1.0,
+    periods_years: tuple[float, ...] = (1.0, 0.5),
+    step_dates: ArrayLike | None = None,
+    kinds: tuple[Kind, ...] = ("offset", "rate", "both"),
+    max_changepoints: int = 5,
+    min_segment_years: float = 1.0,
+    n_candidates: int = 300,
+    n_lambdas: int = 40,
+    noise_model: NoiseModel = "FNWN",
+    method: Literal["exact", "whittle"] = "exact",
+    max_iterations: int = 3,
+    penalty: float | None = None,
+) -> ChangepointResult:
+    """Find offsets and rate changes with an L1 (lasso) penalty.
+
+    Puts an offset and a rate change at every candidate epoch and solves,
+    for a decreasing sequence of penalties, the lasso problem (Tibshirani,
+    R., 1996, Regression shrinkage and selection via the lasso, J. R.
+    Stat. Soc. B, 58(1), 267-288,
+    https://doi.org/10.1111/j.2517-6161.1996.tb02080.x) under the
+    `estimate_trend` noise covariance. This is the sparse prior of
+    Prophet's trend (Taylor & Letham, 2018). Candidates the lasso selects
+    within `min_segment_years` of each other are merged into one change
+    point, each solution is refitted without the penalty, and the one with
+    the lowest BIC is kept. Each change point is then moved to the
+    lowest-BIC epoch within half of `min_segment_years`: the lasso spreads
+    a change over nearly collinear neighbors and their merged epoch is
+    biased (early, for a rate change). As in `detect_changepoints` the
+    noise is then re-estimated with the change points in, up to
+    `max_iterations` times.
+
+    The problem is convex, so unlike the stepwise search of
+    `detect_changepoints` the result does not depend on the order in
+    which change points are added. It tends to find the same change
+    points; where the two disagree the series is ambiguous.
+
+    Parameters
+    ----------
+    dates, values, sampling_days, periods_years, step_dates, kinds, \
+max_changepoints, min_segment_years, n_candidates, noise_model, method, \
+max_iterations, penalty
+        As in `detect_changepoints`.
+    n_lambdas : int
+        Number of penalties on the path, from the one that selects
+        nothing down to a thousandth of it. Default 40.
+
+    Returns
+    -------
+    ChangepointResult
+
+    Raises
+    ------
+    ValueError
+        As `detect_changepoints`.
+
+    """
+    kinds = _check_kinds(kinds)
+    series = _prepare(
+        dates,
+        values,
+        sampling_days,
+        periods_years,
+        step_dates,
+        min_segment_years,
+        n_candidates,
+    )
+    return _select(
+        series,
+        lambda normal: _sparse(
+            normal, series, kinds, max_changepoints, min_segment_years, n_lambdas
+        ),
+        sampling_days,
+        periods_years,
+        noise_model,
+        method,
+        penalty,
+        max_iterations,
     )
 
 
