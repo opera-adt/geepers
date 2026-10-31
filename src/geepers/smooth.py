@@ -353,7 +353,7 @@ def fit_smooth_trend(
         are missed more often (1 in 5 of 30 mm decays over 12 years) and
         get the piecewise model instead.
 
-        For InSAR pixels use about 8. See ``docs/analysis-modules.md``.
+        For DISP-S1 pixels use 5. See ``docs/analysis-modules.md``.
     regressors : pd.DataFrame or mapping of name to array-like, optional
         Explanatory series, as in `geepers.trend.estimate_trend`, in every
         model: a signal the driver explains is not taken for a smooth
