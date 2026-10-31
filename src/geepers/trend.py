@@ -175,6 +175,20 @@ def _step_years(
     return years
 
 
+def _regressor_columns(
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None, n: int
+) -> tuple[list[str], np.ndarray]:
+    """Return the regressor names and their values, one column each."""
+    names = [] if regressors is None else [str(k) for k in regressors]
+    if regressors is None or not names:
+        return names, np.empty((n, 0))
+    columns = [np.asarray(regressors[name], dtype=float) for name in names]
+    if any(c.shape != (n,) for c in columns):
+        msg = f"Every regressor needs one value per epoch ({n})"
+        raise ValueError(msg)
+    return names, np.column_stack(columns)
+
+
 def _design_matrix(
     t_years: np.ndarray,
     poly_deg: int,
@@ -554,14 +568,7 @@ def estimate_trend(
     """
     dates = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    reg_names = [] if regressors is None else [str(k) for k in regressors]
-    reg_all = np.empty((len(y_all), 0))
-    if regressors is not None and reg_names:
-        columns = [np.asarray(regressors[name], dtype=float) for name in reg_names]
-        if any(c.shape != y_all.shape for c in columns):
-            msg = f"Every regressor needs one value per epoch ({len(y_all)})"
-            raise ValueError(msg)
-        reg_all = np.column_stack(columns)
+    reg_names, reg_all = _regressor_columns(regressors, len(y_all))
     good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
     dates, y, reg = dates[good], y_all[good], reg_all[good]
     if len(y) < 10:

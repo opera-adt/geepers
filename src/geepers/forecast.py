@@ -38,7 +38,7 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,7 +49,7 @@ from scipy import linalg
 
 from geepers.changepoints import ChangepointResult, detect_changepoints
 from geepers.linearity import _noise_covariance
-from geepers.trend import DAYS_PER_YEAR, _design_matrix
+from geepers.trend import DAYS_PER_YEAR, _design_matrix, _regressor_columns
 
 __all__ = ["Backtest", "Forecast", "backtest", "forecast_trend"]
 
@@ -116,6 +116,26 @@ def _grid_index(days: np.ndarray, sampling_days: float) -> np.ndarray:
     return np.round(days / sampling_days).astype(int)
 
 
+def _future_regressors(
+    names: list[str],
+    future: pd.DataFrame | Mapping[str, ArrayLike] | None,
+    n_future: int,
+) -> tuple[list[str], np.ndarray]:
+    """Check a driver's future values against its past: order them to match."""
+    future_names, columns = _regressor_columns(future, n_future)
+    if sorted(future_names) != sorted(names):
+        msg = (
+            f"future_regressors {sorted(future_names)} must match the"
+            f" regressors {sorted(names)}"
+        )
+        raise ValueError(msg)
+    if not np.isfinite(columns).all():
+        msg = "future_regressors must be finite at every forecast epoch"
+        raise ValueError(msg)
+    order = [future_names.index(name) for name in names]
+    return names, columns[:, order]
+
+
 def _symmetric_root(covariance: np.ndarray) -> np.ndarray:
     """Return the symmetric square root of a covariance matrix.
 
@@ -143,6 +163,8 @@ def forecast_trend(
     level: float = 0.95,
     n_simulations: int = 2000,
     seed: int | np.random.Generator | None = 0,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
+    future_regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
     **detect_kwargs: Any,
 ) -> Forecast:
     """Extrapolate the change-point model with a forecast interval.
@@ -182,6 +204,15 @@ def forecast_trend(
         Number of simulated paths. Default 2000.
     seed : int or np.random.Generator, optional
         Seed of the simulation. Default 0 (reproducible).
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series, one value per entry of `dates`, as in
+        `geepers.trend.estimate_trend`. Also needed with `changepoints`,
+        if that fit used them.
+    future_regressors : pd.DataFrame or mapping of name to array-like, optional
+        The same series, one value per forecast epoch. Required with
+        `regressors`: the record cannot say what a driver will do. They
+        are taken as exact, so the interval leaves out their uncertainty,
+        and a forecast of the driver gives a narrower one than it should.
     **detect_kwargs
         Passed to `detect_changepoints` (e.g. ``noise_model``, ``kinds``).
 
@@ -193,7 +224,9 @@ def forecast_trend(
     ------
     ValueError
         If neither or both of `horizon_years` and `future_dates` are
-        given, or a forecast epoch is not after the last observation.
+        given, a forecast epoch is not after the last observation, or
+        `regressors` and `future_regressors` do not match each other, the
+        forecast epochs or the fit.
 
     """
     if (horizon_years is None) == (future_dates is None):
@@ -201,8 +234,9 @@ def forecast_trend(
         raise ValueError(msg)
     epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    good = np.isfinite(y_all)
-    epochs, y = epochs[good], y_all[good]
+    reg_names, reg_all = _regressor_columns(regressors, len(y_all))
+    good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
+    epochs, y, reg = epochs[good], y_all[good], reg_all[good]
     if changepoints is None:
         changepoints = detect_changepoints(
             epochs,
@@ -210,6 +244,7 @@ def forecast_trend(
             sampling_days=sampling_days,
             periods_years=periods_years,
             step_dates=step_dates,
+            regressors=dict(zip(reg_names, reg.T, strict=True)) or None,
             **detect_kwargs,
         )
     trend = changepoints.trend
@@ -251,6 +286,11 @@ def forecast_trend(
     design, names = _design_matrix(
         t_future, 1, periods_years, np.zeros(n_steps), [], [], rate_years
     )
+    future_names, future_reg = _future_regressors(
+        reg_names, future_regressors, len(t_future)
+    )
+    design = np.column_stack([design, future_reg])
+    names += [f"reg_{name}" for name in future_names]
     if names != list(trend.parameters):
         msg = (
             "The change-point fit has terms the forecast cannot extend:"
@@ -338,6 +378,7 @@ def backtest(
     min_history_years: float = 4.0,
     n_bins: int = 5,
     forecaster: Callable[..., Any] | None = None,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
     **forecast_kwargs: Any,
 ) -> Backtest:
     """Score `forecast_trend` on the data that followed past cutoffs.
@@ -367,6 +408,11 @@ def backtest(
         future_dates=..., **forecast_kwargs)`` and returning an object
         whose ``table`` has the columns of `Forecast.table`, such as
         `geepers.smooth.forecast_smooth`. Default `forecast_trend`.
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series, one value per entry of `dates`. The forecaster
+        gets the observed values after each cutoff as `future_regressors`,
+        so the score is that of a perfect forecast of the driver: an
+        upper limit on what it can add.
     **forecast_kwargs
         Passed to the forecaster (e.g. ``sampling_days``, ``level``).
 
@@ -382,8 +428,9 @@ def backtest(
     """
     epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    good = np.isfinite(y_all)
-    epochs, y = epochs[good], y_all[good]
+    reg_names, reg_all = _regressor_columns(regressors, len(y_all))
+    good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
+    epochs, y, reg = epochs[good], y_all[good], reg_all[good]
     horizon = pd.Timedelta(days=horizon_years * DAYS_PER_YEAR)
     if cutoffs is None:
         first = epochs[0] + pd.Timedelta(days=min_history_years * DAYS_PER_YEAR)
@@ -404,8 +451,18 @@ def backtest(
         later = (epochs > cutoff) & (epochs <= cutoff + horizon)
         if not later.any():
             continue
+        drivers: dict[str, Any] = {}
+        if reg_names:
+            drivers = {
+                "regressors": dict(zip(reg_names, reg[past].T, strict=True)),
+                "future_regressors": dict(zip(reg_names, reg[later].T, strict=True)),
+            }
         fc = (forecaster or forecast_trend)(
-            epochs[past], y[past], future_dates=epochs[later], **forecast_kwargs
+            epochs[past],
+            y[past],
+            future_dates=epochs[later],
+            **drivers,
+            **forecast_kwargs,
         )
         table = fc.table
         rows.append(

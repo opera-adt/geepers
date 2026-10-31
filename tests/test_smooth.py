@@ -334,6 +334,103 @@ class TestForecastSmooth:
         assert 0.7 <= result.coverage <= 1.0
 
 
+class TestSmoothRegressors:
+    @staticmethod
+    def _driven():
+        t = np.arange(144) / 12
+        driver = 4.0 * np.sin(2 * np.pi * t / 7.0) + 2.0 * np.sin(2 * np.pi * t / 2.7)
+        dates, values, _ = _series(
+            lambda t: 8.0 * np.interp(t, np.arange(144) / 12, driver)
+        )
+        return dates, values, driver
+
+    def test_a_signal_the_driver_explains_is_not_smooth(self):
+        dates, values, driver = self._driven()
+        assert fit_smooth_trend(dates, values, sampling_days=MONTH).shape == "smooth"
+        fit = fit_smooth_trend(
+            dates, values, sampling_days=MONTH, regressors={"well": driver}
+        )
+        assert fit.shape == "linear"
+        amplitude, sigma = fit.parameters["reg_well"]
+        assert abs(amplitude - 8.0) < max(3 * sigma, 0.5)
+        assert fit.rate == pytest.approx(-3.0, abs=0.5)
+
+    def test_a_smooth_signal_beside_the_driver_is_kept(self):
+        dates, values, driver = self._driven()
+        fit = fit_smooth_trend(
+            dates,
+            values + _decay(np.arange(144) / 12),
+            sampling_days=MONTH,
+            regressors={"well": driver},
+        )
+        assert fit.shape == "smooth"
+        assert "reg_well" in fit.parameters
+
+    def test_forecast_uses_the_future_driver(self):
+        dates, values, driver = self._driven()
+        past = np.arange(144) < 108
+        fc = forecast_smooth(
+            dates[past],
+            values[past],
+            future_dates=dates[~past],
+            sampling_days=MONTH,
+            units="mm",
+            regressors={"well": driver[past]},
+            future_regressors={"well": driver[~past]},
+        )
+        plain = forecast_smooth(
+            dates[past],
+            values[past],
+            future_dates=dates[~past],
+            sampling_days=MONTH,
+            units="mm",
+        )
+
+        def rms(f):
+            return np.sqrt(np.mean((f.table["mean"] - values[~past]) ** 2))
+
+        assert rms(fc) < rms(plain) / 2
+
+    def test_missing_future_driver_raises(self):
+        dates, values, driver = self._driven()
+        fit = fit_smooth_trend(
+            dates, values, sampling_days=MONTH, regressors={"well": driver}
+        )
+        with pytest.raises(ValueError, match="must match the regressors"):
+            forecast_smooth(dates, values, 1, sampling_days=MONTH, fit=fit)
+
+    def test_piecewise_forecast_scales_on_rate_changes_not_on_the_driver(self):
+        """The interval's change sizes must not take the regressor's amplitude."""
+        dates, values, _ = _series(lambda t: 2.0 * np.maximum(0.0, t - 6.0))
+        driver = np.cos(np.arange(144) / 11.0)
+        kwargs = {"sampling_days": MONTH, "min_evidence": 1e9}
+        huge = 1000.0 * driver
+        fit = fit_smooth_trend(dates, values + huge, regressors={"d": driver}, **kwargs)
+        base = fit_smooth_trend(dates, values, **kwargs)
+        assert fit.shape == base.shape == "piecewise"
+        future = dates[-1] + pd.to_timedelta(np.arange(1, 25) * MONTH, unit="D")
+        with_driver = forecast_smooth(
+            dates,
+            values + huge,
+            future_dates=future,
+            sampling_days=MONTH,
+            fit=fit,
+            include_noise=False,
+            future_regressors={"d": np.zeros(24)},
+        ).table
+        without = forecast_smooth(
+            dates,
+            values,
+            future_dates=future,
+            sampling_days=MONTH,
+            fit=base,
+            include_noise=False,
+        ).table
+        assert with_driver["sigma_model"].iloc[-1] == pytest.approx(
+            without["sigma_model"].iloc[-1], rel=0.3
+        )
+
+
 class TestSmoothRegression:
     """Exact recovery, a real station, and pinned numbers."""
 

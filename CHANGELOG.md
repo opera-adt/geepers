@@ -34,6 +34,11 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `regressors` in `detect_changepoints`, `fit_sparse_changepoints`,
+  `sample_changepoints`, `fit_smooth_trend`, `forecast_trend` and `backtest`,
+  and `future_regressors` in the forecasts: a change an explanatory series
+  explains is not taken for a change point or a smooth signal. Future values
+  are taken as exact, and `backtest` scores a perfect forecast of the driver.
 - `geepers.smooth.fit_smooth_trend(max_random_walk_mm=3.0)`: the evidence is
   measured against a line allowed random-walk noise up to this amplitude, so
   redder noise is rarely taken for a signal. Changes which series go smooth.

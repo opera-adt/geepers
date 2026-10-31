@@ -270,6 +270,63 @@ def _records(frame: pd.DataFrame) -> list[dict]:
     ]
 
 
+class TestChangepointRegressors:
+    @staticmethod
+    def _driven():
+        """A driver with a jump and a slope change: looks like change points."""
+        dates, values = _monthly(offset=0.0, rate_change=0.0)
+        t = np.arange(len(values)) / 12
+        driver = (t >= 4.0) * 1.0 + np.maximum(0.0, t - 7.0) * 0.5
+        return dates, values + 12.0 * driver, driver
+
+    @pytest.mark.parametrize("fit", [detect_changepoints, fit_sparse_changepoints])
+    def test_a_change_the_driver_explains_is_not_a_change_point(self, fit):
+        dates, values, driver = self._driven()
+        without = fit(dates, values, sampling_days=MONTH)
+        assert len(without.changepoints) > 0
+        found = fit(dates, values, sampling_days=MONTH, regressors={"well": driver})
+        assert len(found.changepoints) == 0
+        amplitude, sigma = found.trend.parameters["reg_well"]
+        assert abs(amplitude - 12.0) < max(3 * sigma, 0.5)
+
+    def test_model_includes_the_driver(self):
+        dates, values, driver = self._driven()
+        found = detect_changepoints(
+            dates, values, sampling_days=MONTH, regressors={"well": driver}
+        )
+        assert np.std(values - found.model) < 2.0
+
+    def test_nan_in_a_regressor_drops_the_epoch(self):
+        dates, values, driver = self._driven()
+        driver = driver.copy()
+        driver[30] = np.nan
+        found = detect_changepoints(
+            dates, values, sampling_days=MONTH, regressors={"well": driver}
+        )
+        assert len(found.model) == len(values) - 1
+
+    def test_wrong_length_raises(self):
+        dates, values, driver = self._driven()
+        with pytest.raises(ValueError, match="one value per epoch"):
+            detect_changepoints(
+                dates, values, sampling_days=MONTH, regressors={"well": driver[:-1]}
+            )
+
+    def test_sampler_takes_regressors(self):
+        dates, values, driver = self._driven()
+        posterior = sample_changepoints(
+            dates,
+            values,
+            sampling_days=MONTH,
+            n_chains=2,
+            n_samples=500,
+            n_burn=100,
+            regressors={"well": driver},
+        )
+        assert "reg_well" in posterior.detection.trend.parameters
+        assert posterior.n_probability.idxmax() == 0
+
+
 class TestDetectChangepointsRegression:
     """Golden-value regression for `detect_changepoints`.
 

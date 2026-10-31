@@ -57,6 +57,7 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -66,11 +67,13 @@ from numpy.typing import ArrayLike
 from scipy import linalg, optimize, stats
 
 from geepers.changepoints import detect_changepoints
+from geepers.forecast import _future_regressors
 from geepers.trend import (
     DAYS_PER_YEAR,
     _design_matrix,
     _nll_core,
     _powerlaw_covariance,
+    _regressor_columns,
 )
 
 __all__ = ["SmoothForecast", "SmoothResult", "fit_smooth_trend", "forecast_smooth"]
@@ -96,6 +99,7 @@ class _Solution:
     periods_years: tuple[float, ...]
     n_steps: int
     rate_change_years: np.ndarray
+    regressor_names: list[str]
     knots: np.ndarray
     knot_step: float
     coefficients: np.ndarray  # base terms, then slope changes
@@ -293,6 +297,7 @@ def fit_smooth_trend(
     knots_per_year: float = 1.0,
     min_evidence: float = 6.0,
     max_random_walk_mm: float | None = 3.0,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> SmoothResult:
     """Fit a smooth trend, its smoothness estimated from the data.
 
@@ -347,6 +352,10 @@ def fit_smooth_trend(
         5, against 28 % and 43 % without the limit. Signals near the limit
         are missed more often (1 in 5 of 30 mm decays over 12 years) and
         get the piecewise model instead.
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series, as in `geepers.trend.estimate_trend`, in every
+        model: a signal the driver explains is not taken for a smooth
+        trend. Amplitudes are in `SmoothResult.parameters` as ``reg_<name>``.
 
     Returns
     -------
@@ -355,7 +364,8 @@ def fit_smooth_trend(
     Raises
     ------
     ValueError
-        If there are fewer than 10 finite values, or `units` is unknown.
+        If there are fewer than 10 finite values, `units` is unknown, or a
+        regressor does not have one value per epoch.
 
     """
     if units not in _UNITS_PER_MM:
@@ -363,8 +373,10 @@ def fit_smooth_trend(
         raise ValueError(msg)
     epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    good = np.isfinite(y_all)
-    epochs, y = epochs[good], y_all[good]
+    reg_names, reg_all = _regressor_columns(regressors, len(y_all))
+    good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
+    epochs, y, reg = epochs[good], y_all[good], reg_all[good]
+    drivers = dict(zip(reg_names, reg.T, strict=True)) or None
     if len(y) < 10:
         msg = f"Need at least 10 finite observations, got {len(y)}"
         raise ValueError(msg)
@@ -384,13 +396,16 @@ def fit_smooth_trend(
             sampling_days=sampling_days,
             periods_years=periods_years,
             step_dates=known or None,
+            regressors=drivers,
         ).changepoints
         offsets = list(found.loc[found["offset"].notna(), "date"])
         steps = _unique_steps([*known, *offsets], epochs)
         screened_rates = list(found.loc[found["rate_change"].notna(), "date"])
     first_after = epochs.searchsorted(pd.DatetimeIndex(steps)) if steps else []
     step_years = np.array([t[i] for i in first_after])
+    reg_labels = [f"reg_{name}" for name in reg_names]
     x, names = _design_matrix(t, 1, periods_years, step_years, [], [])
+    x, names = np.column_stack([x, reg]), names + reg_labels
 
     knot_step = 1.0 / knots_per_year
     knots = np.arange(t[0] + knot_step, t[-1], knot_step)
@@ -423,6 +438,7 @@ def fit_smooth_trend(
         )
         rate_years = np.array([t[i] for i in rate_at])
         x, names = _design_matrix(t, 1, periods_years, step_years, [], [], rate_years)
+        x, names = np.column_stack([x, reg]), names + reg_labels
         _, phi = _search_noise(flicker, x, y0)
         lam = 0.0
     else:
@@ -490,6 +506,7 @@ def fit_smooth_trend(
             periods_years=periods_years,
             n_steps=len(steps),
             rate_change_years=rate_years,
+            regressor_names=reg_names,
             knots=knots if lam > 0 else knots[:0],
             knot_step=knot_step,
             coefficients=coefficients,
@@ -511,6 +528,7 @@ def forecast_smooth(
     include_noise: bool = True,
     level: float = 0.95,
     sampling_days: float = 1.0,
+    future_regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
     **fit_kwargs: Any,
 ) -> SmoothForecast:
     """Extrapolate a smooth trend with a forecast interval.
@@ -542,6 +560,10 @@ def forecast_smooth(
         Coverage of the interval. Default 0.95.
     sampling_days : float
         Nominal sampling interval in days. Default 1.
+    future_regressors : pd.DataFrame or mapping of name to array-like, optional
+        One value per forecast epoch of each regressor of the fit. Required
+        if it has any; taken as exact, so the interval leaves out their
+        uncertainty.
     **fit_kwargs
         Passed to `fit_smooth_trend`, which needs `units` unless `fit` is
         given.
@@ -554,7 +576,8 @@ def forecast_smooth(
     ------
     ValueError
         If neither or both of `horizon_years` and `future_dates` are
-        given, or a forecast epoch is not after the last observation.
+        given, a forecast epoch is not after the last observation, or
+        `future_regressors` does not match the fit or the forecast epochs.
 
     """
     if (horizon_years is None) == (future_dates is None):
@@ -591,7 +614,12 @@ def forecast_smooth(
         [],
         sol.rate_change_years,
     )
-    design = np.column_stack([x_f, np.maximum(0.0, t_future[:, None] - sol.knots)])
+    _, future_reg = _future_regressors(
+        sol.regressor_names, future_regressors, len(t_future)
+    )
+    design = np.column_stack(
+        [x_f, future_reg, np.maximum(0.0, t_future[:, None] - sol.knots)]
+    )
     model = design @ sol.coefficients
     var_model = np.einsum("ij,jk,ik->i", design, sol.covariance, design)
     if sol.lam > 0:
@@ -605,7 +633,11 @@ def forecast_smooth(
     if n_rates and t_last > 0:
         # As `forecast_trend` simulates: Poisson-timed changes at the record's
         # rate with Laplace sizes of its mean magnitude, in closed form
-        scale = float(np.mean(np.abs(sol.coefficients[-n_rates:])))
+        # A piecewise fit has no slope changes: its last terms are the rates
+        # and regressors
+        n_reg = len(sol.regressor_names)
+        sizes = sol.coefficients[-(n_rates + n_reg) : len(sol.coefficients) - n_reg]
+        scale = float(np.mean(np.abs(sizes)))
         var_model = var_model + (n_rates / t_last) * 2 * scale**2 * (
             (t_future - t_last) ** 3 / 3.0
         )

@@ -63,7 +63,7 @@ Example:
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -77,6 +77,7 @@ from geepers.trend import (
     DAYS_PER_YEAR,
     TrendResult,
     _design_matrix,
+    _regressor_columns,
     _step_years,
     estimate_trend,
 )
@@ -202,6 +203,7 @@ class _Series:
     names: list[str]
     known_steps: list[pd.Timestamp]
     candidates: np.ndarray  # observation index of the first epoch after a change
+    regressors: dict[str, np.ndarray] | None = None
 
     def column(self, j: int, part: str) -> np.ndarray:
         i = self.candidates[j]
@@ -221,11 +223,13 @@ def _prepare(
     step_dates: ArrayLike | None,
     min_segment_years: float,
     n_candidates: int,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> _Series:
     epochs = pd.DatetimeIndex(pd.to_datetime(np.asarray(dates)))
     y_all = np.asarray(values, dtype=float)
-    good = np.isfinite(y_all)
-    epochs, y = epochs[good], y_all[good]
+    reg_names, reg_all = _regressor_columns(regressors, len(y_all))
+    good = np.isfinite(y_all) & np.all(np.isfinite(reg_all), axis=1)
+    epochs, y, reg = epochs[good], y_all[good], reg_all[good]
 
     # Same epoch grid and time axis as `estimate_trend`
     t_days = np.asarray((epochs - epochs[0]).total_seconds()) / 86400.0
@@ -241,6 +245,8 @@ def _prepare(
     # As `estimate_trend` places them, so the two fits agree on the columns
     step_years = _step_years(epochs, t, known)
     base, names = _design_matrix(t, 1, periods_years, step_years, [], [])
+    base = np.column_stack([base, reg])
+    names += [f"reg_{name}" for name in reg_names]
 
     inside = np.flatnonzero(
         (t >= t[0] + min_segment_years) & (t <= t[-1] - min_segment_years)
@@ -248,7 +254,8 @@ def _prepare(
     if len(inside) > n_candidates:
         pick = np.round(np.linspace(0, len(inside) - 1, n_candidates)).astype(int)
         inside = inside[np.unique(pick)]
-    return _Series(epochs, y, obs_idx, t, base, names, known, inside)
+    columns = dict(zip(reg_names, reg.T, strict=True)) if reg_names else None
+    return _Series(epochs, y, obs_idx, t, base, names, known, inside, columns)
 
 
 class _Normal:
@@ -421,6 +428,7 @@ def _fit_trend(
         rate_change_dates=rates,
         noise_model=noise_model,
         method=method,
+        regressors=series.regressors,
     )
 
 
@@ -549,6 +557,7 @@ def detect_changepoints(
     method: Literal["exact", "whittle"] = "exact",
     max_iterations: int = 3,
     penalty: float | None = None,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> ChangepointResult:
     """Find offsets and rate changes by stepwise BIC selection.
 
@@ -601,6 +610,10 @@ def detect_changepoints(
         BIC. On long, temporally correlated series (daily GNSS) ``log(n)``
         counts samples that carry little independent information and the
         selection is conservative; 2 gives the AIC.
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series, as in `estimate_trend`, in every model: a
+        change the driver explains is then not taken for a change point.
+        Their amplitudes are in ``result.trend.parameters``.
 
     Returns
     -------
@@ -609,8 +622,9 @@ def detect_changepoints(
     Raises
     ------
     ValueError
-        If `kinds` names an unknown kind, or (from `estimate_trend`) the
-        series has fewer than 10 finite values.
+        If `kinds` names an unknown kind, a regressor does not have one
+        value per epoch, or (from `estimate_trend`) the series has fewer
+        than 10 finite values.
 
     """
     kinds = _check_kinds(kinds)
@@ -622,6 +636,7 @@ def detect_changepoints(
         step_dates,
         min_segment_years,
         n_candidates,
+        regressors,
     )
     return _select(
         series,
@@ -867,6 +882,7 @@ def fit_sparse_changepoints(
     method: Literal["exact", "whittle"] = "exact",
     max_iterations: int = 3,
     penalty: float | None = None,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> ChangepointResult:
     """Find offsets and rate changes with an L1 (lasso) penalty.
 
@@ -898,7 +914,7 @@ def fit_sparse_changepoints(
     ----------
     dates, values, sampling_days, periods_years, step_dates, kinds, \
 max_changepoints, min_segment_years, n_candidates, noise_model, method, \
-max_iterations, penalty
+max_iterations, penalty, regressors
         As in `detect_changepoints`.
     n_lambdas : int
         Number of penalties on the path, from the one that selects
@@ -923,6 +939,7 @@ max_iterations, penalty
         step_dates,
         min_segment_years,
         n_candidates,
+        regressors,
     )
     return _select(
         series,
@@ -1194,6 +1211,7 @@ def sample_changepoints(
     method: Literal["exact", "whittle"] = "exact",
     detection: ChangepointResult | None = None,
     seed: int | np.random.Generator | None = 0,
+    regressors: pd.DataFrame | Mapping[str, ArrayLike] | None = None,
 ) -> ChangepointPosterior:
     """Sample the posterior of the number, epochs and kinds of change points.
 
@@ -1239,6 +1257,8 @@ max_changepoints, min_segment_years, n_candidates, noise_model, method
         settings, to skip running it again.
     seed : int or np.random.Generator, optional
         Seed of the chains. Default 0 (reproducible).
+    regressors : pd.DataFrame or mapping of name to array-like, optional
+        Explanatory series, as in `detect_changepoints`.
 
     Returns
     -------
@@ -1262,6 +1282,7 @@ max_changepoints, min_segment_years, n_candidates, noise_model, method
         step_dates,
         min_segment_years,
         n_candidates,
+        regressors,
     )
     if detection is None:
         detection = detect_changepoints(
@@ -1276,6 +1297,7 @@ max_changepoints, min_segment_years, n_candidates, noise_model, method
             n_candidates=n_candidates,
             noise_model=noise_model,
             method=method,
+            regressors=regressors,
         )
     n_epochs = int(series.obs_idx[-1]) + 1
     normal = _Normal(
