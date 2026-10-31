@@ -34,6 +34,11 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.smooth`: `fit_smooth_trend` estimates a time-varying rate
+  without assuming its shape (penalized linear spline, smoothness and noise
+  by REML), used only with evidence over the piecewise-linear model;
+  `forecast_smooth` extrapolates it.
+- `geepers.forecast.backtest(forecaster=...)` scores any forecaster.
 - `geepers.changepoints.fit_sparse_changepoints_many`: the sparse fit for
   many series on one time grid (shared noise shape, per-series amplitude,
   all lasso paths solved together), returning a summary and a long table
@@ -54,6 +59,9 @@ versions follow PEP 440 via setuptools_scm.
   with the amplitudes integrated out. Both report the present-day rate.
 - `estimate_trend(rate_change_dates=...)`: trend changes without an offset
   (hinge terms `rate_change_<i>`).
+- `estimate_trend(regressors=...)`: external explanatory series (loading,
+  well levels, temperature) estimated as `reg_<name>` with the trend, and
+  `geepers.trend.lagged_regressor` for delayed responses.
 - `geepers.euler`: ITRF2020-PMM and ITRF2014-PMM plate-motion tables
   (`geepers/data/`), `load_plate_motion_model`, `plate_pole`,
   `plate_velocity_enu` and `PLATE_CODES` (UNR two-letter codes → PMM names).
@@ -68,6 +76,10 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Fixed
 
+- `estimate_trend` and `linearity_test` started a step dated on an
+  observation one epoch late when rounding to the sampling grid moved that
+  epoch earlier than its timestamp (e.g. monthly data). Steps now start at
+  the first epoch on or after their date.
 - A freshly solved environment failed 13 tests on the `affine` 3
   PendingDeprecationWarning raised through rasterio ≤ 1.5.1; it is now
   filtered (as in Venti).

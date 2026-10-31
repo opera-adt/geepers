@@ -11,6 +11,7 @@ from geepers.trend import (
     _powerlaw_covariance,
     estimate_trend,
     estimate_trend_many,
+    lagged_regressor,
 )
 
 
@@ -117,6 +118,40 @@ class TestEstimateTrend:
         assert value == pytest.approx(20.0, abs=3 * sigma)
         # trend must not absorb the step
         assert res.velocity == pytest.approx(0.0, abs=3 * res.velocity_uncertainty)
+
+    def test_step_finer_than_the_epoch_resolution(self):
+        # Regression: a computed step date with nanoseconds raised against
+        # epochs in microseconds
+        dates = pd.date_range("2018-01-01", periods=200, freq="D").as_unit("us")
+        y = np.random.default_rng(0).normal(0, 0.5, 200)
+        y[100:] += 20.0
+        step = dates[99] + pd.Timedelta(days=0.123456789123)
+        res = estimate_trend(
+            dates, y, noise_model="WN", periods_years=(), step_dates=[step]
+        )
+        assert res.parameters["step_0"][0] == pytest.approx(20.0, abs=1.0)
+
+    def test_step_on_an_observation_date(self):
+        """A step dated on an epoch starts at that epoch. Regression: step times
+        came from the raw timestamp but epochs from the rounded sampling grid,
+        so on monthly data the step started one epoch late."""
+        month = 365.25 / 12
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(96) * month), unit="D"
+        )
+        y = np.random.default_rng(0).normal(0, 0.5, 96)
+        y[36:] += 20.0
+        res = estimate_trend(
+            dates,
+            y,
+            sampling_days=month,
+            noise_model="WN",
+            periods_years=(),
+            step_dates=[dates[36]],
+        )
+        value, sigma = res.parameters["step_0"]
+        assert value == pytest.approx(20.0, abs=3 * sigma)
+        assert abs(res.residuals[36]) < 2.5
 
     def test_covariance_matches_the_sigmas(self):
         dates, y = _synthetic(n=400, sigma_white=0.5)
@@ -363,3 +398,127 @@ class TestEstimateTrendRegression:
         res = estimate_trend(dates, y, noise_model="WN", periods_years=(1.0,))
         amp = np.hypot(res.parameters["sin_1yr"][0], res.parameters["cos_1yr"][0])
         assert amp == pytest.approx(np.hypot(2.0, 0.5), abs=1e-6)
+
+
+class TestRegressors:
+    def _series(self, n: int = 700, seed: int = 5):
+        rng = np.random.default_rng(seed)
+        dates = pd.date_range("2018-01-01", periods=n, freq="D")
+        t = np.arange(n) / 365.25
+        # A driver that itself trends: without it in the model its trend
+        # leaks into the velocity
+        driver = 3.0 * t + np.cumsum(rng.normal(0, 0.3, n))
+        y = 2.0 * t + 0.8 * driver + rng.normal(0, 0.5, n)
+        return dates, y, driver
+
+    def test_coefficient_and_trend_recovered(self):
+        dates, y, driver = self._series()
+        res = estimate_trend(
+            dates, y, noise_model="WN", periods_years=(), regressors={"x": driver}
+        )
+        value, sigma = res.parameters["reg_x"]
+        assert value == pytest.approx(0.8, abs=3 * sigma)
+        assert res.velocity == pytest.approx(2.0, abs=3 * res.velocity_uncertainty)
+        without = estimate_trend(dates, y, noise_model="WN", periods_years=())
+        assert without.velocity == pytest.approx(2.0 + 0.8 * 3.0, abs=0.5)
+
+    def test_dataframe_matches_mapping(self):
+        dates, y, driver = self._series(n=300)
+        frame = pd.DataFrame({"x": driver}, index=dates)
+        a = estimate_trend(dates, y, noise_model="WN", regressors=frame)
+        b = estimate_trend(dates, y, noise_model="WN", regressors={"x": driver})
+        assert a.parameters == b.parameters
+
+    def test_nan_regressor_drops_the_epoch(self):
+        dates, y, driver = self._series(n=300)
+        driver = driver.copy()
+        driver[10] = np.nan
+        res = estimate_trend(dates, y, noise_model="WN", regressors={"x": driver})
+        assert len(res.residuals) == 299
+
+    def test_without_regressors_nothing_changes(self):
+        dates, y, _ = self._series(n=300)
+        a = estimate_trend(dates, y, noise_model="FNWN")
+        b = estimate_trend(dates, y, noise_model="FNWN", regressors={})
+        assert a.parameters == b.parameters
+        assert a.log_likelihood == b.log_likelihood
+
+    def test_wrong_length_raises(self):
+        dates, y, driver = self._series(n=300)
+        with pytest.raises(ValueError, match="one value per epoch"):
+            estimate_trend(dates, y, regressors={"x": driver[:-1]})
+
+    def test_noise_free_exact_recovery(self):
+        # Regression: on noise-free data the solve returns the inputs
+        dates = pd.date_range("2018-01-01", periods=400, freq="D")
+        t = np.arange(400) / 365.25
+        x = np.sin(2 * np.pi * t / 0.37) + 0.1 * t**2
+        y = 1.0 + 4.0 * t - 2.5 * x
+        res = estimate_trend(
+            dates, y, noise_model="WN", periods_years=(), regressors={"x": x}
+        )
+        assert res.parameters["reg_x"][0] == pytest.approx(-2.5, abs=1e-6)
+        assert res.velocity == pytest.approx(4.0, abs=1e-6)
+        assert res.parameters["intercept"][0] == pytest.approx(1.0, abs=1e-6)
+
+
+class TestLaggedRegressor:
+    def test_shifts_and_interpolates(self):
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        lagged = lagged_regressor(dates, dates, np.arange(10.0), [0, 2, 1.5])
+        assert list(lagged.columns) == [
+            "driver_lag0d",
+            "driver_lag2d",
+            "driver_lag1.5d",
+        ]
+        np.testing.assert_allclose(lagged["driver_lag0d"], np.arange(10.0))
+        np.testing.assert_allclose(lagged["driver_lag2d"].iloc[2:], np.arange(8.0))
+        assert lagged["driver_lag2d"].iloc[:2].isna().all()
+        assert lagged["driver_lag1.5d"].iloc[5] == pytest.approx(3.5)
+
+    def test_recovers_the_lagged_response(self):
+        rng = np.random.default_rng(2)
+        driver_dates = pd.date_range("2017-06-01", periods=1200, freq="D")
+        rain = np.convolve(rng.gamma(0.3, 5.0, 1200), np.ones(15) / 15, "same")
+        dates = driver_dates[200:]
+        lagged = lagged_regressor(dates, driver_dates, rain, [0, 30, 60], name="rain")
+        t = np.arange(len(dates)) / 365.25
+        y = (
+            -5.0 * t
+            + 1.5 * lagged["rain_lag30d"].to_numpy()
+            + rng.normal(0, 0.2, len(t))
+        )
+        res = estimate_trend(
+            dates, y, noise_model="WN", periods_years=(), regressors=lagged
+        )
+        value, sigma = res.parameters["reg_rain_lag30d"]
+        assert value == pytest.approx(1.5, abs=3 * sigma)
+        for other in ("reg_rain_lag0d", "reg_rain_lag60d"):
+            v, s = res.parameters[other]
+            assert abs(v) < 4 * s
+
+
+def test_regressors_with_steps_and_rate_changes():
+    # The new columns of the design matrix must not displace one another
+    dates = pd.date_range("2018-01-01", periods=600, freq="D")
+    t = np.arange(600) / 365.25
+    x = np.sin(2 * np.pi * t / 0.37)
+    y = (
+        2.0 * t
+        + 5.0 * (np.arange(600) >= 200)
+        - 3.0 * np.maximum(0.0, t - t[400])
+        + 1.5 * x
+    )
+    res = estimate_trend(
+        dates,
+        y,
+        noise_model="WN",
+        periods_years=(),
+        step_dates=[dates[200]],
+        rate_change_dates=[dates[400]],
+        regressors={"x": x},
+    )
+    assert res.velocity == pytest.approx(2.0, abs=1e-6)
+    assert res.parameters["step_0"][0] == pytest.approx(5.0, abs=1e-6)
+    assert res.parameters["rate_change_0"][0] == pytest.approx(-3.0, abs=1e-6)
+    assert res.parameters["reg_x"][0] == pytest.approx(1.5, abs=1e-6)

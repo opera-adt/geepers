@@ -120,10 +120,8 @@ class TestDetectChangepoints:
 
     def test_known_steps_are_not_changepoints(self):
         dates, values = _monthly(rate_change=0.0)
-        # Between the last epoch before the offset and the first after it
-        step = dates[35] + (dates[36] - dates[35]) / 2
         found = detect_changepoints(
-            dates, values, sampling_days=MONTH, step_dates=[step]
+            dates, values, sampling_days=MONTH, step_dates=[dates[36]]
         )
         assert found.changepoints.empty
 

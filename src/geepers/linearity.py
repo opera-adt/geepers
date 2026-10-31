@@ -49,6 +49,7 @@ from geepers.trend import (
     TrendResult,
     _design_matrix,
     _powerlaw_covariance,
+    _step_years,
     estimate_trend,
 )
 
@@ -247,14 +248,7 @@ def linearity_test(
     t_days = np.asarray((epochs - epochs[0]).total_seconds()) / 86400.0
     obs_idx = np.round(t_days / sampling_days).astype(int)
     t = obs_idx * sampling_days / DAYS_PER_YEAR
-    steps = pd.DatetimeIndex(
-        pd.to_datetime(
-            np.atleast_1d(np.asarray([] if step_dates is None else step_dates))
-        )
-    )
-    step_years = (
-        np.asarray((steps - epochs[0]).total_seconds()) / 86400.0 / DAYS_PER_YEAR
-    )
+    step_years = _step_years(epochs, t, step_dates)
     A_lin, names = _design_matrix(t, 1, periods_years, step_years, [], [])
     itrend = names.index("trend")
 
