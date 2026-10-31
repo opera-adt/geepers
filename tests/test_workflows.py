@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 import geepers.gps as gps
+from geepers.gps_sources.unr import UnrSource
 from geepers.quality import InsufficientDataError, select_gps_reference
 from geepers.workflows import main, merge_gps_insar
 
@@ -207,6 +208,37 @@ def test_merge_gps_insar_one_row_per_epoch(gps_hour):
     matched = merged.dropna(subset="los_insar")
     assert matched["los_insar"].tolist() == [1.0, 2.0, 3.0]
     assert (abs(matched.index - insar_dates) <= pd.Timedelta("12h")).all()
+
+
+def test_first_acquisition_matches_its_own_day():
+    """Regression: the first epoch was matched to the next day's GPS.
+
+    The workflow bounds the GPS download with the first acquisition time, so
+    the acquisition day's midnight solution must survive the date filter.
+    """
+    first = pd.Timestamp("2016-09-27 00:26:23")
+    daily = pd.DataFrame(
+        {"date": pd.date_range("2016-09-25", "2016-09-30"), "los_gps": np.arange(6.0)}
+    )
+    df_gps = UnrSource()._filter_by_date(daily, first).set_index("date")
+    df_insar = pd.DataFrame({"los_insar": [0.0]}, index=pd.DatetimeIndex([first]))
+
+    matched = merge_gps_insar(df_gps, df_insar).dropna(subset="los_insar")
+
+    assert matched.index.tolist() == [pd.Timestamp("2016-09-27")]
+
+
+@pytest.mark.parametrize("hour", [0, 0.44, 14.12, 19.27, 23.99])
+def test_daily_gps_matches_the_acquisition_day(hour):
+    """Regression: acquisitions after 12:00 UTC took the next day's solution."""
+    days = pd.date_range("2020-01-01", periods=6, freq="D")
+    df_gps = pd.DataFrame({"los_gps": np.arange(6.0)}, index=days)
+    acquired = pd.Timestamp("2020-01-03") + pd.Timedelta(hours=hour)
+    df_insar = pd.DataFrame({"los_insar": [1.0]}, index=pd.DatetimeIndex([acquired]))
+
+    matched = merge_gps_insar(df_gps, df_insar).dropna(subset="los_insar")
+
+    assert matched.index.tolist() == [pd.Timestamp("2020-01-03")]
 
 
 def test_merge_gps_insar_respects_tolerance():
