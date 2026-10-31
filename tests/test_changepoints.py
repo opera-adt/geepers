@@ -11,11 +11,12 @@ from geepers.changepoints import (
     ChangepointResult,
     detect_changepoints,
     fit_sparse_changepoints,
+    fit_sparse_changepoints_many,
     sample_changepoints,
 )
 from geepers.linearity import _noise_covariance
 from geepers.synthetic import power_law_noise
-from geepers.trend import DAYS_PER_YEAR, estimate_trend
+from geepers.trend import DAYS_PER_YEAR, TrendResult, estimate_trend
 
 MONTH = 365.25 / 12
 OFFSET_AT, RATE_AT = 3.0, 6.5  # years after the first epoch
@@ -368,6 +369,19 @@ class TestFitSparseChangepoints:
         _, _, stepwise = offset_and_rate_change
         pd.testing.assert_frame_equal(found.changepoints, stepwise.changepoints)
 
+    def test_refinement_recovers_a_smooth_signal(self):
+        # Regression: the lasso selection alone keeps too few change points on
+        # a sigmoid and misses its flattening, which ruins the present-day rate
+        n = 108
+        t = np.arange(n) / 12
+        rng = np.random.default_rng(1)
+        values = -40.0 / (1 + np.exp(-(t - 6.0) / 0.7)) + rng.normal(0, 1.0, n)
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(n) * MONTH), unit="D"
+        )
+        found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
+        assert abs(found.rate) < 5.0
+
     def test_no_changepoints_in_a_linear_series(self):
         dates, values = _monthly(offset=0.0, rate_change=0.0)
         found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
@@ -401,6 +415,25 @@ class TestFitSparseChangepoints:
             fit_sparse_changepoints(dates, values, kinds=("jump",))  # type: ignore[arg-type]
 
 
+def _station_monthly(site: str) -> pd.Series:
+    """Vertical (mm) of a station in tests/data/unr.zip, as 30-day means."""
+    import zipfile
+    from pathlib import Path
+
+    with (
+        zipfile.ZipFile(Path(__file__).parent / "data/unr.zip") as archive,
+        archive.open(f"tests/data/unr/{site}.tenv3") as f,
+    ):
+        df = pd.read_csv(f, sep=r"\s+")
+    mm = (df["u0(m)"] + df["____up(m)"]).to_numpy() * 1000.0
+    s = pd.Series(mm - mm[0], index=pd.to_datetime(df["YYMMMDD"], format="%y%b%d"))
+    edges = pd.date_range(s.index[0], s.index[-1], freq=pd.Timedelta(days=MONTH))
+    means = s.groupby(pd.cut(s.index, edges, right=False), observed=True).mean()
+    return pd.Series(
+        means.to_numpy(), index=pd.DatetimeIndex([b.left for b in means.index])
+    ).dropna()
+
+
 class TestFitSparseChangepointsRegression:
     """Golden-value regression for `fit_sparse_changepoints`."""
 
@@ -425,6 +458,15 @@ class TestFitSparseChangepointsRegression:
         assert list(cps["date"]) == [dates[36], dates[78]]
         assert found.rate == pytest.approx(-7.0, abs=0.02)
 
+    def test_busy_station_keeps_its_early_transient(self):
+        """Regression: the lasso path stopped once it held more clusters than
+        `max_changepoints`, and on a station with many changes (AHUP, Kilauea)
+        nothing was found near the 2006-08 inflation."""
+        s = _station_monthly("AHUP")
+        found = fit_sparse_changepoints(s.index, s.to_numpy(), sampling_days=MONTH)
+        gap = np.abs((found.changepoints["date"] - pd.Timestamp("2006-02-27")).dt.days)
+        assert (gap < 366).any()
+
     def test_golden(self, golden):
         dates, values = _monthly(seed=6)
         found = fit_sparse_changepoints(dates, values, sampling_days=MONTH)
@@ -437,5 +479,130 @@ class TestFitSparseChangepointsRegression:
                 "rate_sigma": found.rate_sigma,
                 "bic": found.bic,
                 "bic_none": found.bic_none,
+            },
+        )
+
+
+def _batch(n_each: int = 4):
+    """Series of three kinds: linear, offset at year 3, rate change at 6.5."""
+    rng = np.random.default_rng(1)
+    rows, kinds = [], []
+    for i in range(3 * n_each):
+        kind = i % 3
+        _, v = _monthly(
+            offset=8.0 if kind == 1 else 0.0,
+            rate_change=-4.0 if kind == 2 else 0.0,
+            seed=100 + i,
+        )
+        rows.append(v * rng.uniform(0.8, 1.2))
+        kinds.append(kind)
+    dates, _ = _monthly()
+    return dates, np.array(rows), np.array(kinds)
+
+
+FNWN = TrendResult(
+    velocity=np.nan, velocity_uncertainty=np.nan, sigma_white=1.0, sigma_flicker=0.7
+)
+
+
+@pytest.fixture(scope="module")
+def batch():
+    dates, rows, kinds = _batch()
+    return (
+        dates,
+        rows,
+        kinds,
+        fit_sparse_changepoints_many(dates, rows, sampling_days=MONTH),
+    )
+
+
+class TestFitSparseChangepointsMany:
+    def test_finds_the_change_points_of_each_series(self, batch):
+        _, _, kinds, result = batch
+        n = result.summary["n_changepoints"].to_numpy()
+        assert (n[kinds == 0] == 0).all()
+        assert (n[kinds != 0] >= 1).all()
+        cps = result.changepoints
+        found = cps.groupby("series")["kind"].apply(set)
+        for name, kind in zip(result.summary.index, kinds, strict=True):
+            if kind == 1:
+                assert "offset" in found[name]
+            elif kind == 2:
+                assert found[name] & {"rate", "both"}
+
+    def test_a_series_alone_matches_the_batch(self):
+        # With the noise given, nothing couples the series: each must come
+        # out as it does on its own
+        dates, rows, _ = _batch(n_each=2)
+        together = fit_sparse_changepoints_many(
+            dates, rows, noise=FNWN, sampling_days=MONTH
+        )
+        for k in (0, 2, 4):
+            alone = fit_sparse_changepoints_many(
+                dates, rows[[k]], noise=FNWN, sampling_days=MONTH
+            )
+            a = alone.summary.iloc[0]
+            b = together.summary.iloc[k]
+            assert a["n_changepoints"] == b["n_changepoints"]
+            assert a["rate"] == pytest.approx(b["rate"], rel=1e-9)
+            mine = together.changepoints[together.changepoints["series"] == str(k)]
+            assert list(alone.changepoints["date"]) == list(mine["date"])
+            assert list(alone.changepoints["kind"]) == list(mine["kind"])
+            np.testing.assert_allclose(
+                alone.changepoints[["offset", "rate_change"]].to_numpy(float),
+                mine[["offset", "rate_change"]].to_numpy(float),
+                rtol=1e-9,
+            )
+
+    def test_noise_scale_tracks_the_amplitude(self):
+        dates, rows, _ = _batch(n_each=1)
+        doubled = np.vstack([rows[0], 2.0 * rows[0]])
+        result = fit_sparse_changepoints_many(
+            dates, doubled, noise=FNWN, sampling_days=MONTH
+        )
+        scale = result.summary["noise_scale"].to_numpy()
+        assert scale[1] == pytest.approx(2.0 * scale[0], rel=1e-9)
+        # Scaling a series scales its rate and leaves the selection alone
+        assert result.summary["rate"].iloc[1] == pytest.approx(
+            2.0 * result.summary["rate"].iloc[0], rel=1e-6
+        )
+
+    def test_dataframe_input_and_incomplete_series(self):
+        dates, rows, _ = _batch(n_each=1)
+        frame = pd.DataFrame(rows.T, index=dates, columns=["a", "b", "c"])
+        frame.iloc[5, 1] = np.nan
+        result = fit_sparse_changepoints_many(None, frame, sampling_days=MONTH)
+        assert list(result.summary.index) == ["a", "b", "c"]
+        assert result.summary.loc["b"].isna().all()
+        assert "b" not in set(result.changepoints["series"])
+
+    def test_given_noise_is_used(self):
+        dates, rows, _ = _batch(n_each=1)
+        result = fit_sparse_changepoints_many(
+            dates, rows, noise=FNWN, sampling_days=MONTH
+        )
+        assert result.noise is FNWN
+
+    def test_no_complete_series_raises(self):
+        dates, rows, _ = _batch(n_each=1)
+        rows[:, 3] = np.nan
+        with pytest.raises(ValueError, match="No series without NaNs"):
+            fit_sparse_changepoints_many(dates, rows, sampling_days=MONTH)
+
+
+class TestFitSparseChangepointsManyRegression:
+    """Golden-value regression for `fit_sparse_changepoints_many`."""
+
+    def test_golden(self, batch, golden):
+        *_, result = batch
+        golden(
+            "changepoints_many.json",
+            {
+                "summary": _records(result.summary.reset_index()),
+                "changepoints": _records(result.changepoints),
+                "noise": {
+                    "sigma_white": result.noise.sigma_white,
+                    "sigma_flicker": result.noise.sigma_flicker,
+                },
             },
         )
