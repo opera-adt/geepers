@@ -118,6 +118,13 @@ class TestEstimateTrend:
         # trend must not absorb the step
         assert res.velocity == pytest.approx(0.0, abs=3 * res.velocity_uncertainty)
 
+    def test_covariance_matches_the_sigmas(self):
+        dates, y = _synthetic(n=400, sigma_white=0.5)
+        res = estimate_trend(dates, y, noise_model="WN")
+        assert res.covariance.shape == (len(res.parameters),) * 2
+        sigmas = [s for _, s in res.parameters.values()]
+        np.testing.assert_allclose(np.sqrt(np.diag(res.covariance)), sigmas)
+
     def test_rate_change_estimated(self):
         dates, y = _synthetic(n=900, velocity=2.0, sigma_white=0.5)
         t_yr = np.arange(900) / 365.25

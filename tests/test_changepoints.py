@@ -256,3 +256,92 @@ class TestSampleChangepoints:
         dates, values = _monthly()
         with pytest.raises(ValueError, match="p_change must be in"):
             sample_changepoints(dates, values, p_change=1.0)
+
+
+def _records(frame: pd.DataFrame) -> list[dict]:
+    """Rows as JSON-able dicts, dates as ISO strings."""
+    out = frame.copy()
+    for column in out.columns:
+        if pd.api.types.is_datetime64_any_dtype(out[column]):
+            out[column] = out[column].dt.strftime("%Y-%m-%d")
+    return [
+        {k: None if isinstance(v, float) and np.isnan(v) else v for k, v in row.items()}
+        for row in out.to_dict(orient="records")
+    ]
+
+
+class TestDetectChangepointsRegression:
+    """Golden-value regression for `detect_changepoints`.
+
+    The near noise-free series must give back the inputs; the noisy fixture
+    pins the selection, sizes, segment rates and noise estimate, so a change
+    in the search, the BIC or the noise refit shows up here.
+    """
+
+    def test_recovers_exact_parameters(self):
+        n = 120
+        t = np.arange(n) / 12
+        values = (
+            -3.0 * t
+            + 3.0 * np.sin(2 * np.pi * t)
+            + 8.0 * (t >= OFFSET_AT)
+            - 4.0 * np.maximum(0.0, t - RATE_AT)
+            + np.random.default_rng(0).normal(0, 0.05, n)
+        )
+        dates = pd.Timestamp("2016-01-01") + pd.to_timedelta(
+            np.round(np.arange(n) * MONTH), unit="D"
+        )
+        found = detect_changepoints(
+            dates, values, sampling_days=MONTH, noise_model="WN"
+        )
+        cps = found.changepoints
+        assert list(cps["kind"]) == ["offset", "rate"]
+        assert list(cps["date"]) == [dates[36], dates[78]]
+        assert cps["offset"].iloc[0] == pytest.approx(8.0, abs=0.05)
+        assert cps["rate_change"].iloc[1] == pytest.approx(-4.0, abs=0.02)
+        assert found.rate == pytest.approx(-7.0, abs=0.02)
+        assert list(found.segments["rate"].round(1)) == [-3.0, -3.0, -7.0]
+
+    def test_golden(self, offset_and_rate_change, golden):
+        _, _, found = offset_and_rate_change
+        golden(
+            "changepoints_detect.json",
+            {
+                "changepoints": _records(found.changepoints),
+                "segments": _records(found.segments),
+                "rate": found.rate,
+                "rate_sigma": found.rate_sigma,
+                "bic": found.bic,
+                "bic_none": found.bic_none,
+                "sigma_white": found.trend.sigma_white,
+                "sigma_flicker": found.trend.sigma_flicker,
+            },
+        )
+
+
+class TestSampleChangepointsRegression:
+    """Golden-value regression for `sample_changepoints` with a fixed seed."""
+
+    def test_golden(self, offset_and_rate_change, golden):
+        dates, values, found = offset_and_rate_change
+        post = sample_changepoints(
+            dates,
+            values,
+            sampling_days=MONTH,
+            detection=found,
+            n_samples=1000,
+            n_burn=200,
+            n_chains=2,
+            seed=11,
+        )
+        golden(
+            "changepoints_sample.json",
+            {
+                "changepoints": _records(post.changepoints),
+                "n_probability": post.n_probability.tolist(),
+                "rate": post.rate,
+                "rate_sigma": post.rate_sigma,
+                "acceptance_rate": post.acceptance_rate,
+                "rate_samples_head": post.rate_samples[:5].tolist(),
+            },
+        )

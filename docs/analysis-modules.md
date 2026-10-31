@@ -141,6 +141,37 @@ post.rhat                     # chain convergence
   `step_dates`. The flicker + white default matters for the same reason
   as in `linearity_test`.
 
+## Forecasts and backtests (`geepers.forecast`)
+
+`forecast_trend` extrapolates the `detect_changepoints` model (present-day
+rate and periodic terms) with an interval built from three parts: the
+parameter uncertainty, the colored noise predicted from the past
+residuals (flicker persists, so its conditional mean is not zero), and
+future rate changes simulated at the rate and mean size this series has
+shown, as in Prophet (Taylor & Letham, 2018). `backtest` redoes the whole
+fit at past cutoffs and scores the forecasts against what followed:
+
+```python
+from geepers.forecast import backtest, forecast_trend
+
+fc = forecast_trend(dates, up_mm, horizon_years=5, sampling_days=30)
+fc.table[["mean", "lower", "upper", "sigma_model", "sigma_noise"]]
+fc.change_rates, fc.change_scales     # simulated future rate changes
+
+bt = backtest(dates, up_mm, horizon_years=3, sampling_days=30)
+bt.metrics                            # rmse, mae, coverage, width by lead
+```
+
+- Only rate changes are simulated by default. A past offset is usually an
+  event whose recurrence the record cannot predict, and simulating offsets
+  made the 95 % intervals cover 100 % at three times the needed width;
+  `simulate_changes=("offset", "rate")` turns them on.
+- On synthetic flicker + white series without change points the 95 %
+  intervals cover 92-96 % of the next three years. A record that has never
+  shown a rate change simulates none, so a first change is not covered
+  until it has been in the record long enough to be detected (coverage
+  0.24 half a year after a -4 mm/yr change, 0.97 after 2.5 years).
+
 ## Station stability metrics (`geepers.variability`)
 
 Quality metrics extracted from the AUS GNSS screening workflow:
