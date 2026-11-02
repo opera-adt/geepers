@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -36,15 +37,20 @@ import numpy as np
 from numpy.typing import ArrayLike
 from pyproj import Transformer
 
+from geepers.gps_imaging import crosses_breaklines, great_circle_degrees
+
 __all__ = [
     "EulerPole",
     "estimate_euler_pole",
+    "local_plate_velocity",
     "pole_to_rotation_vector",
     "predict_plate_motion",
     "rotation_vector_to_pole",
 ]
 
 logger = logging.getLogger("geepers")
+
+KM_PER_DEGREE = 111.195
 
 _LONLAT_TO_ECEF = Transformer.from_crs(
     "EPSG:4326",
@@ -463,3 +469,92 @@ def plate_velocity_enu(
     """
     ve, vn = predict_plate_motion(plate_pole(plate, model), lon, lat, height)
     return ve, vn, np.zeros_like(ve)
+
+
+def local_plate_velocity(
+    lon: ArrayLike,
+    lat: ArrayLike,
+    ve: ArrayLike,
+    vn: ArrayLike,
+    sigma_e: ArrayLike,
+    sigma_n: ArrayLike,
+    lon0: float,
+    lat0: float,
+    *,
+    radius_km: float = 333.0,
+    min_stations: int = 6,
+    iterations: int = 10,
+    breaklines: Sequence[ArrayLike] | None = None,
+) -> tuple[float, float]:
+    """Estimate broad tectonic motion at a point from the stations around it.
+
+    The tectonic background of the OPERA DISP-CAL ATBD section 2.5.5.2: a robust fit of
+    3 rotation and 3 uniform horizontal strain parameters. Fitting strain keeps velocity
+    gradients in a deforming zone from biasing the rotation, and strain contributes
+    nothing at the point itself.
+
+    Parameters
+    ----------
+    lon, lat : array-like
+        Station coordinates in degrees.
+    ve, vn : array-like
+        East and north velocities.
+    sigma_e, sigma_n : array-like
+        1-sigma velocity uncertainties.
+    lon0, lat0 : float
+        The point, in degrees.
+    radius_km : float
+        Stations this close contribute. Default 333 km.
+    min_stations : int
+        Fewest stations for a fit.
+    iterations : int
+        Reweighting iterations of the robust (L1) fit.
+    breaklines : sequence of array-like, optional
+        Polylines of (lon, lat). Stations across them do not contribute.
+
+    Returns
+    -------
+    tuple of float
+        East and north velocity at the point; NaN if too few stations.
+
+    """
+    lon = np.asarray(lon, float)
+    lat = np.asarray(lat, float)
+    km = great_circle_degrees(lat0, lon0, lat, lon) * KM_PER_DEGREE
+    keep = km <= radius_km
+    # A station with no usable rate would stop the least-squares solver
+    for values in (ve, vn, sigma_e, sigma_n):
+        keep &= np.isfinite(np.asarray(values, float))
+    if breaklines is not None:
+        keep &= ~crosses_breaklines(lon, lat, lon0, lat0, breaklines)
+    if keep.sum() < min_stations:
+        return float("nan"), float("nan")
+
+    def on_east_north(lon_deg, lat_deg):
+        la, lo = np.radians(lat_deg), np.radians(lon_deg)
+        east = np.c_[-np.sin(la) * np.cos(lo), -np.sin(la) * np.sin(lo), np.cos(la)]
+        north = np.c_[np.sin(lo), -np.cos(lo), np.zeros_like(la)]
+        return east, north
+
+    east, north = on_east_north(lon[keep], lat[keep])
+    x = (lon[keep] - lon0) * np.cos(np.radians(lat0)) * KM_PER_DEGREE
+    y = (lat[keep] - lat0) * KM_PER_DEGREE
+    zeros = np.zeros_like(x)
+    design = np.vstack(
+        [
+            np.c_[east, x, y, zeros],
+            np.c_[north, zeros, x, y],
+        ]
+    )
+    data = np.r_[np.asarray(ve, float)[keep], np.asarray(vn, float)[keep]]
+    sigma = np.r_[np.asarray(sigma_e, float)[keep], np.asarray(sigma_n, float)[keep]]
+    scale = np.abs(design).max(axis=0)
+    a = design / scale
+    w = 1.0 / sigma
+    coef = np.zeros(6)
+    for _ in range(iterations):
+        coef = np.linalg.lstsq(a * w[:, None], data * w, rcond=None)[0]
+        w = 1.0 / np.sqrt(sigma * np.maximum(np.abs(data - a @ coef), 0.01))
+    rotation = coef[:3] / scale[:3]
+    east0, north0 = on_east_north(np.array([lon0]), np.array([lat0]))
+    return float((east0 @ rotation)[0]), float((north0 @ rotation)[0])

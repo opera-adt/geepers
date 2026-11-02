@@ -10,6 +10,7 @@ from geepers.gps_imaging import great_circle_degrees
 from geepers.quality import gap_percentage
 from geepers.variability import (
     delaunay_neighbors,
+    rate_variability_index,
     spatial_structure_function,
     spatial_variability,
     ssf_per_station,
@@ -206,3 +207,26 @@ class TestGapPercentage:
     def test_empty_window(self):
         dates = pd.date_range("2020-01-01", periods=10, freq="D")
         assert np.isnan(gap_percentage(dates, start="2021-01-01", end="2021-02-01"))
+
+
+class TestRateVariabilityIndex:
+    t = np.arange(3000) / 365.25
+    noise = np.random.default_rng(5).normal(0, 1.0, 3000)
+
+    def test_separates_steady_from_changing_rates(self):
+        steady = rate_variability_index(self.t, 4.0 * self.t + self.noise)
+        changing = rate_variability_index(
+            self.t, 4.0 * self.t + 3.0 * self.t**2 + self.noise
+        )
+        assert steady < 0.5
+        assert changing > 3.0
+
+    def test_short_record_has_no_index(self):
+        t = np.arange(200) / 365.25
+        assert np.isnan(rate_variability_index(t, t))
+
+    def test_empty_step_list_is_accepted(self):
+        y = 4.0 * self.t + self.noise
+        assert rate_variability_index(
+            self.t, y, step_times=[]
+        ) == rate_variability_index(self.t, y)
