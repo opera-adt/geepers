@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,8 @@ from geepers.gps_imaging import make_ssf
 DAYS = pd.date_range("2012-01-01", periods=400, freq="D")
 SSF = np.c_[[0.0, 1.0, 10.0, 180.0], [1.0, 0.7, 0.2, 0.0]]
 FAULT = [np.array([(0.0, -10.0), (0.0, 10.0)])]
+# Crosses nothing, but takes the path that recomputes every neighborhood
+FAR_AWAY = [np.array([(100.0, 60.0), (101.0, 61.0)])]
 
 
 def network(n: int = 12, seed: int = 0) -> pd.DataFrame:
@@ -46,6 +49,29 @@ def series_for(motion: float, gaps: slice | None = None) -> pd.DataFrame:
         index=DAYS,
     )
     return df if gaps is None else df.drop(DAYS[gaps])
+
+
+def filled_network(
+    stations: pd.DataFrame, gappy: dict[str, slice]
+) -> gridding.PositionCube:
+    series = {s: series_for(0.0, gappy.get(s)) for s in stations.id}
+    return gridding.build_position_cube(series, stations, DAYS, {}, {})
+
+
+def noisy_network(
+    rng: np.random.Generator, gappy: dict[str, slice]
+) -> gridding.PositionCube:
+    """Stations that disagree, so the median has to choose between them."""
+    stations = network(14, seed=2)
+    series = {}
+    for site in stations.id:
+        df = series_for(rng.normal(0, 3))
+        for c in ("east", "north", "up"):
+            df[c] += rng.normal(0, 1.5, len(df)) + rng.normal(0, 0.02) * np.arange(
+                len(df)
+            )
+        series[site] = df if site not in gappy else df.drop(DAYS[gappy[site]])
+    return gridding.build_position_cube(series, stations, DAYS, {}, {})
 
 
 def test_years_since_counts_365_25_day_years():
@@ -259,3 +285,177 @@ def test_background_rates_returns_a_row_per_point():
     out = gridding.background_rates(stats, [0.0, 80.0], [0.0, 0.0])
     assert out["ve"].iloc[0] == pytest.approx(1.0, abs=0.01)
     assert out["ve"].isna().tolist() == [False, True]
+
+
+class TestBuildPositionCube:
+    def test_gaps_are_nan_and_observed_is_recorded(self):
+        cube = filled_network(network(4), {"S000": slice(10, 20)})
+        assert np.isnan(cube.x[0, 10:20]).all()
+        assert not cube.observed[0, 10:20].any()
+        assert cube.observed[1].all()
+
+    def test_equipment_step_is_removed_and_earthquake_kept(self):
+        stations = network(1)
+        df = series_for(0.0)
+        df.loc[DAYS[200] :, "east"] += 30.0
+        df.loc[DAYS[300] :, "north"] += 30.0
+        cube = gridding.build_position_cube(
+            {"S000": df}, stations, DAYS, {"S000": [DAYS[200]]}, {"S000": [DAYS[300]]}
+        )
+        assert abs(cube.x[0, 205, 0] - cube.x[0, 195, 0]) < 3.0
+        assert cube.x[0, 305, 1] - cube.x[0, 295, 1] > 20.0
+        assert cube.earthquakes[0].tolist() == [300]
+
+    def test_outlier_and_noisy_days_become_gaps(self):
+        stations = network(1)
+        df = series_for(0.0)
+        df.loc[DAYS[50], "up"] += 100.0
+        df.loc[DAYS[60], "sigma_up"] = 50.0
+        cube = gridding.build_position_cube({"S000": df}, stations, DAYS, {}, {})
+        assert not cube.observed[0, 50]
+        assert not cube.observed[0, 60]
+        assert cube.observed[0, 70]
+
+
+class TestFillGaps:
+    def test_two_sided_gap_recovers_the_shared_signal(self):
+        cube = filled_network(network(12), {"S000": slice(100, 140)})
+        counts = gridding.fill_gaps(cube, SSF)
+        assert counts["spatial_pass_1"] == 40
+        assert counts["model"] == 0
+        truth = series_for(0.0)["east"].to_numpy()[100:140]
+        assert cube.x[0, 100:140, 0] == pytest.approx(truth, abs=1e-6)
+
+    def test_gap_before_the_first_observation_is_filled_from_after(self):
+        cube = filled_network(network(12), {"S000": slice(0, 60)})
+        gridding.fill_gaps(cube, SSF)
+        truth = series_for(0.0)["east"].to_numpy()[:60]
+        assert cube.x[0, :60, 0] == pytest.approx(truth, abs=1e-6)
+
+    def test_no_neighbours_falls_back_to_the_model(self):
+        cube = filled_network(network(1), {"S000": slice(100, 110)})
+        counts = gridding.fill_gaps(cube, SSF)
+        assert counts["model"] == 10
+        assert np.isfinite(cube.x).all()
+
+    def test_earthquake_blocks_a_reference_across_it(self):
+        stations = network(12)
+        series = {s: series_for(0.0) for s in stations.id}
+        series["S000"] = series["S000"].drop(DAYS[100:140])
+        series["S000"].loc[DAYS[140] :, "east"] += 30.0
+        cube = gridding.build_position_cube(
+            series, stations, DAYS, {}, {"S000": [DAYS[120]]}
+        )
+        gridding.fill_gaps(cube, SSF)
+        # Days after the earthquake tie to later data, which carries the step
+        assert cube.x[0, 130, 0] - series_for(0.0)["east"].iloc[130] == pytest.approx(
+            30.0, abs=1e-6
+        )
+        assert cube.x[0, 110, 0] == pytest.approx(
+            series_for(0.0)["east"].iloc[110], abs=1e-6
+        )
+
+    def test_parallel_matches_serial(self):
+        gappy = {"S000": slice(100, 110), "S001": slice(5, 9)}
+        serial = filled_network(network(12), gappy)
+        parallel = filled_network(network(12), gappy)
+        gridding.fill_gaps(serial, SSF)
+        gridding.fill_gaps(parallel, SSF, n_workers=2)
+        assert np.array_equal(serial.x, parallel.x)
+
+    def test_shared_neighborhoods_match_the_general_path(self):
+        rng = np.random.default_rng(3)
+        gappy = {"S000": slice(100, 140), "S003": slice(0, 30), "S007": slice(250, 300)}
+        fast = noisy_network(rng, gappy)
+        general = deepcopy(fast)
+        gridding.fill_gaps(fast, SSF)
+        gridding.fill_gaps(general, SSF, breaklines=FAR_AWAY)
+        assert fast.x == pytest.approx(general.x, abs=1e-9)
+        assert fast.s == pytest.approx(general.s, abs=1e-9)
+
+    def test_coincident_stations_still_fill(self):
+        stations = network(12)
+        stations.loc[1, ["lon", "lat"]] = stations.loc[2, ["lon", "lat"]].to_numpy()
+        series = {s: series_for(0.0) for s in stations.id}
+        series["S000"] = series["S000"].drop(DAYS[100:110])
+        cube = gridding.build_position_cube(series, stations, DAYS, {}, {})
+        gridding.fill_gaps(cube, SSF)
+        assert np.isfinite(cube.x).all()
+
+    @pytest.mark.parametrize(("weight_by_sigma", "shift"), [(False, 0.0), (True, 50.0)])
+    def test_a_confident_outlier_only_wins_when_weighting_by_sigma(
+        self, weight_by_sigma, shift
+    ):
+        cube = filled_network(network(12), {"S000": slice(105, 106)})
+        km = np.hypot(cube.lon - cube.lon[0], cube.lat - cube.lat[0])
+        km[0] = np.inf
+        nearest = int(np.argmin(km))
+        cube.x[nearest, 105] += 50.0
+        # The fill weights by the sigma of a difference, so the references count too
+        cube.s[nearest, 104:107] = 1e-6
+        gridding.fill_gaps(cube, SSF, weight_by_sigma=weight_by_sigma)
+        truth = series_for(0.0)["east"].iloc[105]
+        assert cube.x[0, 105, 0] == pytest.approx(truth + shift, abs=1e-6)
+
+
+class TestImagePositions:
+    def test_returns_displacement_since_the_first_day(self):
+        cube = filled_network(network(12), {})
+        out = gridding.image_positions(cube, [0.1, -0.1], [0.0, 0.2], SSF)
+        assert out.shape == (len(DAYS), 2, 3)
+        assert (out[0] == 0).all()
+        truth = series_for(0.0)["east"].to_numpy()
+        assert out[:, 0, 0] == pytest.approx(truth - truth[0], abs=1e-6)
+
+    def test_shared_neighborhoods_match_the_general_path(self):
+        cube = noisy_network(np.random.default_rng(4), {})
+        # Includes a point exactly on a station, and one beyond the network
+        lon = [0.1, -0.1, cube.lon[2], 5.0]
+        lat = [0.0, 0.2, cube.lat[2], 5.0]
+        fast = gridding.image_positions(cube, lon, lat, SSF)
+        general = gridding.image_positions(cube, lon, lat, SSF, breaklines=FAR_AWAY)
+        assert fast == pytest.approx(general, abs=1e-12)
+
+    def test_parallel_matches_serial(self):
+        cube = noisy_network(np.random.default_rng(5), {})
+        lon, lat = [0.1, -0.1, 0.05], [0.0, 0.2, -0.1]
+        serial = gridding.image_positions(cube, lon, lat, SSF)
+        parallel = gridding.image_positions(cube, lon, lat, SSF, n_workers=2)
+        assert np.array_equal(serial, parallel)
+
+    def test_gaps_are_refused(self):
+        cube = filled_network(network(4), {"S000": slice(1, 3)})
+        with pytest.raises(ValueError, match="run fill_gaps first"):
+            gridding.image_positions(cube, [0.0], [0.0], SSF)
+
+    def test_breakline_keeps_each_side_to_itself(self):
+        stations = network(30)
+        series = {s: series_for(0.0) for s in stations.id}
+        ramp = np.arange(len(DAYS)) * 0.1
+        for row in stations.itertuples():
+            if row.lon < 0:
+                series[row.id]["east"] = ramp
+            else:
+                series[row.id]["east"] = -ramp
+        cube = gridding.build_position_cube(series, stations, DAYS, {}, {})
+        out = gridding.image_positions(
+            cube, [-0.05, 0.05], [0.0, 0.0], SSF, breaklines=FAULT
+        )
+        assert out[-1, 0, 0] == pytest.approx(ramp[-1])
+        assert out[-1, 1, 0] == pytest.approx(-ramp[-1])
+
+    @pytest.mark.parametrize(
+        ("weight_by_sigma", "expected"), [(False, 0.0), (True, 100.0)]
+    )
+    def test_a_confident_outlier_only_wins_when_weighting_by_sigma(
+        self, weight_by_sigma, expected
+    ):
+        cube = filled_network(network(12), {})
+        cube.x[:, -1, 0] = cube.x[:, 0, 0]
+        nearest = int(np.argmin(np.hypot(cube.lon - 0.1, cube.lat)))
+        cube.x[nearest, -1, 0] += 100.0
+        cube.s[nearest, -1, 0] = 1e-6
+        out = gridding.image_positions(
+            cube, [0.1], [0.0], SSF, weight_by_sigma=weight_by_sigma
+        )
+        assert out[-1, 0, 0] == pytest.approx(expected)

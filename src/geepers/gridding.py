@@ -18,7 +18,9 @@ to mean the displacement at the gap time.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable, Mapping
+import multiprocessing as mp
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -26,25 +28,34 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
+from scipy.spatial import Delaunay, QhullError
 
 from geepers.euler import local_plate_velocity
 from geepers.gps_imaging import (
     Breaklines,
     great_circle_degrees,
     iterated_median_spatial_filter,
+    linked_stations,
     msf_interpolate,
+    tri_vertex_neighbors,
+    weighted_medians,
 )
 from geepers.midas import midas
+from geepers.steps import remove_known_steps
 from geepers.variability import rate_variability_index
 
 __all__ = [
     "PUBLISHED_SELECTION",
+    "PositionCube",
     "SelectionCriteria",
     "atbd_ssf",
     "background_rates",
     "background_weight",
+    "build_position_cube",
     "decluster",
+    "fill_gaps",
     "filter_station_rates",
+    "image_positions",
     "rate_grid",
     "read_breaklines",
     "select_time_variable",
@@ -59,6 +70,11 @@ KM_PER_DEGREE = 111.195
 # MIDAS can report almost no uncertainty on a clean series, and sigmas divide weights
 MIN_SIGMA_RATE = 0.1
 CLUSTER_RADIUS_KM = 0.01
+MAX_POSITION_SIGMA = 10.0
+MAX_MEDIAN_DEPARTURE = 10.0
+# "The nearest 1%" of the roughly 4500 stations in the ATBD
+N_NEIGHBORS = 45
+MIN_NEIGHBORS = 3
 
 
 @dataclass(frozen=True)
@@ -487,3 +503,459 @@ def rate_grid(
         ).to_numpy()
         out[f"n{c}"] = est["n_stations"].to_numpy()
     return pd.DataFrame(out)
+
+
+@dataclass
+class PositionCube:
+    """Selected stations on a common daily axis.
+
+    Attributes
+    ----------
+    sites : list of str
+        Station names.
+    lon, lat : np.ndarray
+        Station coordinates in degrees.
+    days : pd.DatetimeIndex
+        The daily axis.
+    x, s : np.ndarray
+        Positions and sigmas in mm, (station, day, component); NaN marks a gap.
+    observed : np.ndarray
+        True where (station, day) held a kept solution before filling.
+    earthquakes : list of np.ndarray
+        Each station's earthquake steps, as indices into `days`.
+
+    """
+
+    sites: list[str]
+    lon: np.ndarray
+    lat: np.ndarray
+    days: pd.DatetimeIndex
+    x: np.ndarray
+    s: np.ndarray
+    observed: np.ndarray
+    earthquakes: list[np.ndarray]
+
+
+def _median_of_adjacent(y: np.ndarray) -> np.ndarray:
+    pad = np.r_[y[0], y[0], y, y[-1], y[-1]]
+    return np.median(np.lib.stride_tricks.sliding_window_view(pad, 5), axis=1)
+
+
+def _steps_within(
+    dates: Iterable[pd.Timestamp], origin: pd.Timestamp, t: np.ndarray
+) -> np.ndarray:
+    times = years_since(pd.DatetimeIndex(sorted(dates)), origin)
+    return np.unique(times[(times > t[0]) & (times < t[-1])])
+
+
+def build_position_cube(
+    series: Mapping[str, pd.DataFrame],
+    stations: pd.DataFrame,
+    days: pd.DatetimeIndex,
+    equipment: Mapping[str, Iterable[pd.Timestamp]],
+    earthquakes: Mapping[str, Iterable[pd.Timestamp]],
+) -> PositionCube:
+    """Put stations on the daily axis without equipment steps and outliers.
+
+    Earthquake steps stay in the series: they are signal. A day is dropped if any
+    component's sigma exceeds 10 mm or it departs from the median of the 5 adjacent
+    observations by more than 10 mm. The ATBD takes that median over a filled series;
+    here it is over observations.
+
+    Parameters
+    ----------
+    series : mapping of str to pd.DataFrame
+        Per station: ``east``, ``north``, ``up`` and ``sigma_*`` in mm by date.
+    stations : pd.DataFrame
+        ``id``, ``lon`` and ``lat``.
+    days : pd.DatetimeIndex
+        The daily axis.
+    equipment, earthquakes : mapping of str to iterable of pd.Timestamp
+        Catalogued steps per station. A missing station has none.
+
+    Returns
+    -------
+    PositionCube
+
+    """
+    x = np.full((len(stations), len(days), 3), np.nan)
+    s = np.full_like(x, np.nan)
+    day_times = years_since(days, days[0])
+    quakes = []
+    for i, site in enumerate(stations.id):
+        df = series[site]
+        df = df[(df.index >= days[0]) & (df.index <= days[-1])]
+        where = days.get_indexer(df.index)
+        t = day_times[where]
+
+        kit = _steps_within(equipment.get(site, ()), days[0], t)
+        eq = _steps_within(earthquakes.get(site, ()), days[0], t)
+        quakes.append(np.searchsorted(day_times, eq))
+        keep = np.ones(len(df), bool)
+        cleaned = {}
+        for c, sigma in zip(COMPONENTS, SIGMA_COLUMNS, strict=True):
+            cleaned[c] = remove_known_steps(t, df[c].to_numpy(), kit, other_steps=eq)
+            keep &= df[sigma].to_numpy() <= MAX_POSITION_SIGMA
+            departure = np.abs(cleaned[c] - _median_of_adjacent(cleaned[c]))
+            keep &= departure <= MAX_MEDIAN_DEPARTURE
+        for k, (c, sigma) in enumerate(zip(COMPONENTS, SIGMA_COLUMNS, strict=True)):
+            x[i, where[keep], k] = cleaned[c][keep]
+            s[i, where[keep], k] = df[sigma].to_numpy()[keep]
+    return PositionCube(
+        list(stations.id),
+        stations.lon.to_numpy(),
+        stations.lat.to_numpy(),
+        days,
+        x,
+        s,
+        np.isfinite(x[:, :, 0]),
+        quakes,
+    )
+
+
+# Worker state, inherited by forked workers instead of pickled for every task
+_WORKER: dict[str, Any] = {}
+
+
+def _set_worker(**state: Any) -> None:
+    _WORKER.clear()
+    _WORKER.update(state)
+
+
+def _map(
+    function: Callable[[int], Any],
+    items: Sequence[int],
+    n_workers: int,
+    state: dict[str, Any],
+    chunksize: int = 1,
+) -> list[Any]:
+    # Set before forking, for the workers to inherit without pickling the arrays
+    _set_worker(**state)
+    if n_workers <= 1:
+        return [function(item) for item in items]
+    with ProcessPoolExecutor(n_workers, mp_context=mp.get_context("fork")) as pool:
+        return list(pool.map(function, items, chunksize=chunksize))
+
+
+def _can_share_neighborhoods(
+    lon: np.ndarray,
+    lat: np.ndarray,
+    breaklines: Breaklines | None,
+    weight_by_sigma: bool,
+) -> bool:
+    """Tell whether weights stay the same for every value at the same stations."""
+    if weight_by_sigma or breaklines is not None:
+        return False
+    return len(np.unique(np.c_[lon, lat], axis=0)) == len(lon)
+
+
+def _distance_weights(
+    lon: np.ndarray,
+    lat: np.ndarray,
+    lon_point: float,
+    lat_point: float,
+    ssf: np.ndarray,
+) -> np.ndarray:
+    weight = np.interp(
+        great_circle_degrees(lat_point, lon_point, lat, lon), ssf[:, 0], ssf[:, 1]
+    )
+    return np.ones_like(weight) if np.all(weight == 0) else weight
+
+
+def _shared_neighborhood(
+    j: int, usable: np.ndarray
+) -> tuple[np.ndarray, np.ndarray] | None:
+    lon, lat = _WORKER["lon"], _WORKER["lat"]
+    try:
+        tri = Delaunay(np.c_[lon[usable], lat[usable]])
+        linked = linked_stations(
+            lon[usable], lat[usable], lon[j], lat[j], tri_vertex_neighbors(tri)
+        )
+    except QhullError:
+        return None
+    if linked.size == 0:
+        return None
+    stations = usable[linked]
+    return stations, _distance_weights(
+        lon[stations], lat[stations], lon[j], lat[j], _WORKER["ssf"]
+    )
+
+
+def _difference_at_target(
+    j: int, near: np.ndarray, day: int, ref: int, known_links: dict[bytes, Any]
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return the target's displacement from `ref` to `day` (ATBD Eqs. 12-14, 18)."""
+    x, s, have = _WORKER["x"], _WORKER["s"], _WORKER["have"]
+    lon, lat = _WORKER["lon"], _WORKER["lat"]
+    usable = near[have[near, day] & have[near, ref]]
+    if usable.size < MIN_NEIGHBORS:
+        return None
+    if _WORKER["share_neighborhoods"]:
+        key = usable.tobytes()
+        if key not in known_links:
+            known_links[key] = _shared_neighborhood(j, usable)
+        if known_links[key] is None:
+            return None
+        stations, weight = known_links[key]
+        change = x[stations, day] - x[stations, ref]
+        value = weighted_medians(change, weight)
+        scatter = change - value
+        scatter = np.median(np.abs(scatter - np.median(scatter, axis=0)), axis=0)
+        return value, np.hypot(np.median(s[usable, day], axis=0), 1.4826 * scatter)
+    value, sigma = np.zeros(3), np.zeros(3)
+    for k in range(3):
+        try:
+            est = msf_interpolate(
+                lon[usable],
+                lat[usable],
+                x[usable, day, k] - x[usable, ref, k],
+                (
+                    np.hypot(s[usable, day, k], s[usable, ref, k])
+                    if _WORKER["weight_by_sigma"]
+                    else np.ones(usable.size)
+                ),
+                [lon[j]],
+                [lat[j]],
+                _WORKER["ssf"],
+                breaklines=_WORKER["breaklines"],
+            ).iloc[0]
+        except Exception:
+            return None
+        if not np.isfinite(est["value"]):
+            return None
+        value[k] = est["value"]
+        robust = est["sigma_robust"] if np.isfinite(est["sigma_robust"]) else 0.0
+        sigma[k] = np.hypot(np.median(s[usable, day, k]), robust)
+    return value, sigma
+
+
+def _fill_one_station(j: int) -> tuple[int, list[tuple[int, np.ndarray, np.ndarray]]]:
+    x, have = _WORKER["x"], _WORKER["have"]
+    lon, lat = _WORKER["lon"], _WORKER["lat"]
+    quakes = _WORKER["earthquakes"][j]
+    distance = great_circle_degrees(lat[j], lon[j], lat, lon)
+    distance[j] = np.inf
+    near = np.argsort(distance)[:N_NEIGHBORS]
+    known = np.flatnonzero(have[j])
+    rows: list[tuple[int, np.ndarray, np.ndarray]] = []
+    if known.size == 0:
+        return j, rows
+    links: dict[bytes, Any] = {}
+    for day in np.flatnonzero(~have[j]):
+        pos = np.searchsorted(known, day)
+        before = known[pos - 1] if pos > 0 else None
+        after = known[pos] if pos < known.size else None
+        # No earthquake may fall between a reference and the gap
+        if before is not None and ((quakes > before) & (quakes <= day)).any():
+            before = None
+        if after is not None and ((quakes > day) & (quakes <= after)).any():
+            after = None
+        below = (
+            None
+            if before is None
+            else _difference_at_target(j, near, day, before, links)
+        )
+        above = (
+            None if after is None else _difference_at_target(j, near, day, after, links)
+        )
+        if before is not None and after is not None and below and above:
+            weight = (after - day) / (after - before)
+            value = weight * (x[j, before] + below[0]) + (1 - weight) * (
+                x[j, after] + above[0]
+            )
+            sigma = weight * below[1] + (1 - weight) * above[1]
+        elif below is not None:
+            value, sigma = x[j, before] + below[0], below[1]
+        elif above is not None:
+            value, sigma = x[j, after] + above[0], above[1]
+        else:
+            continue
+        rows.append((int(day), value, sigma))
+    return j, rows
+
+
+def _fill_from_model(cube: PositionCube) -> int:
+    t = years_since(cube.days, cube.days[0])
+    count = 0
+    for j in range(len(cube.sites)):
+        gaps = np.isnan(cube.x[j, :, 0])
+        if not gaps.any():
+            continue
+        known = ~gaps
+        design = trajectory_design(t, t[cube.earthquakes[j]])
+        for k in range(3):
+            coef = np.linalg.lstsq(design[known], cube.x[j, known, k], rcond=None)[0]
+            cube.x[j, gaps, k] = design[gaps] @ coef
+            cube.s[j, gaps, k] = np.sqrt(2) * np.nanmedian(cube.s[j, :, k])
+        count += int(gaps.sum())
+    return count
+
+
+def fill_gaps(
+    cube: PositionCube,
+    ssf: np.ndarray,
+    *,
+    breaklines: Breaklines | None = None,
+    n_workers: int = 1,
+    passes: int = 2,
+    weight_by_sigma: bool = False,
+) -> dict[str, int]:
+    """Fill every gap in place (ATBD section 2.5.6.1).
+
+    A gap takes the displacement of the stations around it since the nearest day with
+    data on either side, unless an earthquake intervenes. A second pass treats filled
+    days as data, and `trajectory_design` fills what remains.
+
+    Parameters
+    ----------
+    cube : PositionCube
+        Modified in place. Every station needs some data.
+    ssf : np.ndarray
+        Spatial structure function from `make_ssf`.
+    breaklines : sequence of array-like, optional
+        Neighbours across these are not used.
+    n_workers : int
+        Processes.
+    passes : int
+        Spatial passes.
+    weight_by_sigma : bool
+        Divide weights by the position sigmas, as ATBD Eq. (6) reads. Default False,
+        since UNR Version 0.3 weights by distance alone: see `image_positions`.
+
+    Returns
+    -------
+    dict of str to int
+        Station-days observed and filled by each method.
+
+    """
+    counts = {"observed": int(cube.observed.sum())}
+    share = _can_share_neighborhoods(cube.lon, cube.lat, breaklines, weight_by_sigma)
+    for attempt in range(passes):
+        state = {
+            "x": cube.x,
+            "s": cube.s,
+            "have": np.isfinite(cube.x[:, :, 0]),
+            "lon": cube.lon,
+            "lat": cube.lat,
+            "ssf": ssf,
+            "breaklines": breaklines,
+            "earthquakes": cube.earthquakes,
+            "weight_by_sigma": weight_by_sigma,
+            "share_neighborhoods": share,
+        }
+        results = _map(_fill_one_station, range(len(cube.sites)), n_workers, state)
+        filled = 0
+        for j, rows in results:
+            for day, value, sigma in rows:
+                cube.x[j, day] = value
+                cube.s[j, day] = sigma
+                filled += 1
+        counts[f"spatial_pass_{attempt + 1}"] = filled
+    counts["model"] = _fill_from_model(cube)
+    return counts
+
+
+def _image_one_day(day: int) -> np.ndarray:
+    x, s = _WORKER["x"], _WORKER["s"]
+    out = np.empty((len(_WORKER["node_lon"]), 3))
+    for k in range(3):
+        out[:, k] = msf_interpolate(
+            _WORKER["lon"],
+            _WORKER["lat"],
+            x[:, day, k] - x[:, 0, k],
+            s[:, day, k] if _WORKER["weight_by_sigma"] else np.ones(x.shape[0]),
+            _WORKER["node_lon"],
+            _WORKER["node_lat"],
+            _WORKER["ssf"],
+            breaklines=_WORKER["breaklines"],
+        )["value"].to_numpy()
+    return out
+
+
+def _image_one_point(point: int) -> np.ndarray:
+    lon, lat = _WORKER["lon"], _WORKER["lat"]
+    lon_point, lat_point = _WORKER["node_lon"][point], _WORKER["node_lat"][point]
+    try:
+        stations = linked_stations(lon, lat, lon_point, lat_point, _WORKER["neighbors"])
+    except QhullError:
+        stations = np.empty(0, int)
+    if stations.size == 0:
+        return np.full((_WORKER["displacement"].shape[1], 3), np.nan)
+    weight = _distance_weights(
+        lon[stations], lat[stations], lon_point, lat_point, _WORKER["ssf"]
+    )
+    return weighted_medians(_WORKER["displacement"][stations], weight)
+
+
+def image_positions(
+    cube: PositionCube,
+    lon: ArrayLike,
+    lat: ArrayLike,
+    ssf: np.ndarray,
+    *,
+    breaklines: Breaklines | None = None,
+    n_workers: int = 1,
+    weight_by_sigma: bool = False,
+) -> np.ndarray:
+    """Image displacement since the first day onto grid points (ATBD section 2.5.6.3).
+
+    Weights come from distance alone and do not change through time. Replaying UNR's
+    Version 0.3 medians with its own station values, this predicts the winning station
+    far better than dividing by daily sigmas. Rates, in `rate_grid`, do use sigmas.
+
+    Parameters
+    ----------
+    cube : PositionCube
+        Gap-free, from `fill_gaps`.
+    lon, lat : array-like
+        Grid points.
+    ssf : np.ndarray
+        Spatial structure function from `make_ssf`.
+    breaklines : sequence of array-like, optional
+        Links crossing these are not used.
+    n_workers : int
+        Processes.
+    weight_by_sigma : bool
+        Divide weights by each day's position sigmas. Default False.
+
+    Returns
+    -------
+    np.ndarray
+        Displacement in mm, (day, point, component).
+
+    """
+    if np.isnan(cube.x).any():
+        msg = "the cube has gaps: run fill_gaps first"
+        raise ValueError(msg)
+    node_lon = np.atleast_1d(np.asarray(lon, float))
+    node_lat = np.atleast_1d(np.asarray(lat, float))
+    if _can_share_neighborhoods(cube.lon, cube.lat, breaklines, weight_by_sigma):
+        # Weights never change, so each point needs its neighborhood only once
+        shared = {
+            "displacement": cube.x - cube.x[:, :1],
+            "lon": cube.lon,
+            "lat": cube.lat,
+            "ssf": ssf,
+            "neighbors": tri_vertex_neighbors(Delaunay(np.c_[cube.lon, cube.lat])),
+            "node_lon": node_lon,
+            "node_lat": node_lat,
+        }
+        results = _map(
+            _image_one_point, range(len(node_lon)), n_workers, shared, chunksize=16
+        )
+        return np.stack(results, axis=1)
+    state = {
+        "x": cube.x,
+        "s": cube.s,
+        "lon": cube.lon,
+        "lat": cube.lat,
+        "ssf": ssf,
+        "breaklines": breaklines,
+        "weight_by_sigma": weight_by_sigma,
+        "node_lon": node_lon,
+        "node_lat": node_lat,
+    }
+    results = _map(
+        _image_one_day, range(len(cube.days)), n_workers, state, chunksize=16
+    )
+    return np.stack(results)
