@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy.spatial import Delaunay
 
+from geepers import gps_imaging
 from geepers.gps_imaging import (
     great_circle_degrees,
     make_ssf,
@@ -146,3 +148,32 @@ class TestMSFInterpolate:
         expected = 2.0 * (lon_i + 117.0)
         # weighted median shrugs off the corrupted nearest station
         assert abs(out_med["value"].iloc[0] - expected) < 3.0
+
+
+def test_tri_vertex_neighbors_lists_each_point_with_its_triangles():
+    tri = Delaunay(np.array([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (5.0, 5.0)]))
+    expected = [set() for _ in range(4)]
+    for simplex in tri.simplices:
+        for i in simplex:
+            expected[i].update(int(j) for j in simplex)
+    out = gps_imaging.tri_vertex_neighbors(tri)
+    assert [set(a.tolist()) for a in out] == expected
+
+
+def test_collapse_keeps_order_with_and_without_duplicates():
+    lon, lat = np.array([2.0, 1.0, 3.0]), np.array([0.0, 0.0, 0.0])
+    lo, _, v, s, groups = gps_imaging._collapse_duplicates(
+        lon, lat, np.array([20.0, 10.0, 30.0]), np.array([2.0, 1.0, 3.0])
+    )
+    assert lo.tolist() == [1.0, 2.0, 3.0]
+    assert v.tolist() == [10.0, 20.0, 30.0]
+    assert s.tolist() == [1.0, 2.0, 3.0]
+    assert [g.tolist() for g in groups] == [[1], [0], [2]]
+    lo, _, v, s, groups = gps_imaging._collapse_duplicates(
+        np.array([1.0, 1.0]),
+        np.array([0.0, 0.0]),
+        np.array([1.0, 3.0]),
+        np.array([4.0, 2.0]),
+    )
+    assert (lo.tolist(), v.tolist(), s.tolist()) == ([1.0], [2.0], [2.0])
+    assert groups[0].tolist() == [0, 1]
