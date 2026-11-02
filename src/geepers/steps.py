@@ -34,7 +34,14 @@ import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
 
-__all__ = ["clean_step_dates", "detect_steps", "detect_steps_enu", "white_noise_sigma"]
+__all__ = [
+    "clean_step_dates",
+    "detect_steps",
+    "detect_steps_enu",
+    "estimate_local_step",
+    "remove_known_steps",
+    "white_noise_sigma",
+]
 
 
 def _aic(rss: float, n: int, k: int) -> float:
@@ -265,3 +272,128 @@ def detect_steps_enu(
     if not non_empty:
         return pd.DataFrame(columns=["date", "step_size", "delta_aic", "component"])
     return pd.concat(non_empty, ignore_index=True)
+
+
+def _theil_sen(t: np.ndarray, y: np.ndarray, side: np.ndarray | None = None) -> float:
+    i, j = np.triu_indices(len(t), k=1)
+    if side is not None:
+        same = side[i] == side[j]
+        i, j = i[same], j[same]
+    dt = t[j] - t[i]
+    good = dt > 0
+    return float(np.median((y[j][good] - y[i][good]) / dt[good])) if good.any() else 0.0
+
+
+def estimate_local_step(
+    t: ArrayLike, y: ArrayLike, at: float, *, tolerance: float = 0.1, max_iter: int = 20
+) -> float:
+    """Estimate a step from nearby data, alternating a robust trend and a level change.
+
+    The OPERA DISP-CAL ATBD section 2.5.6.1 procedure: a Theil-Sen trend from pairs on
+    the same side of the step gives a first step size, the median level change of the
+    detrended series. Later trends use all pairs with the step removed.
+
+    Parameters
+    ----------
+    t : array-like
+        Times in years around the step, usually 30 days each side.
+    y : array-like
+        Observations.
+    at : float
+        Time of the step; a sample at this time counts as after it.
+    tolerance : float
+        Stop when the step changes by less than this, in units of `y`.
+    max_iter : int
+        Most iterations.
+
+    Returns
+    -------
+    float
+        Level after minus level before.
+
+    """
+    t = np.asarray(t, float)
+    y = np.asarray(y, float)
+    side = t >= at
+    if side.all() or not side.any():
+        msg = "the step needs data on both sides"
+        raise ValueError(msg)
+    flat = y - _theil_sen(t, y, side) * t
+    step = float(np.median(flat[side]) - np.median(flat[~side]))
+    for _ in range(max_iter):
+        flat = y - _theil_sen(t, y - step * side) * t
+        new = float(np.median(flat[side]) - np.median(flat[~side]))
+        converged = abs(new - step) < tolerance
+        step = new
+        if converged:
+            break
+    return step
+
+
+def remove_known_steps(
+    t: ArrayLike,
+    y: ArrayLike,
+    step_times: ArrayLike,
+    *,
+    other_steps: ArrayLike = (),
+    window_years: float = 30.0 / 365.25,
+    min_points: int = 2,
+) -> np.ndarray:
+    """Subtract catalogued steps, such as equipment changes, from a series.
+
+    Each step comes from `estimate_local_step` on the data within `window_years`,
+    stopping at any neighboring step. Where a gap leaves too little data, it comes from
+    a simultaneous fit of a line, annual and semi-annual terms and all steps.
+
+    Parameters
+    ----------
+    t : array-like
+        Times in years, increasing.
+    y : array-like
+        Observations.
+    step_times : array-like
+        Times of the steps to remove.
+    other_steps : array-like
+        Times of steps to stay in the series, such as earthquakes. Windows stop at them,
+        and the simultaneous fit includes them.
+    window_years : float
+        Half-width of the local window. Default 30 days.
+    min_points : int
+        Fewest samples on each side for a local estimate.
+
+    Returns
+    -------
+    np.ndarray
+        A copy of `y` without the steps.
+
+    """
+    t = np.asarray(t, float)
+    out = np.array(y, float)
+    remove = np.unique(np.asarray(step_times, float))
+    every = np.unique(np.r_[remove, np.asarray(other_steps, float)])
+    for at in remove:
+        others = every[every != at]
+        lo = max(at - window_years, others[others < at].max(initial=-np.inf))
+        hi = min(at + window_years, others[others > at].min(initial=np.inf))
+        keep = (t >= lo) & (t < hi)
+        tw, yw = t[keep], out[keep]
+        if (tw < at).sum() >= min_points and (tw >= at).sum() >= min_points:
+            step = estimate_local_step(tw, yw, at)
+        else:
+            step = _step_from_trajectory(t, out, every, at)
+        out[t >= at] -= step
+    return out
+
+
+def _step_from_trajectory(
+    t: np.ndarray, y: np.ndarray, every: np.ndarray, at: float
+) -> float:
+    active = every[(every > t[0]) & (every < t[-1])]
+    where = np.flatnonzero(active == at)
+    if where.size == 0:
+        return 0.0
+    w = 2 * np.pi * t
+    columns = [np.ones_like(t), t, np.sin(w), np.cos(w), np.sin(2 * w), np.cos(2 * w)]
+    columns += [(t >= time).astype(float) for time in active]
+    coef = np.linalg.lstsq(np.column_stack(columns), y, rcond=None)[0]
+    return float(coef[6 + where[0]])

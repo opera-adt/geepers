@@ -6,6 +6,8 @@ from geepers.steps import (
     clean_step_dates,
     detect_steps,
     detect_steps_enu,
+    estimate_local_step,
+    remove_known_steps,
     white_noise_sigma,
 )
 from geepers.synthetic import SyntheticStep, power_law_noise, synthetic_timeseries
@@ -216,3 +218,45 @@ class TestDetectStepsEnu:
         up_steps = found[found.component == "up"]
         assert len(up_steps) == 1
         assert abs((up_steps.date.iloc[0] - dates[365]).days) <= 2
+
+
+class TestEstimateLocalStep:
+    def test_recovers_a_step_under_a_steep_trend(self):
+        rng = np.random.default_rng(1)
+        t = np.arange(60) / 365.25
+        y = 30.0 * t + 8.0 * (t >= t[30]) + rng.normal(0, 0.5, 60)
+        assert estimate_local_step(t, y, t[30]) == pytest.approx(8.0, abs=1.0)
+
+    def test_one_sided_data_is_refused(self):
+        t = np.arange(10) / 365.25
+        with pytest.raises(ValueError, match="both sides"):
+            estimate_local_step(t, t, 5.0)
+
+
+class TestRemoveKnownSteps:
+    t = np.arange(2000) / 365.25
+
+    def test_step_is_removed_and_the_rate_kept(self):
+        y = 5.0 * self.t + 12.0 * (self.t >= self.t[1000])
+        out = remove_known_steps(self.t, y, [self.t[1000]])
+        assert np.polyfit(self.t, out, 1)[0] == pytest.approx(5.0, abs=0.01)
+        assert np.ptp(out - 5.0 * self.t) < 0.5
+
+    def test_step_across_a_long_gap_uses_the_trajectory_fit(self):
+        t = np.r_[np.arange(800), np.arange(1000, 2000)] / 365.25
+        at = 900 / 365.25
+        out = remove_known_steps(t, 2.0 * t + 15.0 * (t >= at), [at])
+        assert np.ptp(out - 2.0 * t) < 0.5
+
+    def test_other_steps_stay_and_bound_the_window(self):
+        at, kept = self.t[1000], self.t[1010]
+        y = 10.0 * (self.t >= at) + 20.0 * (self.t >= kept)
+        out = remove_known_steps(self.t, y, [at], other_steps=[kept])
+        assert out[1005] == pytest.approx(0.0, abs=0.01)
+        assert out[-1] == pytest.approx(20.0, abs=0.01)
+
+    def test_no_steps_returns_a_copy(self):
+        y = np.ones(self.t.size)
+        out = remove_known_steps(self.t, y, [])
+        assert out.tolist() == y.tolist()
+        assert out is not y

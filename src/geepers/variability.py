@@ -35,6 +35,7 @@ from geepers.midas import midas
 __all__ = [
     "TemporalVariability",
     "delaunay_neighbors",
+    "rate_variability_index",
     "spatial_structure_function",
     "spatial_variability",
     "ssf_per_station",
@@ -275,6 +276,58 @@ def _window_starts(t_years: np.ndarray, window_years: float) -> list[float]:
         starts.append(candidate)
         current = candidate
     return starts
+
+
+def rate_variability_index(
+    t_years: ArrayLike,
+    values: ArrayLike,
+    *,
+    window_years: float = 2.0,
+    step_years: float = 1.0 / 12.0,
+    step_times: ArrayLike | None = None,
+) -> float:
+    """Spread of MIDAS rates in short sliding windows of one component.
+
+    The index of the OPERA DISP-CAL ATBD Eq. (4), used to select stations for the UNR
+    gridded time-variable product: 1.4826 x MAD of MIDAS rates in 2-year windows moved
+    by one month. Unlike `temporal_velocity_variability` it measures the spread about
+    the median windowed rate, not about the full-series rate.
+
+    Parameters
+    ----------
+    t_years : array-like
+        Observation times in years, increasing.
+    values : array-like
+        Observations of one component.
+    window_years : float
+        Window length. Default 2 years.
+    step_years : float
+        Shift between windows. Default one month.
+    step_times : array-like, optional
+        Times of known offsets, passed to MIDAS so pairs never span them.
+
+    Returns
+    -------
+    float
+        The index in units/year; NaN if the record has no complete window.
+
+    """
+    t = np.asarray(t_years, float)
+    y = np.asarray(values, float)
+    steps = None if step_times is None else np.asarray(step_times, float)
+    if steps is not None and steps.size == 0:
+        steps = None
+    rates = []
+    for start in np.arange(t[0], t[-1] - window_years, step_years):
+        keep = (t >= start) & (t < start + window_years)
+        if keep.sum() < 2:
+            continue
+        rate = midas(t[keep], y[keep], steps).velocity
+        if np.isfinite(rate):
+            rates.append(rate)
+    if not rates:
+        return float("nan")
+    return float(1.4826 * np.median(np.abs(np.array(rates) - np.median(rates))))
 
 
 def temporal_velocity_variability(

@@ -8,6 +8,7 @@ import pytest
 from geepers.euler import (
     EulerPole,
     estimate_euler_pole,
+    local_plate_velocity,
     pole_to_rotation_vector,
     predict_plate_motion,
     rotation_vector_to_pole,
@@ -110,3 +111,42 @@ class TestEstimate:
     def test_too_few_stations_raises(self):
         with pytest.raises(ValueError, match="at least 2"):
             estimate_euler_pole([1.0], [1.0], [1.0], [1.0], [0.1], [0.1])
+
+
+class TestLocalPlateVelocity:
+    def stations(self):
+        rng = np.random.default_rng(4)
+        lon, lat = rng.uniform(-2, 2, 40), rng.uniform(28, 32, 40)
+        ve = 40.0 * np.cos(np.radians(lat)) / np.cos(np.radians(30.0))
+        return lon, lat, ve, np.zeros(40), np.full(40, 0.5), np.full(40, 0.5)
+
+    def test_recovers_a_rigid_rotation(self):
+        ve, vn = local_plate_velocity(*self.stations(), 0.0, 30.0)
+        assert ve == pytest.approx(40.0, abs=0.01)
+        assert vn == pytest.approx(0.0, abs=0.01)
+
+    def test_strain_does_not_bias_the_point(self):
+        lon, lat, ve, vn, se, sn = self.stations()
+        ve = ve + 3.0 * lon
+        out, _ = local_plate_velocity(lon, lat, ve, vn, se, sn, 0.0, 30.0)
+        assert out == pytest.approx(40.0, abs=0.1)
+
+    def test_too_few_stations_gives_nan(self):
+        assert np.isnan(local_plate_velocity(*self.stations(), 80.0, 30.0)[0])
+
+    def test_stations_with_no_usable_rate_are_left_out(self):
+        lon, lat, ve, vn, se, sn = self.stations()
+        clean = local_plate_velocity(lon, lat, ve, vn, se, sn, 0.0, 30.0)
+        lon, lat = np.r_[lon, 0.1], np.r_[lat, 30.1]
+        ve, vn = np.r_[ve, np.nan], np.r_[vn, 1.0]
+        se, sn = np.r_[se, 1.0], np.r_[sn, np.inf]
+        assert local_plate_velocity(lon, lat, ve, vn, se, sn, 0.0, 30.0) == clean
+
+    def test_breakline_excludes_the_far_plate(self):
+        lon, lat, ve, vn, se, sn = self.stations()
+        ve = np.where(lon < 0, -40.0, 40.0)
+        fault = [np.array([(0.0, 20.0), (0.0, 40.0)])]
+        out, _ = local_plate_velocity(
+            lon, lat, ve, vn, se, sn, 1.0, 30.0, breaklines=fault
+        )
+        assert out == pytest.approx(40.0, abs=1.0)
