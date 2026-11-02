@@ -10,6 +10,7 @@ from functools import cache, lru_cache, partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -146,6 +147,50 @@ class UnrGridSource(BaseGpsSource):
         df = self._filter_by_date(df, start_date, end_date)
         df = self._zero_data(df, zero_by, columns=["east", "north", "up"])
         return validate(df, "StationObservationSchema", lazy=True)
+
+    def node_series(
+        self, grid_id: int, *, plate: Literal["NA", "PA", "IGS14", "IGS20"] = "IGS20"
+    ) -> pd.DataFrame:
+        """Load one grid point exactly as published, in mm, indexed by calendar day.
+
+        The files step their decimal years by exactly 1/365.25 through leap years, so
+        converting those to dates merges neighboring days. This counts days from the
+        first row instead.
+
+        Parameters
+        ----------
+        grid_id : int
+            The grid point number.
+        plate : {"NA", "PA", "IGS14", "IGS20"}
+            Reference frame of the file.
+
+        Returns
+        -------
+        pd.DataFrame
+            ``decimal_year``, ``east``, ``north``, ``up`` and ``sigma_*``.
+
+        Raises
+        ------
+        ValueError
+            If the file does not have one row per day.
+
+        """
+        path = self._download_file(
+            str(grid_id),
+            plate=plate,
+            version=self.version,
+            gridded_type=self.gridded_type,
+        )
+        df = self._read_data_file(path).drop(columns="rapid_flag")
+        days = np.round((df.decimal_year - df.decimal_year.iloc[0]) * 365.25).astype(
+            int
+        )
+        start = pd.Timestamp(year=int(df.decimal_year.iloc[0]), month=1, day=1)
+        df.index = pd.DatetimeIndex(start + pd.to_timedelta(days, "D"), name="date")
+        if df.index.has_duplicates:
+            msg = f"grid point {grid_id}: epochs are not one per day"
+            raise ValueError(msg)
+        return df
 
     def _read_station_data(self) -> gpd.GeoDataFrame:
         """Read raw grid point data from the source.

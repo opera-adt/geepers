@@ -242,3 +242,19 @@ hyparquet are inlined, so only the basemap/terrain tiles need the network.
   the page, and a "Clear cache & reload" button. Fetches are keyed to the
   file's `Last-Modified`/`ETag`, so regenerating a parquet under the same
   name can never serve stale cached byte ranges.
+
+# Recreating the UNR grid
+
+`recreate-unr-grid.py` rebuilds the time-constant and time-variable products in a box from
+station positions, and scores them against the published Version 0.3 files:
+
+```bash
+python scripts/recreate-unr-grid.py --bbox -119.5 38.5 -117.5 40.0 -o nevada \
+    --cache-dir unr_cache --workers 32
+```
+
+Northern Nevada takes about 2 minutes on 32 workers, including the downloads. Widen
+`--buffer` where the network is sparse, since a node's neighbours can be hundreds of
+kilometers away. Boxes do not wrap the dateline. See
+[the notebook](../docs/notebooks/gps_imaging_unr_grid.ipynb) for each step, and for what is
+documented and what is inferred.
