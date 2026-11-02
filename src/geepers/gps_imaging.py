@@ -26,6 +26,7 @@ doi:10.1029/2020GL087976.
 
 from __future__ import annotations
 
+import itertools
 import logging
 from typing import Any, Literal
 
@@ -181,6 +182,16 @@ def _collapse_duplicates(
     _, first_idx, inverse = np.unique(
         key, axis=0, return_index=True, return_inverse=True
     )
+    if len(first_idx) == len(lon):
+        # Nothing to merge, which is nearly every call: skip the per-group medians
+        groups = [first_idx[g : g + 1] for g in range(len(first_idx))]
+        return (
+            lon[first_idx],
+            lat[first_idx],
+            values[first_idx],
+            sigmas[first_idx],
+            groups,
+        )
     groups = [np.flatnonzero(inverse == g) for g in range(len(first_idx))]
     lon2 = np.array([lon[g[0]] for g in groups])
     lat2 = np.array([lat[g[0]] for g in groups])
@@ -189,14 +200,14 @@ def _collapse_duplicates(
     return lon2, lat2, v2, s2, groups
 
 
-def _tri_vertex_neighbors(tri: Delaunay) -> list[np.ndarray]:
+def tri_vertex_neighbors(tri: Delaunay) -> list[np.ndarray]:
     """For each point, the unique vertices of all simplices containing it."""
-    n = tri.points.shape[0]
-    sets: list[set[int]] = [set() for _ in range(n)]
-    for simplex in tri.simplices:
-        for i in simplex:
-            sets[i].update(int(j) for j in simplex)
-    return [np.fromiter(sorted(s), int) for s in sets]
+    pointer, others = tri.vertex_neighbor_vertices
+    # A point in no simplex, which Qhull leaves out when coplanar, has no neighbors
+    return [
+        np.sort(np.r_[others[a:b], i]) if b > a else np.empty(0, int)
+        for i, (a, b) in enumerate(itertools.pairwise(pointer))
+    ]
 
 
 def _neighborhood_estimate(
@@ -272,7 +283,7 @@ def median_spatial_filter(
 
     lon2, lat2, v2, s2, groups = _collapse_duplicates(lon, lat, values, sigmas)
     tri = Delaunay(np.c_[lon2, lat2])
-    neighborhoods = _tri_vertex_neighbors(tri)
+    neighborhoods = tri_vertex_neighbors(tri)
 
     out2 = np.full(len(lon2), np.nan)
     for i, iw in enumerate(neighborhoods):
@@ -353,7 +364,7 @@ def msf_interpolate(
 
     lon2, lat2, v2, s2, _ = _collapse_duplicates(lon, lat, values, sigmas)
     tri0 = Delaunay(np.c_[lon2, lat2])
-    nbr0 = _tri_vertex_neighbors(tri0)
+    nbr0 = tri_vertex_neighbors(tri0)
 
     rows = []
     for lo, la in zip(lon_new, lat_new, strict=True):
@@ -398,7 +409,7 @@ def msf_interpolate(
         except Exception:  # degenerate local geometry
             rows.append(row)
             continue
-        iw = _tri_vertex_neighbors(tri)[q]
+        iw = tri_vertex_neighbors(tri)[q]
         if robust_network:
             dista = great_circle_degrees(la, lo, bi, li)
             md = np.median(dista[iw])
