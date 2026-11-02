@@ -74,6 +74,8 @@ class StationQuality:
     rms_misfit : float
         Root-mean-square misfit between GPS and InSAR measurements, after
         removing their mean offset (the series have independent zero levels).
+    num_overlap : int
+        Number of epochs with both valid GPS and valid InSAR.
 
     """
 
@@ -82,6 +84,7 @@ class StationQuality:
     temporal_coherence: float | None
     similarity: float | None
     rms_misfit: float
+    num_overlap: int = 0
 
 
 def drop_relocations(
@@ -180,7 +183,8 @@ def compute_station_quality(df: pd.DataFrame) -> StationQuality:
 
     # RMS misfit between GPS and InSAR
     common_mask = ~(df["los_gps"].isna() | df["los_insar"].isna())
-    if common_mask.sum() > 0:
+    num_overlap = int(common_mask.sum())
+    if num_overlap > 0:
         diff = df.loc[common_mask, "los_insar"] - df.loc[common_mask, "los_gps"]
         # The two series have independent zero levels (GPS mean-removed,
         # InSAR zero at its first epoch); that constant is not misfit
@@ -195,6 +199,7 @@ def compute_station_quality(df: pd.DataFrame) -> StationQuality:
         temporal_coherence=temporal_coherence,
         similarity=similarity,
         rms_misfit=rms_misfit,
+        num_overlap=num_overlap,
     )
 
 
@@ -219,8 +224,11 @@ def select_gps_reference(
     station_to_merged_df
         Merged GPS/InSAR tables keyed by station name.
     min_coverage_fraction
-        Minimum fraction of epochs required to consider a station.
-        This is used to filter out stations with insufficient with InSAR data.
+        Smallest share a station needs of the days in the record with valid GPS,
+        and of the InSAR epochs with both valid GPS and valid InSAR, the latter
+        relative to the station with the most valid InSAR epochs. A misfit or
+        coherence from a few epochs says little about the rest, and a station
+        is only compared with the reference on the epochs they share.
     coherence_priority
         If `True`, prefer highest mean temporal-coherence; otherwise, use RMSE.
 
@@ -252,12 +260,17 @@ def select_gps_reference(
     # los_insar
     total_time = max_insar_time - min_insar_time
     total_days = total_time.total_seconds() / (24 * 3600)
+    num_epochs = max(
+        df["los_insar"].notna().sum() for df in station_to_merged_df.values()
+    )
 
     # Filter stations with insufficient overlap
     candidate_stations = {
         station: quality
         for station, quality in qualities.items()
         if quality.num_gps >= (min_coverage_fraction * total_days)
+        and quality.num_overlap > 0
+        and quality.num_overlap >= (min_coverage_fraction * num_epochs)
     }
 
     if not candidate_stations:
