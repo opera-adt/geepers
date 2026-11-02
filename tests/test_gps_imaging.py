@@ -8,7 +8,9 @@ from scipy.spatial import Delaunay
 
 from geepers import gps_imaging
 from geepers.gps_imaging import (
+    crosses_breaklines,
     great_circle_degrees,
+    iterated_median_spatial_filter,
     make_ssf,
     median_spatial_filter,
     msf_interpolate,
@@ -148,6 +150,235 @@ class TestMSFInterpolate:
         expected = 2.0 * (lon_i + 117.0)
         # weighted median shrugs off the corrupted nearest station
         assert abs(out_med["value"].iloc[0] - expected) < 3.0
+
+
+class TestBreaklines:
+    fault = (np.array([(0.0, -5.0), (0.0, 5.0)]),)
+
+    def stations(self):
+        rng = np.random.default_rng(7)
+        lon, lat = rng.uniform(-2, 2, 80), rng.uniform(-2, 2, 80)
+        return lon, lat, np.where(lon < 0, -10.0, 10.0), np.full(80, 0.5)
+
+    def test_crossing_is_detected_per_baseline(self):
+        out = crosses_breaklines(
+            [-1.0, 1.0, -1.0],
+            [0.0, 0.0, 9.0],
+            [1.0, 2.0, 1.0],
+            [0.0, 0.0, 9.0],
+            self.fault,
+        )
+        assert out.tolist() == [True, False, False]
+
+    def test_no_lines_means_no_crossings(self):
+        assert not crosses_breaklines([0.0], [0.0], [1.0], [1.0], []).any()
+
+    def test_baseline_ending_on_the_line_does_not_cross(self):
+        assert not crosses_breaklines([-1.0], [0.0], [0.0], [0.0], self.fault)[0]
+
+    def test_filter_does_not_mix_the_sides(self):
+        lon, lat, values, sigmas = self.stations()
+        mixed = median_spatial_filter(lon, lat, values, sigmas, method="weighted_mean")
+        kept = median_spatial_filter(
+            lon, lat, values, sigmas, method="weighted_mean", breaklines=self.fault
+        )
+        assert (np.abs(mixed) < 10).any()
+        assert kept == pytest.approx(values)
+
+    def test_interpolation_uses_one_side(self):
+        lon, lat, values, sigmas = self.stations()
+        out = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            [-0.01, 0.01],
+            [0.0, 0.0],
+            method="weighted_mean",
+            breaklines=self.fault,
+        )
+        assert out["value"].tolist() == pytest.approx([-10.0, 10.0])
+        assert out["sigma_rms"].tolist() == pytest.approx([0.0, 0.0], abs=1e-12)
+
+    def test_point_with_every_link_cut_triangulates_its_own_side(self):
+        # The nearest stations are all across the line; the point's side has far ones
+        lon = np.array([0.1, 0.1, 0.2, -3.0, -3.0, -4.0])
+        lat = np.array([-0.1, 0.1, 0.0, -1.0, 1.0, 0.0])
+        values = np.array([9.0, 9.0, 9.0, 1.0, 1.0, 1.0])
+        out = msf_interpolate(
+            lon, lat, values, np.ones(6), [-0.05], [0.0], breaklines=self.fault
+        )
+        assert out["value"].iloc[0] == 1.0
+
+    def test_no_breaklines_changes_nothing(self):
+        lon, lat, values, sigmas = self.stations()
+        plain = msf_interpolate(lon, lat, values, sigmas, [0.5], [0.5])
+        none = msf_interpolate(lon, lat, values, sigmas, [0.5], [0.5], breaklines=[])
+        assert plain["value"].iloc[0] == none["value"].iloc[0]
+
+
+class TestBackground:
+    def stations(self):
+        rng = np.random.default_rng(8)
+        return rng.uniform(-2, 2, 40), rng.uniform(-2, 2, 40), np.zeros(40), np.ones(40)
+
+    def test_full_weight_replaces_the_stations(self):
+        lon, lat, values, sigmas = self.stations()
+        out = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            [0.1],
+            [0.1],
+            background=[9.0],
+            background_weight=[1.0],
+        )
+        assert out["value"].iloc[0] == 9.0
+
+    def test_small_weight_cannot_move_a_median(self):
+        lon, lat, values, sigmas = self.stations()
+        out = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            [0.1],
+            [0.1],
+            background=[9.0],
+            background_weight=[0.1],
+        )
+        assert out["value"].iloc[0] == 0.0
+
+    def test_nan_background_is_ignored(self):
+        lon, lat, values, sigmas = self.stations()
+        out = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            [0.1],
+            [0.1],
+            background=[np.nan],
+            background_weight=[1.0],
+        )
+        assert out["value"].iloc[0] == 0.0
+
+    def test_weight_is_required_with_background(self):
+        lon, lat, values, sigmas = self.stations()
+        with pytest.raises(ValueError, match="must be given together"):
+            msf_interpolate(lon, lat, values, sigmas, [0.1], [0.1], background=[9.0])
+
+    def test_plain_median_is_refused(self):
+        lon, lat, values, sigmas = self.stations()
+        with pytest.raises(ValueError, match="needs a weighted method"):
+            msf_interpolate(
+                lon,
+                lat,
+                values,
+                sigmas,
+                [0.1],
+                [0.1],
+                method="median",
+                background=[9.0],
+                background_weight=[0.5],
+            )
+
+    def test_sigma_median_reports_contributing_stations(self):
+        lon, lat, values, sigmas = self.stations()
+        out = msf_interpolate(lon, lat, values, 2 * sigmas, [0.1], [0.1])
+        assert out["sigma_median"].iloc[0] == 2.0
+
+
+class TestIteratedFilter:
+    ssf = np.c_[[0.0, 1.0, 10.0, 180.0], [1.0, 0.7, 0.2, 0.0]]
+
+    def field(self):
+        rng = np.random.default_rng(9)
+        lon, lat = rng.uniform(-2, 2, 40), rng.uniform(-2, 2, 40)
+        return lon, lat, lon + rng.normal(0, 0.5, 40), np.full(40, 0.5)
+
+    def test_outlier_is_removed(self):
+        lon, lat, _, sigmas = self.field()
+        values = np.zeros(40)
+        values[4] = 100.0
+        out = iterated_median_spatial_filter(
+            lon, lat, values, sigmas, self.ssf, n_iterations=3
+        )
+        assert out[4] == 0.0
+
+    def test_seed_fixes_the_result(self):
+        args = self.field()
+        one = iterated_median_spatial_filter(*args, self.ssf, n_iterations=3, seed=1)
+        two = iterated_median_spatial_filter(*args, self.ssf, n_iterations=3, seed=1)
+        assert one.tolist() == two.tolist()
+
+    def test_perturbation_keeps_ssf_valid(self, monkeypatch):
+        seen = []
+
+        def record(lon, lat, values, sigmas, ssf, **kwargs):
+            seen.append(ssf)
+            return np.zeros(len(lon))
+
+        monkeypatch.setattr("geepers.gps_imaging.median_spatial_filter", record)
+        iterated_median_spatial_filter(*self.field(), self.ssf, n_iterations=20)
+        for ssf in seen:
+            assert (np.diff(ssf[:, 1]) <= 0).all()
+            assert ssf[0, 1] == 1.0
+            assert ssf[-1, 1] == 0.0
+
+
+class TestWeightedMedians:
+    def test_matches_the_single_series_median(self):
+        rng = np.random.default_rng(0)
+        values = rng.normal(size=(7, 50, 3))
+        weights = rng.uniform(0.1, 1, 7)
+        out = gps_imaging.weighted_medians(values, weights)
+        assert out.shape == (50, 3)
+        for day in range(50):
+            for k in range(3):
+                assert out[day, k] == gps_imaging.weighted_median(
+                    values[:, day, k], weights
+                )
+
+    def test_one_weight_per_station_is_required(self):
+        with pytest.raises(ValueError, match="one value per station"):
+            gps_imaging.weighted_medians(np.zeros((3, 2)), np.ones(2))
+
+
+class TestLinkedStations:
+    def setup_method(self):
+        rng = np.random.default_rng(1)
+        self.lon, self.lat = rng.uniform(-2, 2, 30), rng.uniform(-2, 2, 30)
+        tri = Delaunay(np.c_[self.lon, self.lat])
+        self.neighbors = gps_imaging.tri_vertex_neighbors(tri)
+
+    def test_matches_msf_interpolate(self):
+        ssf = np.c_[[0.0, 180.0], [1.0, 0.0]]
+        for values_seed in range(5):
+            values = np.random.default_rng(values_seed).normal(size=30)
+            out = gps_imaging.msf_interpolate(
+                self.lon, self.lat, values, np.ones(30), [0.2], [0.3], ssf
+            ).iloc[0]
+            linked = gps_imaging.linked_stations(
+                self.lon, self.lat, 0.2, 0.3, self.neighbors
+            )
+            assert linked.size == out["n_stations"]
+            weight = np.interp(
+                gps_imaging.great_circle_degrees(
+                    0.3, 0.2, self.lat[linked], self.lon[linked]
+                ),
+                ssf[:, 0],
+                ssf[:, 1],
+            )
+            assert out["value"] == gps_imaging.weighted_median(values[linked], weight)
+
+    def test_a_station_at_the_point_stays_linked(self):
+        linked = gps_imaging.linked_stations(
+            self.lon, self.lat, self.lon[4], self.lat[4], self.neighbors
+        )
+        assert 4 in linked
+        assert len(set(linked.tolist())) == linked.size
 
 
 def test_tri_vertex_neighbors_lists_each_point_with_its_triangles():
