@@ -129,6 +129,7 @@ modules for GNSS velocity fields (see
 | `geepers.surface` | Polynomial trend surfaces for remove-restore interpolation |
 | `geepers.spline` | Elastically coupled east/north spline interpolation (Sandwell & Wessel, 2016) |
 | `geepers.cross_validation` | Spatially blocked cross-validation for choosing interpolation parameters and comparing methods |
+| `geepers.gridding` | Rebuild UNR-style gridded rates and daily time series from station positions (OPERA DISP-CAL ATBD recipe) |
 | `geepers.euler` | Euler pole estimation and plate-motion prediction |
 | `geepers.strain` | Strain-rate/rotation fields from gridded velocities |
 | `geepers.masks` | Distance and convex-hull masks to blank grid nodes not supported by stations |

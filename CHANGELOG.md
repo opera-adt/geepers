@@ -5,6 +5,25 @@ versions follow PEP 440 via setuptools_scm.
 
 ## [Unreleased]
 
+### Added
+
+- `geepers.gridding`: rebuild UNR-style gridded rates and daily time series from
+  station positions, after the OPERA DISP-CAL ATBD: station selection, declustering,
+  spatial gap filling and daily imaging. Daily filling and imaging weight by distance
+  alone, as the published Version 0.3 medians show; `weight_by_sigma=True` follows ATBD
+  Eq. (6) as written.
+- `gridding.PUBLISHED_SELECTION`: the daily station selection closest to the published grid.
+- `scripts/recreate-unr-grid.py` and the notebook "Recreating the UNR grid": rebuild both
+  UNR products in a box and score them against the published files.
+- `UnrGridSource.node_series`: one grid point as published, indexed by calendar day.
+- Breaklines in GPS Imaging: `median_spatial_filter` and `msf_interpolate` take
+  `breaklines`, and links crossing a fault or plate boundary leave the neighborhood.
+- `msf_interpolate` takes `background` and `background_weight` for a model datum at
+  each point, and reports `sigma_median`.
+- `gps_imaging.crosses_breaklines`, `gps_imaging.iterated_median_spatial_filter`,
+  `variability.rate_variability_index`, `steps.estimate_local_step`,
+  `steps.remove_known_steps` and `euler.local_plate_velocity`.
+
 ### Changed
 
 - **Dependencies are split into a lean core and extras.** `pip install geepers`

@@ -745,6 +745,40 @@ automatically by the `geepers` CLI workflow
 the [validation notebook](notebooks/gnss_insar_validation.ipynb)
 demonstrates everything on real data.
 
+## Gridded time series from positions (`geepers.gridding`)
+
+Rebuilds the UNR gridded product from station positions, after section 2.5 of the OPERA
+DISP-CAL ATBD: select stations, fill their gaps from neighbours, then image each day.
+
+```python
+from geepers.gps_imaging import make_ssf
+from geepers import gridding
+
+ssf = make_ssf(stats.lon, stats.lat, stats.vu, stats.su)
+stats = stats.join(gridding.filter_station_rates(stats, ssf, breaklines=faults))
+rates = gridding.rate_grid(gridding.decluster(stats), lon_g, lat_g, ssf, breaklines=faults)
+
+chosen = stats[gridding.select_time_variable(stats, gridding.PUBLISHED_SELECTION)]
+cube = gridding.build_position_cube(series, chosen, days, equipment, earthquakes)
+gridding.fill_gaps(cube, ssf, breaklines=faults, n_workers=32)
+daily = gridding.image_positions(cube, lon_g, lat_g, ssf, breaklines=faults, n_workers=32)
+```
+
+`faults` is a list of (lon, lat) polylines. Delaunay links that cross one leave every
+neighborhood, in the filter, the gap filling and the imaging.
+
+Daily filling and imaging weight by distance alone, unlike the rates: replaying UNR's
+Version 0.3 medians in Southern California, that picks its winning station on 82-87% of
+days, against 67-76% with daily sigmas. Pass `weight_by_sigma=True` for ATBD Eq. (6) as
+written.
+
+`PUBLISHED_SELECTION` keeps stations with 4 years of data since 2012 and applies no other
+limit, which is closer to the published daily grid than section 2.5.2 as written. Calling
+`select_time_variable` with no criteria follows the ATBD.
+
+[Recreating the UNR grid](notebooks/gps_imaging_unr_grid.ipynb) walks through each step
+over Southern California, and `scripts/recreate-unr-grid.py` does the same for any box.
+
 ## Choosing between GPS Imaging and collocation
 
 - **GPS Imaging**: robust to outliers, preserves sharp boundaries, no

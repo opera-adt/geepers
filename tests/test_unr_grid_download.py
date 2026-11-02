@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import pytest
+
 from geepers.gps_sources.unr_grid import UnrGridSource
 
 
@@ -35,3 +39,32 @@ def test_download_data_files_binds_arguments(tmp_path, monkeypatch):
     assert sorted(p.name for p in files) == ["000001_IGS20.tenv8", "000002_IGS20.tenv8"]
     assert sorted(c[0] for c in calls) == ["000001", "000002"]
     assert {c[1:] for c in calls} == {("IGS20", tmp_path, "0.3", "constant")}
+
+
+def _write_tenv8(path, decimal_years):
+    rows = [
+        f"{t:.4f} {i}.0 0.5 -1.0 1.0 1.2 3.0 0" for i, t in enumerate(decimal_years)
+    ]
+    path.write_text("\n".join(rows) + "\n")
+    return path
+
+
+def test_node_series_counts_days_through_a_leap_year(tmp_path, monkeypatch):
+    # Steps of exactly 1/365.25, as published, over 2012-02-29
+    years = 2012.0 + np.arange(400) / 365.25
+    path = _write_tenv8(tmp_path / "node.tenv8", years)
+    source = UnrGridSource(cache_dir=tmp_path)
+    monkeypatch.setattr(source, "_download_file", lambda *_, **__: path)
+    df = source.node_series(5)
+    assert df.index.equals(pd.date_range("2012-01-01", periods=400, freq="D"))
+    assert df.east.iloc[3] == 3.0
+    assert df.sigma_up.iloc[0] == 3.0
+    assert "rapid_flag" not in df
+
+
+def test_node_series_refuses_repeated_days(tmp_path, monkeypatch):
+    path = _write_tenv8(tmp_path / "node.tenv8", [2012.0, 2012.0])
+    source = UnrGridSource(cache_dir=tmp_path)
+    monkeypatch.setattr(source, "_download_file", lambda *_, **__: path)
+    with pytest.raises(ValueError, match="not one per day"):
+        source.node_series(5)
