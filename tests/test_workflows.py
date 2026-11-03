@@ -7,7 +7,11 @@ import pytest
 
 import geepers.gps as gps
 from geepers.gps_sources.unr import UnrSource
-from geepers.quality import InsufficientDataError, select_gps_reference
+from geepers.quality import (
+    InsufficientDataError,
+    compute_station_quality,
+    select_gps_reference,
+)
 from geepers.workflows import main, merge_gps_insar
 
 
@@ -154,6 +158,97 @@ def test_select_gps_reference_insufficient_data():
         match="Could not determine an automatic reference station",
     ):
         select_gps_reference(station_to_merged, min_coverage_fraction=0.5)
+
+
+def _reference_candidate(
+    *,
+    misfit: float,
+    insar_fraction: float = 1.0,
+    gps_fraction: float = 1.0,
+    gps_every: int = 1,
+    coherence: float = 0.8,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Merged table: daily rows over 4 years, InSAR every 12 days."""
+    rng = np.random.default_rng(seed)
+    dates = pd.date_range("2020-01-01", "2023-12-31", freq="D")
+    n = len(dates)
+    gps = 0.002 * np.arange(n) / 365.25
+    gps[int(gps_fraction * n) :] = np.nan
+    mask = np.zeros(n, dtype=bool)
+    mask[::gps_every] = True
+    gps[~mask] = np.nan
+
+    epochs = np.arange(0, n, 12)
+    insar = np.full(n, np.nan)
+    insar[epochs] = 0.002 * epochs / 365.25 + rng.normal(0, misfit, len(epochs))
+    insar[epochs[int(insar_fraction * len(epochs)) :]] = np.nan
+    return pd.DataFrame(
+        {
+            "los_gps": gps,
+            "los_insar": insar,
+            "temporal_coherence": np.where(np.isnan(insar), np.nan, coherence),
+        },
+        index=dates,
+    )
+
+
+@pytest.mark.parametrize("coherence_priority", [True, False])
+def test_reference_needs_insar_on_most_epochs(coherence_priority):
+    """Regression: only GPS rows were counted, so a station with complete GPS and
+    InSAR on 10 % of epochs could win on the misfit or coherence of those few."""
+    stations = {
+        "FULL": _reference_candidate(misfit=0.004, coherence=0.7),
+        "FEW": _reference_candidate(misfit=0.001, insar_fraction=0.1, coherence=0.9),
+    }
+    assert (
+        select_gps_reference(stations, coherence_priority=coherence_priority) == "FULL"
+    )
+
+
+def test_reference_needs_gps_on_most_epochs():
+    stations = {
+        "FULL": _reference_candidate(misfit=0.004),
+        "SHORT": _reference_candidate(misfit=0.001, gps_fraction=0.15),
+    }
+    assert select_gps_reference(stations, coherence_priority=False) == "FULL"
+
+
+def test_reference_still_needs_gps_on_most_days():
+    """A gappy GPS record is not admitted for hitting the InSAR epochs.
+
+    Dropping this check changed picks that had full overlap, for the worse: from
+    P030 to WYRK on F07085, 6.3 to 12.7 mm on the same stations and dates.
+    """
+    stations = {
+        "GAPPY": _reference_candidate(misfit=0.001, gps_every=3),
+        "DAILY": _reference_candidate(misfit=0.004),
+    }
+    assert select_gps_reference(stations, coherence_priority=False) == "DAILY"
+
+
+def test_reference_coverage_is_relative_to_the_best_station():
+    """An epoch no station could see does not count against any of them."""
+    stations = {
+        "A": _reference_candidate(misfit=0.004, insar_fraction=0.5),
+        "B": _reference_candidate(misfit=0.001, insar_fraction=0.45),
+        "C": _reference_candidate(misfit=0.0001, insar_fraction=0.2),
+    }
+    assert select_gps_reference(stations, coherence_priority=False) == "B"
+
+
+def test_reference_without_any_insar_raises():
+    stations = {"A": _reference_candidate(misfit=0.001, insar_fraction=0.0)}
+    with pytest.raises(InsufficientDataError, match="insufficient overlapping data"):
+        select_gps_reference(stations)
+
+
+def test_station_quality_counts_epochs_with_both():
+    quality = compute_station_quality(
+        _reference_candidate(misfit=0.001, insar_fraction=0.5)
+    )
+    assert quality.num_overlap == 61
+    assert quality.num_gps == 1461
 
 
 def test_select_gps_reference_no_coherence_data():

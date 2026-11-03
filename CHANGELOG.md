@@ -5,6 +5,16 @@ versions follow PEP 440 via setuptools_scm.
 
 ## [Unreleased]
 
+### Fixed
+
+- `select_gps_reference`: a station also needs both valid GPS and valid InSAR on
+  `min_coverage_fraction` of the InSAR epochs. Only GPS was counted, so a station with
+  InSAR on few epochs could become the reference on the misfit or coherence of those
+  few, and every station was then compared on those epochs only. This can change the
+  automatic reference.
+- `StationQuality.num_overlap`, also a new column of `station_summary.csv`, counts those
+  epochs.
+
 ### Added
 
 - `geepers.gridding`: rebuild UNR-style gridded rates and daily time series from
