@@ -39,6 +39,7 @@ from scipy.spatial import Delaunay
 from geepers._optional import require
 
 __all__ = [
+    "DEFAULT_BREAKLINE_WEIGHT",
     "crosses_breaklines",
     "iterated_median_spatial_filter",
     "make_ssf",
@@ -51,6 +52,11 @@ logger = logging.getLogger("geepers")
 
 Method = Literal["weighted_median", "median", "weighted_mean"]
 Breaklines = Sequence[ArrayLike]
+
+# Better than dropping crossing links on held-out stations at the San Andreas, and as
+# good or better against published rates beside the Gulf of California. See the UNR
+# grid notebook.
+DEFAULT_BREAKLINE_WEIGHT = 0.25
 
 
 def great_circle_degrees(
@@ -348,6 +354,7 @@ def _neighborhood_estimate(
     sv: np.ndarray,
     ssf: np.ndarray | None,
     method: Method,
+    link_scale: np.ndarray | None = None,
 ) -> tuple[float, np.ndarray]:
     """Weighted estimate over one neighborhood; returns (value, weights)."""
     if method == "median":
@@ -360,6 +367,8 @@ def _neighborhood_estimate(
     else:
         w = np.interp(dist, ssf[:, 0], ssf[:, 1])
     w = w / sv
+    if link_scale is not None:
+        w = w * link_scale
     if np.all(w == 0):
         w = np.ones_like(w)
     w = w / w.sum()
@@ -367,6 +376,12 @@ def _neighborhood_estimate(
     if method == "weighted_median":
         return weighted_median(v, w), w
     return float(np.sum(v * w)), w  # weighted_mean
+
+
+def _check_breakline_weight(breakline_weight: float) -> None:
+    if not 0.0 <= breakline_weight <= 1.0:
+        msg = f"breakline_weight must be in [0, 1], got {breakline_weight}"
+        raise ValueError(msg)
 
 
 def median_spatial_filter(
@@ -379,6 +394,7 @@ def median_spatial_filter(
     method: Method = "weighted_median",
     robust_network: bool = False,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
 ) -> np.ndarray:
     """Median spatial filter of a velocity field at the stations.
 
@@ -403,8 +419,11 @@ def median_spatial_filter(
         Expand each neighborhood with all stations closer than the
         median Delaunay-neighbor distance (Kreemer et al., 2020).
     breaklines : sequence of array-like, optional
-        Polylines of (lon, lat). Links crossing them leave the neighborhood;
-        see `crosses_breaklines`.
+        Polylines of (lon, lat). See `crosses_breaklines`.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`, so that most of an
+        estimate comes from one side. 0 drops them and 1 ignores the breaklines. The
+        ``"median"`` method has no weights, so it always drops them.
 
     Returns
     -------
@@ -412,6 +431,9 @@ def median_spatial_filter(
         Filtered values, same length/order as the input.
 
     """
+    _check_breakline_weight(breakline_weight)
+    if method == "median":
+        breakline_weight = 0.0  # no weights to scale, so crossing links are dropped
     lon = np.asarray(lon, float)
     lat = np.asarray(lat, float)
     values = np.asarray(values, float)
@@ -430,12 +452,17 @@ def median_spatial_filter(
             dist_all = great_circle_degrees(lat2[i], lon2[i], lat2, lon2)
             md = np.median(dist_all[idx])
             idx = np.union1d(idx, np.flatnonzero(dist_all <= md))
-        if breaklines is not None:
-            idx = idx[
-                ~crosses_breaklines(lon2[idx], lat2[idx], lon2[i], lat2[i], breaklines)
-            ]
+        scale = None
+        if breaklines is not None and breakline_weight < 1:
+            crossing = crosses_breaklines(
+                lon2[idx], lat2[idx], lon2[i], lat2[i], breaklines
+            )
+            if breakline_weight == 0:
+                idx = idx[~crossing]
+            else:
+                scale = np.where(crossing, breakline_weight, 1.0)
         dist = great_circle_degrees(lat2[i], lon2[i], lat2[idx], lon2[idx])
-        out2[i], _ = _neighborhood_estimate(dist, v2[idx], s2[idx], ssf, method)
+        out2[i], _ = _neighborhood_estimate(dist, v2[idx], s2[idx], ssf, method, scale)
 
     out = np.full(len(lon), np.nan)
     for i, g in enumerate(groups):
@@ -454,6 +481,7 @@ def iterated_median_spatial_filter(
     perturbation: float = 0.2,
     seed: int = 0,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
 ) -> np.ndarray:
     """Median of repeated median spatial filters, each with a perturbed SSF.
 
@@ -476,6 +504,8 @@ def iterated_median_spatial_filter(
         Seed for the perturbations.
     breaklines : sequence of array-like, optional
         Passed to `median_spatial_filter`.
+    breakline_weight : float
+        Passed to `median_spatial_filter`.
 
     Returns
     -------
@@ -491,7 +521,13 @@ def iterated_median_spatial_filter(
         moved[:, 1] = np.minimum.accumulate(np.clip(moved[:, 1], 0, 1))
         fields.append(
             median_spatial_filter(
-                lon, lat, values, sigmas, moved, breaklines=breaklines
+                lon,
+                lat,
+                values,
+                sigmas,
+                moved,
+                breaklines=breaklines,
+                breakline_weight=breakline_weight,
             )
         )
     return np.median(fields, axis=0)
@@ -509,6 +545,7 @@ def msf_interpolate(
     method: Method = "weighted_median",
     robust_network: bool = False,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
     background: ArrayLike | None = None,
     background_weight: ArrayLike | None = None,
 ) -> pd.DataFrame:
@@ -535,9 +572,14 @@ def msf_interpolate(
         Use the full network within the median neighbor distance instead
         of only Delaunay-connected stations (Kreemer et al., 2020).
     breaklines : sequence of array-like, optional
-        Polylines of (lon, lat). Links crossing them leave the neighborhood; see
-        `crosses_breaklines`. A point left with no links is triangulated again using
-        only the stations on its side.
+        Polylines of (lon, lat), see `crosses_breaklines`. A point with every link
+        crossing them is triangulated again using the stations on its side.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`, so that most of an
+        estimate comes from one side. 0 drops them and 1 ignores the breaklines. A point
+        with every link crossing keeps those links at this weight, alongside its own
+        side's stations. The ``"median"`` method has no weights, so it always drops
+        them.
     background : array-like, optional
         One extra datum per evaluation point, such as a plate motion or GIA model,
         inserted into the estimate. NaN means none at that point.
@@ -563,6 +605,9 @@ def msf_interpolate(
     of the median-based MAD - we follow the evident intent.
 
     """
+    _check_breakline_weight(breakline_weight)
+    if method == "median":
+        breakline_weight = 0.0  # no weights to scale, so crossing links are dropped
     lon = np.asarray(lon, float)
     lat = np.asarray(lat, float)
     values = np.asarray(values, float)
@@ -639,18 +684,31 @@ def msf_interpolate(
             iw = np.union1d(iw, np.flatnonzero(dista <= md))
         if not point_has_data:
             iw = np.setdiff1d(iw, [q])
-        if breaklines is not None:
-            iw = iw[~crosses_breaklines(li[iw], bi[iw], lo, la, breaklines)]
-            if iw.size == 0:
+        scale = None
+        if breaklines is not None and breakline_weight < 1:
+            crossing = crosses_breaklines(li[iw], bi[iw], lo, la, breaklines)
+            if crossing.all():
+                far = iw
+                li_far, bi_far, vi_far, si_far = li[far], bi[far], vi[far], si[far]
                 li, bi, vi, si, iw = _same_side_neighbors(
                     lon2, lat2, v2, s2, lo, la, breaklines
                 )
+                if breakline_weight > 0:
+                    # Scaling every link alike would change nothing
+                    scale = np.r_[np.ones(iw.size), np.full(far.size, breakline_weight)]
+                    iw = np.r_[iw, li.size + np.arange(far.size)]
+                    li, bi = np.r_[li, li_far], np.r_[bi, bi_far]
+                    vi, si = np.r_[vi, vi_far], np.r_[si, si_far]
+            elif breakline_weight == 0:
+                iw = iw[~crossing]
+            else:
+                scale = np.where(crossing, breakline_weight, 1.0)
         if iw.size == 0:
             rows.append(row)
             continue
 
         dist = great_circle_degrees(la, lo, bi[iw], li[iw])
-        est, w = _neighborhood_estimate(dist, vi[iw], si[iw], ssf, method)
+        est, w = _neighborhood_estimate(dist, vi[iw], si[iw], ssf, method, scale)
 
         if has_bg:
             data = np.r_[vi[iw], bg]

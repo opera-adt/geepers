@@ -261,10 +261,25 @@ class TestRateGrid:
     def test_breakline_keeps_the_far_plate_out(self):
         stats = self.stats()
         stats.loc[stats.lon < 0, ["ve", "vmsfe"]] = -40.0
-        west = gridding.rate_grid(stats, [-0.1], [0.0], SSF, breaklines=FAULT)
-        east = gridding.rate_grid(stats, [0.1], [0.0], SSF, breaklines=FAULT)
+        kwargs = {"breaklines": FAULT, "breakline_weight": 0.0}
+        west = gridding.rate_grid(stats, [-0.1], [0.0], SSF, **kwargs)
+        east = gridding.rate_grid(stats, [0.1], [0.0], SSF, **kwargs)
         assert west["ve"].iloc[0] == -40.0
         assert east["ve"].iloc[0] == 3.0
+
+    def test_breakline_weight_reaches_the_rates(self):
+        stats = self.stats()
+        stats.loc[stats.lon < 0, ["ve", "vmsfe"]] = -40.0
+        at = ([0.1], [0.0])
+        ignored = gridding.rate_grid(
+            stats, *at, SSF, breaklines=FAULT, breakline_weight=1.0
+        )
+        plain = gridding.rate_grid(stats, *at, SSF)
+        assert ignored["ve"].iloc[0] == plain["ve"].iloc[0]
+        small = gridding.rate_grid(
+            stats, *at, SSF, breaklines=FAULT, breakline_weight=1e-6
+        )
+        assert small["ve"].iloc[0] == 3.0
 
 
 def test_filter_station_rates_removes_an_outlier():
@@ -373,6 +388,15 @@ class TestFillGaps:
         assert fast.x == pytest.approx(general.x, abs=1e-9)
         assert fast.s == pytest.approx(general.s, abs=1e-9)
 
+    def test_breakline_weight_of_one_matches_no_breakline(self):
+        rng = np.random.default_rng(6)
+        gappy = {"S000": slice(100, 140), "S003": slice(0, 30)}
+        plain = noisy_network(rng, gappy)
+        soft = deepcopy(plain)
+        gridding.fill_gaps(plain, SSF)
+        gridding.fill_gaps(soft, SSF, breaklines=FAULT, breakline_weight=1.0)
+        assert soft.x == pytest.approx(plain.x, abs=1e-9)
+
     def test_coincident_stations_still_fill(self):
         stations = network(12)
         stations.loc[1, ["lon", "lat"]] = stations.loc[2, ["lon", "lat"]].to_numpy()
@@ -439,10 +463,19 @@ class TestImagePositions:
                 series[row.id]["east"] = -ramp
         cube = gridding.build_position_cube(series, stations, DAYS, {}, {})
         out = gridding.image_positions(
-            cube, [-0.05, 0.05], [0.0, 0.0], SSF, breaklines=FAULT
+            cube, [-0.05, 0.05], [0.0, 0.0], SSF, breaklines=FAULT, breakline_weight=0.0
         )
         assert out[-1, 0, 0] == pytest.approx(ramp[-1])
         assert out[-1, 1, 0] == pytest.approx(-ramp[-1])
+
+    def test_breakline_weight_reaches_the_imaging(self):
+        cube = noisy_network(np.random.default_rng(7), {})
+        lon, lat = [0.1, -0.1], [0.0, 0.2]
+        plain = gridding.image_positions(cube, lon, lat, SSF)
+        ignored = gridding.image_positions(
+            cube, lon, lat, SSF, breaklines=FAULT, breakline_weight=1.0
+        )
+        assert ignored == pytest.approx(plain, abs=1e-12)
 
     @pytest.mark.parametrize(
         ("weight_by_sigma", "expected"), [(False, 0.0), (True, 100.0)]

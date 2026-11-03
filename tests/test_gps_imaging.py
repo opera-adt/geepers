@@ -8,6 +8,7 @@ from scipy.spatial import Delaunay
 
 from geepers import gps_imaging
 from geepers.gps_imaging import (
+    DEFAULT_BREAKLINE_WEIGHT,
     crosses_breaklines,
     great_circle_degrees,
     iterated_median_spatial_filter,
@@ -180,7 +181,13 @@ class TestBreaklines:
         lon, lat, values, sigmas = self.stations()
         mixed = median_spatial_filter(lon, lat, values, sigmas, method="weighted_mean")
         kept = median_spatial_filter(
-            lon, lat, values, sigmas, method="weighted_mean", breaklines=self.fault
+            lon,
+            lat,
+            values,
+            sigmas,
+            method="weighted_mean",
+            breaklines=self.fault,
+            breakline_weight=0.0,
         )
         assert (np.abs(mixed) < 10).any()
         assert kept == pytest.approx(values)
@@ -196,6 +203,7 @@ class TestBreaklines:
             [0.0, 0.0],
             method="weighted_mean",
             breaklines=self.fault,
+            breakline_weight=0.0,
         )
         assert out["value"].tolist() == pytest.approx([-10.0, 10.0])
         assert out["sigma_rms"].tolist() == pytest.approx([0.0, 0.0], abs=1e-12)
@@ -206,7 +214,14 @@ class TestBreaklines:
         lat = np.array([-0.1, 0.1, 0.0, -1.0, 1.0, 0.0])
         values = np.array([9.0, 9.0, 9.0, 1.0, 1.0, 1.0])
         out = msf_interpolate(
-            lon, lat, values, np.ones(6), [-0.05], [0.0], breaklines=self.fault
+            lon,
+            lat,
+            values,
+            np.ones(6),
+            [-0.05],
+            [0.0],
+            breaklines=self.fault,
+            breakline_weight=0.0,
         )
         assert out["value"].iloc[0] == 1.0
 
@@ -215,6 +230,104 @@ class TestBreaklines:
         plain = msf_interpolate(lon, lat, values, sigmas, [0.5], [0.5])
         none = msf_interpolate(lon, lat, values, sigmas, [0.5], [0.5], breaklines=[])
         assert plain["value"].iloc[0] == none["value"].iloc[0]
+
+    def test_breakline_weight_of_one_ignores_the_breaklines(self):
+        lon, lat, values, sigmas = self.stations()
+        plain = msf_interpolate(lon, lat, values, sigmas, [-0.01], [0.0])
+        ignored = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            [-0.01],
+            [0.0],
+            breaklines=self.fault,
+            breakline_weight=1.0,
+        )
+        assert ignored["value"].iloc[0] == plain["value"].iloc[0]
+
+    def test_penalized_links_contribute_less_but_stay(self):
+        lon, lat, values, sigmas = self.stations()
+        kwargs = {"method": "weighted_mean", "breaklines": self.fault}
+        at = ([-0.01], [0.0])
+        mean = {
+            w: (
+                msf_interpolate(
+                    lon, lat, values, sigmas, *at, breakline_weight=w, **kwargs
+                )["value"].iloc[0]
+            )
+            for w in (0.0, 0.25, 1.0)
+        }
+        assert mean[0.0] == pytest.approx(-10.0)
+        assert mean[0.0] < mean[0.25] < mean[1.0]
+        assert (
+            msf_interpolate(
+                lon, lat, values, sigmas, *at, breakline_weight=0.25, **kwargs
+            )["sigma_rms"].iloc[0]
+            > 0
+        )
+
+    def test_crossing_links_are_penalized_by_default(self):
+        lon, lat, values, sigmas = self.stations()
+        kwargs = {"method": "weighted_mean", "breaklines": self.fault}
+        at = ([-0.01], [0.0])
+        default = msf_interpolate(lon, lat, values, sigmas, *at, **kwargs)
+        explicit = msf_interpolate(
+            lon,
+            lat,
+            values,
+            sigmas,
+            *at,
+            breakline_weight=DEFAULT_BREAKLINE_WEIGHT,
+            **kwargs,
+        )
+        assert 0 < DEFAULT_BREAKLINE_WEIGHT < 1
+        assert default["value"].iloc[0] == explicit["value"].iloc[0]
+
+    def test_filter_penalizes_links_too(self):
+        lon, lat, values, sigmas = self.stations()
+        kwargs = {"method": "weighted_mean", "breaklines": self.fault}
+        dropped = median_spatial_filter(
+            lon, lat, values, sigmas, breakline_weight=0.0, **kwargs
+        )
+        soft = median_spatial_filter(lon, lat, values, sigmas, **kwargs)
+        full = median_spatial_filter(lon, lat, values, sigmas, method="weighted_mean")
+        west = lon < 0
+        assert dropped[west] == pytest.approx(-10.0)
+        assert (soft[west] >= dropped[west]).all()
+        assert (soft[west] <= full[west] + 1e-12).all()
+        assert (soft[west] > dropped[west]).any()
+
+    def test_point_with_every_link_crossing_still_favors_its_own_side(self):
+        lon = np.array([0.1, 0.1, 0.2, -3.0, -3.0, -4.0])
+        lat = np.array([-0.1, 0.1, 0.0, -1.0, 1.0, 0.0])
+        values = np.array([9.0, 9.0, 9.0, 1.0, 1.0, 1.0])
+        out = msf_interpolate(
+            lon,
+            lat,
+            values,
+            np.ones(6),
+            [-0.05],
+            [0.0],
+            breaklines=self.fault,
+            breakline_weight=0.01,
+        )
+        assert out["value"].iloc[0] == 1.0
+
+    @pytest.mark.parametrize("weight", [-0.1, 1.5])
+    def test_breakline_weight_out_of_range_is_refused(self, weight):
+        lon, lat, values, sigmas = self.stations()
+        with pytest.raises(ValueError, match=r"breakline_weight must be in \[0, 1\]"):
+            msf_interpolate(
+                lon, lat, values, sigmas, [0.5], [0.5], breakline_weight=weight
+            )
+
+    def test_median_has_no_weights_so_it_drops_crossing_links(self):
+        lon, lat, values, sigmas = self.stations()
+        out = median_spatial_filter(
+            lon, lat, values, sigmas, method="median", breaklines=self.fault
+        )
+        assert out == pytest.approx(values)
 
 
 class TestBackground:

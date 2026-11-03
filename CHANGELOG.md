@@ -17,7 +17,8 @@ versions follow PEP 440 via setuptools_scm.
   UNR products in a box and score them against the published files.
 - `UnrGridSource.node_series`: one grid point as published, indexed by calendar day.
 - Breaklines in GPS Imaging: `median_spatial_filter` and `msf_interpolate` take
-  `breaklines`, and links crossing a fault or plate boundary leave the neighborhood.
+  `breaklines`. Links crossing a fault or plate boundary stay, with their weight scaled
+  by `breakline_weight` (default 0.25); 0 drops them and 1 ignores the breaklines.
 - `msf_interpolate` takes `background` and `background_weight` for a model datum at
   each point, and reports `sigma_median`.
 - `gps_imaging.crosses_breaklines`, `gps_imaging.iterated_median_spatial_filter`,

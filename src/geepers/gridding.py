@@ -32,6 +32,7 @@ from scipy.spatial import Delaunay, QhullError
 
 from geepers.euler import local_plate_velocity
 from geepers.gps_imaging import (
+    DEFAULT_BREAKLINE_WEIGHT,
     Breaklines,
     great_circle_degrees,
     iterated_median_spatial_filter,
@@ -45,6 +46,7 @@ from geepers.steps import remove_known_steps
 from geepers.variability import rate_variability_index
 
 __all__ = [
+    "DEFAULT_BREAKLINE_WEIGHT",
     "PUBLISHED_SELECTION",
     "PositionCube",
     "SelectionCriteria",
@@ -275,6 +277,7 @@ def filter_station_rates(
     ssf: np.ndarray,
     *,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
     seed: int = 0,
 ) -> pd.DataFrame:
     """Median-spatial-filter the station rates (ATBD section 2.5.3).
@@ -286,7 +289,10 @@ def filter_station_rates(
     ssf : np.ndarray
         Spatial structure function from `make_ssf`.
     breaklines : sequence of array-like, optional
-        Links crossing these are not used.
+        Links crossing these are penalized, see `breakline_weight`.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`. 0 drops them and 1 ignores
+        the breaklines.
     seed : int
         Seed for the SSF perturbations; each component gets its own stream.
 
@@ -306,6 +312,7 @@ def filter_station_rates(
             ssf,
             seed=seed + offset,
             breaklines=breaklines,
+            breakline_weight=breakline_weight,
         )
     return out
 
@@ -453,6 +460,7 @@ def rate_grid(
     *,
     velocity: str = "vmsf",
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
     background: pd.DataFrame | None = None,
     weight: ArrayLike | None = None,
 ) -> pd.DataFrame:
@@ -469,7 +477,10 @@ def rate_grid(
     velocity : str
         Prefix of the rate columns: ``"vmsf"`` for filtered rates, ``"v"`` for raw.
     breaklines : sequence of array-like, optional
-        Links crossing these are not used.
+        Links crossing these are penalized, see `breakline_weight`.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`. 0 drops them and 1 ignores
+        the breaklines.
     background : pd.DataFrame, optional
         Model rates per point in ``v?`` columns; absent components have none.
     weight : array-like, optional
@@ -495,6 +506,7 @@ def rate_grid(
             lat,
             ssf,
             breaklines=breaklines,
+            breakline_weight=breakline_weight,
             **kwargs,
         )
         out[f"v{c}"] = est["value"].to_numpy()
@@ -718,6 +730,7 @@ def _difference_at_target(
                 [lat[j]],
                 _WORKER["ssf"],
                 breaklines=_WORKER["breaklines"],
+                breakline_weight=_WORKER["breakline_weight"],
             ).iloc[0]
         except Exception:
             return None
@@ -796,6 +809,7 @@ def fill_gaps(
     ssf: np.ndarray,
     *,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
     n_workers: int = 1,
     passes: int = 2,
     weight_by_sigma: bool = False,
@@ -813,7 +827,10 @@ def fill_gaps(
     ssf : np.ndarray
         Spatial structure function from `make_ssf`.
     breaklines : sequence of array-like, optional
-        Neighbours across these are not used.
+        Links crossing these are penalized, see `breakline_weight`.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`. 0 drops them and 1 ignores
+        the breaklines.
     n_workers : int
         Processes.
     passes : int
@@ -839,6 +856,7 @@ def fill_gaps(
             "lat": cube.lat,
             "ssf": ssf,
             "breaklines": breaklines,
+            "breakline_weight": breakline_weight,
             "earthquakes": cube.earthquakes,
             "weight_by_sigma": weight_by_sigma,
             "share_neighborhoods": share,
@@ -868,6 +886,7 @@ def _image_one_day(day: int) -> np.ndarray:
             _WORKER["node_lat"],
             _WORKER["ssf"],
             breaklines=_WORKER["breaklines"],
+            breakline_weight=_WORKER["breakline_weight"],
         )["value"].to_numpy()
     return out
 
@@ -894,6 +913,7 @@ def image_positions(
     ssf: np.ndarray,
     *,
     breaklines: Breaklines | None = None,
+    breakline_weight: float = DEFAULT_BREAKLINE_WEIGHT,
     n_workers: int = 1,
     weight_by_sigma: bool = False,
 ) -> np.ndarray:
@@ -912,7 +932,10 @@ def image_positions(
     ssf : np.ndarray
         Spatial structure function from `make_ssf`.
     breaklines : sequence of array-like, optional
-        Links crossing these are not used.
+        Links crossing these are penalized, see `breakline_weight`.
+    breakline_weight : float
+        Multiplies the weight of links crossing `breaklines`. 0 drops them and 1 ignores
+        the breaklines.
     n_workers : int
         Processes.
     weight_by_sigma : bool
@@ -951,6 +974,7 @@ def image_positions(
         "lat": cube.lat,
         "ssf": ssf,
         "breaklines": breaklines,
+        "breakline_weight": breakline_weight,
         "weight_by_sigma": weight_by_sigma,
         "node_lon": node_lon,
         "node_lat": node_lat,
