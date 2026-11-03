@@ -764,8 +764,11 @@ gridding.fill_gaps(cube, ssf, breaklines=faults, n_workers=32)
 daily = gridding.image_positions(cube, lon_g, lat_g, ssf, breaklines=faults, n_workers=32)
 ```
 
-`faults` is a list of (lon, lat) polylines. Delaunay links that cross one leave every
-neighborhood, in the filter, the gap filling and the imaging.
+`faults` is a list of (lon, lat) polylines. Delaunay links that cross one stay in the
+neighborhood at reduced weight, in the filter, the gap filling and the imaging, so most of
+an estimate comes from its own side. `breakline_weight` sets the factor, 0.25 by default: 0
+drops those links and 1 ignores the breaklines. `background_rates` still leaves out stations
+across a breakline.
 
 Daily filling and imaging weight by distance alone, unlike the rates: replaying UNR's
 Version 0.3 medians in Southern California, that picks its winning station on 82-87% of
