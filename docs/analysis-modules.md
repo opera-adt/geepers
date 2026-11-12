@@ -447,6 +447,35 @@ grid = msf_interpolate(lon, lat, v_up, sigma_up, lon_grid, lat_grid, ssf)
 grid[["value", "sigma_robust", "n_stations"]]
 ```
 
+## Smooth imaging with uncertainties (`geepers.structure_kriging`)
+
+GPS Imaging gives a surface that steps where the median changes station, and
+an uncertainty with no term for the distance to the stations. This module
+interpolates the same rates by local kriging, with the spatial structure
+function measured from the stations as the variogram, so the uncertainty of a
+point grows with its distance from the stations and with the local roughness.
+Keep the median filter to decide which stations are outliers, and krige the
+raw rates of the rest.
+
+```python
+from geepers import structure_kriging as sk
+
+g = sk.structure(lon, lat, v_up)                   # scatter^2 against separation
+grid = sk.krige(lon, lat, v_up, sigma_up, lon_grid, lat_grid, g, positive=True)
+grid[["value", "sigma", "km"]]
+
+# horizontal rates carry tectonic gradients: estimate about a local plane,
+# used only where the stations show one
+g_plane = sk.structure(lon, lat, sk.detrend(lon, lat, v_east))
+east = sk.krige(lon, lat, v_east, sigma_east, lon_grid, lat_grid, g_plane,
+                trend=True, g_plain=sk.structure(lon, lat, v_east),
+                breaklines=faults, positive=True)
+east["sigma_total"].where(east["planar"] == 1, east["sigma"])
+```
+
+`sigma` is that of the smooth field; `sigma_total` adds the local scatter of
+the stations, which is unmodelled signal where a plane was used.
+
 ## Least-squares collocation (`geepers.collocation`)
 
 Geostatistical interpolation of horizontal (or scalar) velocity fields
