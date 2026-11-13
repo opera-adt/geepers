@@ -254,7 +254,7 @@ def write_viewer(rates: pd.DataFrame, out: Path, start: str = "2016-01-01") -> P
 
 
 def rates_from_unr(
-    cache_dir: Path | None, bbox: Sequence[float], workers: int
+    cache_dir: Path | None, bbox: tuple[float, float, float, float], workers: int
 ) -> pd.DataFrame:
     """Compute MIDAS station rates from UNR positions, as recreate-unr-grid.py does."""
     here = Path(__file__).resolve().parent
@@ -267,7 +267,7 @@ def rates_from_unr(
     sys.modules[spec.name] = recreate
     spec.loader.exec_module(recreate)
     source = UnrSource(cache_dir=None if cache_dir is None else cache_dir / "stations")
-    sites = pd.DataFrame(source.stations(bbox=tuple(bbox)))[["id", "lon", "lat"]]
+    sites = pd.DataFrame(source.stations(bbox=bbox))[["id", "lon", "lat"]]
     sites = sites.drop_duplicates("id").reset_index(drop=True)
     steps = source.steps(list(sites.id))
     table = recreate.reconnaissance(
@@ -343,9 +343,9 @@ def run(args: argparse.Namespace, nodes: pd.DataFrame | None = None) -> dict[str
         flush=True,
     )
     if nodes is None:
-        nodes = pd.DataFrame(
-            UnrGridSource(version="0.3").stations(bbox=tuple(args.bbox))
-        )
+        west, south, east, north = args.bbox
+        grid = UnrGridSource(version="0.3")
+        nodes = pd.DataFrame(grid.stations(bbox=(west, south, east, north)))
     rates = image_nodes(prepared, nodes[["id", "lon", "lat"]], args.workers)
     rates.to_parquet(args.output / "rates.parquet", index=False)
     written = {
