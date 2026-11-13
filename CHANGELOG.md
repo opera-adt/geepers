@@ -17,6 +17,11 @@ versions follow PEP 440 via setuptools_scm.
 
 ### Added
 
+- `geepers.structure_kriging`: image station rates as a smooth surface with uncertainties.
+  The spatial structure function, measured from the stations, is used as the variogram of a
+  local kriging, so the uncertainty of a point grows with its distance from the stations and
+  with the local roughness. Options: a local plane as drift, used only where the stations
+  show one; breaklines; non-negative weights against extrapolation.
 - `geepers.gridding`: rebuild UNR-style gridded rates and daily time series from
   station positions, after the OPERA DISP-CAL ATBD: station selection, declustering,
   spatial gap filling and daily imaging. Daily filling and imaging weight by distance
