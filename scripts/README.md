@@ -258,3 +258,29 @@ Northern Nevada takes about 2 minutes on 32 workers, including the downloads. Wi
 kilometers away. Boxes do not wrap the dateline. See
 [the notebook](../docs/notebooks/gps_imaging_unr_grid.ipynb) for each step, and for what is
 documented and what is inferred.
+
+## Regenerating the UNR time-constant grid
+
+`regenerate-unr-grid.py` rebuilds the time-constant grid on the nodes of UNR
+Version 0.3 as a smooth surface with uncertainties: station rates screened with the
+GPS Imaging median filter, stations of deforming areas left out of the vertical, and
+the rest kriged with `geepers.structure_kriging` (horizontals about a local plane where
+the stations show one; breaklines cut the horizontals only).
+
+```bash
+python regenerate-unr-grid.py --stations station_rates.parquet -o grid \
+    --areas deforming_areas.geojson --breaklines breaklines.geojson --viewer
+python -m http.server 8123   # then browse_unr_grid.html?data=grid/viewer.parquet
+```
+
+`--rates-from-unr` computes the station rates instead (MIDAS from UNR positions,
+avoiding catalogued steps). The output opens like the published grid:
+
+```python
+from geepers.gps_sources import UnrGridSource
+grid = UnrGridSource(version="0.3", gridded_type="constant", cache_dir="grid")
+grid.node_series(9600)
+```
+
+`UnrGridSource` looks for node files in `<cache_dir>/unrgrid/` and downloads the
+published file from UNR, without warning, for any node it does not find there.

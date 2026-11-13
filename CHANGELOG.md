@@ -22,6 +22,9 @@ versions follow PEP 440 via setuptools_scm.
   local kriging, so the uncertainty of a point grows with its distance from the stations and
   with the local roughness. Options: a local plane as drift, used only where the stations
   show one; breaklines; non-negative weights against extrapolation.
+- `scripts/regenerate-unr-grid.py`: regenerate the UNR time-constant grid as a smooth
+  surface with uncertainties (`geepers.structure_kriging`), with deforming areas left out
+  of the vertical; the output opens with `UnrGridSource` and in `browse_unr_grid.html`.
 - `geepers.gridding`: rebuild UNR-style gridded rates and daily time series from
   station positions, after the OPERA DISP-CAL ATBD: station selection, declustering,
   spatial gap filling and daily imaging. Daily filling and imaging weight by distance
