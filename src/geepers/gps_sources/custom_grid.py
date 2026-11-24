@@ -38,7 +38,7 @@ class CustomGridSource(UnrGridSource):
 
     Examples
     --------
-    >>> grid = CustomGridSource.from_snapshot("unr_grid_opera-..._IGS20_20261123")
+    >>> grid = CustomGridSource.from_snapshot("snapshot_dir")  # doctest: +SKIP
     >>> grid.stations(bbox=(-122.6, 36.3, -120.3, 38.3))  # doctest: +SKIP
     >>> grid.timeseries("043500")  # doctest: +SKIP
 
